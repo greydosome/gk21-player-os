@@ -1,0 +1,56 @@
+#!/bin/bash
+set -euo pipefail
+
+PROJECT_DIR="/home/rocky/gk21"
+
+case "${1:-help}" in
+  home)
+    cd "$PROJECT_DIR"
+    exec bash
+    ;;
+
+  status)
+    cd "$PROJECT_DIR"
+    git status
+    ;;
+
+  deploy)
+    sudo "$PROJECT_DIR/scripts/deploy.sh"
+    ;;
+
+  backup)
+    sudo /postgres/scripts/backup_gk21.sh
+    ;;
+
+  logs)
+    tail -n 50 /postgres/logs/backup_gk21.log
+    ;;
+
+  cron)
+    cat /etc/cron.d/gk21_backup
+    ;;
+
+  db)
+    sudo -u postgres psql -d gk21
+    ;;
+
+  tree)
+    tree -L 2 "$PROJECT_DIR"
+    ;;
+
+  help|*)
+    cat <<HELP
+GK21 CLI
+
+Usage:
+  gk home      프로젝트 디렉토리 이동
+  gk status    Git 상태 확인
+  gk deploy    운영 스크립트 배포
+  gk backup    DB 백업 실행
+  gk logs      백업 로그 확인
+  gk cron      크론 설정 확인
+  gk db        gk21 DB 접속
+  gk tree      프로젝트 트리 확인
+HELP
+    ;;
+esac
