@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 
+from app.api import ai_analysis
 from app.api import day
 from app.api import db
+from app.api import dashboard
 from app.api import health
 
 app = FastAPI(
@@ -12,3 +14,5 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(db.router)
 app.include_router(day.router)
+app.include_router(dashboard.router)
+app.include_router(ai_analysis.router)
