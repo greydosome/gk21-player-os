@@ -23,17 +23,21 @@ def _build_ai_response(row):
 
         "lookback_days": data.get("lookback_days"),
 
-        "provider": data.get("provider"),
+        "overview": {
 
-        "model_name": data.get("model_name"),
+            "score": data.get("overall_score"),
 
-        "prompt_version": data.get("prompt_version"),
+            "confidence": data.get("confidence"),
 
-        "ai_status": data.get("ai_status"),
+            "status": data.get("ai_status"),
 
-        "overall_score": data.get("overall_score"),
+            "provider": data.get("provider"),
 
-        "confidence": data.get("confidence"),
+            "model_name": data.get("model_name"),
+
+            "prompt_version": data.get("prompt_version"),
+
+        },
 
         "summary": data.get("summary"),
 
@@ -42,18 +46,6 @@ def _build_ai_response(row):
         "weakness": data.get("weakness"),
 
         "next_goal": data.get("next_goal"),
-
-        "comments": {
-
-            "body": data.get("body_comment"),
-
-            "workout": data.get("workout_comment"),
-
-            "meal": data.get("meal_comment"),
-
-            "sleep": data.get("sleep_comment"),
-
-        },
 
         "cards": {
 
@@ -67,29 +59,29 @@ def _build_ai_response(row):
 
         },
 
+        "comments": {
+
+            "body": data.get("body_comment"),
+
+            "meal": data.get("meal_comment"),
+
+            "workout": data.get("workout_comment"),
+
+            "sleep": data.get("sleep_comment"),
+
+        },
+
         "recommendations": {
 
-            "exercises": detail.get("recommended_exercises") or [],
+            "exercise": detail.get("recommended_exercises") or [],
 
-            "nutrition_focus": detail.get("nutrition_focus") or [],
-
-            "risk_factors": detail.get("risk_factors") or [],
-
-            "motivation": detail.get("motivation"),
+            "nutrition": detail.get("nutrition_focus") or [],
 
         },
 
-        "usage": {
+        "risk_factors": detail.get("risk_factors") or [],
 
-            "latency_ms": data.get("latency_ms"),
-
-            "token_input": data.get("token_input"),
-
-            "token_output": data.get("token_output"),
-
-            "cost_usd": data.get("cost_usd"),
-
-        },
+        "motivation": detail.get("motivation"),
 
         "error_message": data.get("error_message"),
 
@@ -140,14 +132,6 @@ def get_daily_ai_analysis(target_date: date):
             a.sleep_comment,
 
             a.analysis_detail,
-
-            a.latency_ms,
-
-            a.token_input,
-
-            a.token_output,
-
-            a.cost_usd,
 
             a.error_message,
 
