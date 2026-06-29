@@ -15,7 +15,6 @@ def get_today(target_date: date):
     """)
 
     with engine.connect() as conn:
-
         row = conn.execute(
             sql,
             {
@@ -30,11 +29,15 @@ def save_day(req):
 
     with engine.begin() as conn:
 
+        #################################################
+        # day_record UPSERT
+        #################################################
+
         existing = conn.execute(
             text("""
                 SELECT day_record_id
                 FROM day_record
-                WHERE record_date=:record_date
+                WHERE record_date = :record_date
             """),
             {
                 "record_date": req.record_date
@@ -55,34 +58,116 @@ def save_day(req):
                     WHERE day_record_id=:day_record_id
                 """),
                 {
-                    **req.model_dump(),
-                    "day_record_id": existing
+                    "day_record_id": existing,
+                    "score": req.score,
+                    "grade": req.grade,
+                    "mood_score": req.mood_score,
+                    "memo": req.memo
                 }
             )
 
-            return existing
+            day_record_id = existing
 
-        day_record_id = conn.execute(
-            text("""
-                INSERT INTO day_record
-                (
-                    record_date,
-                    score,
-                    grade,
-                    mood_score,
-                    memo
-                )
-                VALUES
-                (
-                    :record_date,
-                    :score,
-                    :grade,
-                    :mood_score,
-                    :memo
-                )
-                RETURNING day_record_id
-            """),
-            req.model_dump()
-        ).scalar_one()
+        else:
 
-        return day_record_id
+            day_record_id = conn.execute(
+                text("""
+                    INSERT INTO day_record
+                    (
+                        record_date,
+                        score,
+                        grade,
+                        mood_score,
+                        memo
+                    )
+                    VALUES
+                    (
+                        :record_date,
+                        :score,
+                        :grade,
+                        :mood_score,
+                        :memo
+                    )
+                    RETURNING day_record_id
+                """),
+                {
+                    "record_date": req.record_date,
+                    "score": req.score,
+                    "grade": req.grade,
+                    "mood_score": req.mood_score,
+                    "memo": req.memo
+                }
+            ).scalar_one()
+
+        #################################################
+        # body_record UPSERT
+        #################################################
+
+        if req.body is not None:
+
+            body_exists = conn.execute(
+                text("""
+                    SELECT body_record_id
+                    FROM body_record
+                    WHERE day_record_id=:day_record_id
+                """),
+                {
+                    "day_record_id": day_record_id
+                }
+            ).scalar()
+
+            params = {
+                "day_record_id": day_record_id,
+                "weight_kg": req.body.weight_kg,
+                "waist_cm": req.body.waist_cm,
+                "water_liter": req.body.water_liter,
+                "protein_gram": req.body.protein_gram,
+                "binge_yn": req.body.binge_yn,
+            }
+
+            if body_exists:
+
+                params["body_record_id"] = body_exists
+
+                conn.execute(
+                    text("""
+                        UPDATE body_record
+                        SET
+                            weight_kg=:weight_kg,
+                            waist_cm=:waist_cm,
+                            water_liter=:water_liter,
+                            protein_gram=:protein_gram,
+                            binge_yn=:binge_yn,
+                            updated_at=now()
+                        WHERE body_record_id=:body_record_id
+                    """),
+                    params
+                )
+
+            else:
+
+                conn.execute(
+                    text("""
+                        INSERT INTO body_record
+                        (
+                            day_record_id,
+                            weight_kg,
+                            waist_cm,
+                            water_liter,
+                            protein_gram,
+                            binge_yn
+                        )
+                        VALUES
+                        (
+                            :day_record_id,
+                            :weight_kg,
+                            :waist_cm,
+                            :water_liter,
+                            :protein_gram,
+                            :binge_yn
+                        )
+                    """),
+                    params
+                )
+
+    return day_record_id
