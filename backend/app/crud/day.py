@@ -50,12 +50,12 @@ def save_day(req):
                 text("""
                     UPDATE day_record
                     SET
-                        score=:score,
-                        grade=:grade,
-                        mood_score=:mood_score,
-                        memo=:memo,
-                        updated_at=now()
-                    WHERE day_record_id=:day_record_id
+                        score = :score,
+                        grade = :grade,
+                        mood_score = :mood_score,
+                        memo = :memo,
+                        updated_at = now()
+                    WHERE day_record_id = :day_record_id
                 """),
                 {
                     "day_record_id": existing,
@@ -109,7 +109,7 @@ def save_day(req):
                 text("""
                     SELECT body_record_id
                     FROM body_record
-                    WHERE day_record_id=:day_record_id
+                    WHERE day_record_id = :day_record_id
                 """),
                 {
                     "day_record_id": day_record_id
@@ -133,13 +133,13 @@ def save_day(req):
                     text("""
                         UPDATE body_record
                         SET
-                            weight_kg=:weight_kg,
-                            waist_cm=:waist_cm,
-                            water_liter=:water_liter,
-                            protein_gram=:protein_gram,
-                            binge_yn=:binge_yn,
-                            updated_at=now()
-                        WHERE body_record_id=:body_record_id
+                            weight_kg = :weight_kg,
+                            waist_cm = :waist_cm,
+                            water_liter = :water_liter,
+                            protein_gram = :protein_gram,
+                            binge_yn = :binge_yn,
+                            updated_at = now()
+                        WHERE body_record_id = :body_record_id
                     """),
                     params
                 )
@@ -165,6 +165,73 @@ def save_day(req):
                             :water_liter,
                             :protein_gram,
                             :binge_yn
+                        )
+                    """),
+                    params
+                )
+
+        #################################################
+        # workout_record UPSERT
+        #################################################
+
+        if req.workout is not None:
+
+            workout_exists = conn.execute(
+                text("""
+                    SELECT workout_record_id
+                    FROM workout_record
+                    WHERE day_record_id = :day_record_id
+                """),
+                {
+                    "day_record_id": day_record_id
+                }
+            ).scalar()
+
+            params = {
+                "day_record_id": day_record_id,
+                "planned_workout": req.workout.planned_workout,
+                "completed_workout": req.workout.completed_workout,
+                "bike_minutes": req.workout.bike_minutes,
+                "workout_done_yn": req.workout.workout_done_yn,
+            }
+
+            if workout_exists:
+
+                params["workout_record_id"] = workout_exists
+
+                conn.execute(
+                    text("""
+                        UPDATE workout_record
+                        SET
+                            planned_workout = :planned_workout,
+                            completed_workout = :completed_workout,
+                            bike_minutes = :bike_minutes,
+                            workout_done_yn = :workout_done_yn,
+                            updated_at = now()
+                        WHERE workout_record_id = :workout_record_id
+                    """),
+                    params
+                )
+
+            else:
+
+                conn.execute(
+                    text("""
+                        INSERT INTO workout_record
+                        (
+                            day_record_id,
+                            planned_workout,
+                            completed_workout,
+                            bike_minutes,
+                            workout_done_yn
+                        )
+                        VALUES
+                        (
+                            :day_record_id,
+                            :planned_workout,
+                            :completed_workout,
+                            :bike_minutes,
+                            :workout_done_yn
                         )
                     """),
                     params
