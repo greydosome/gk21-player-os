@@ -5,6 +5,7 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.session import engine
+from app.schemas.day import DayRecordRequest
 
 
 app = FastAPI(
@@ -75,4 +76,38 @@ def get_today(record_date: date | None = Query(default=None)):
         "success": True,
         "record_date": str(target_date),
         "record": dict(row) if row else None,
+    }
+
+
+@app.post("/api/day")
+def save_day(req: DayRecordRequest):
+    sql = text("""
+        INSERT INTO day_record
+        (
+            record_date,
+            score,
+            grade,
+            mood_score,
+            memo
+        )
+        VALUES
+        (
+            :record_date,
+            :score,
+            :grade,
+            :mood_score,
+            :memo
+        )
+        RETURNING day_record_id
+    """)
+
+    with engine.begin() as conn:
+        day_record_id = conn.execute(
+            sql,
+            req.model_dump()
+        ).scalar_one()
+
+    return {
+        "success": True,
+        "day_record_id": day_record_id,
     }
