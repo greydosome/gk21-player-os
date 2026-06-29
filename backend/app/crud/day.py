@@ -3,6 +3,14 @@ from datetime import date
 
 from sqlalchemy import text
 
+from app.ai.context import get_ai_context
+
+from app.ai.metrics import calculate_ai_metrics
+
+from app.ai.rule_engine import build_daily_rule_analysis
+
+from app.ai.saver import save_ai_analysis
+
 from app.db.session import engine
 
 from app.crud.body import save_body
@@ -165,6 +173,28 @@ def save_day_record(conn, req):
 
     return day_record_id
 
+def generate_daily_ai_analysis(conn, day_record_id, record_date):
+
+    context = get_ai_context(record_date)
+
+    metrics = calculate_ai_metrics(context)
+
+    analysis = build_daily_rule_analysis(context, metrics)
+
+    save_ai_analysis(
+
+        conn=conn,
+
+        day_record_id=day_record_id,
+
+        context=context,
+
+        metrics=metrics,
+
+        analysis=analysis
+
+    )
+
 def save_day(req):
 
     with engine.begin() as conn:
@@ -178,6 +208,8 @@ def save_day(req):
         save_meal(conn, day_record_id, req.meal)
 
         save_sleep(conn, day_record_id, req.sleep)
+
+        generate_daily_ai_analysis(conn, day_record_id, req.record_date)
 
     return day_record_id
 
