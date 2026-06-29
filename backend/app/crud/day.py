@@ -2,7 +2,7 @@ from datetime import date
 
 from sqlalchemy import text
 
-from app.ai.analysis_service import generate_daily_ai_analysis
+from app.ai.analysis_service import generate_daily_rule_analysis
 from app.crud.body import save_body
 from app.crud.meal import save_meal
 from app.crud.sleep import save_sleep
@@ -11,7 +11,6 @@ from app.db.session import engine
 
 
 def get_today(target_date: date):
-
     sql = text("""
         SELECT *
         FROM v_day_record_summary
@@ -22,29 +21,23 @@ def get_today(target_date: date):
     with engine.connect() as conn:
         row = conn.execute(
             sql,
-            {
-                "record_date": target_date
-            }
+            {"record_date": target_date}
         ).mappings().first()
 
     return dict(row) if row else None
 
 
 def save_day_record(conn, req):
-
     existing = conn.execute(
         text("""
             SELECT day_record_id
             FROM day_record
             WHERE record_date = :record_date
         """),
-        {
-            "record_date": req.record_date
-        }
+        {"record_date": req.record_date}
     ).scalar()
 
     if existing:
-
         conn.execute(
             text("""
                 UPDATE day_record
@@ -64,7 +57,6 @@ def save_day_record(conn, req):
                 "memo": req.memo
             }
         )
-
         return existing
 
     return conn.execute(
@@ -98,9 +90,7 @@ def save_day_record(conn, req):
 
 
 def save_day(req):
-
     with engine.begin() as conn:
-
         day_record_id = save_day_record(conn, req)
 
         save_body(conn, day_record_id, req.body)
@@ -108,7 +98,7 @@ def save_day(req):
         save_meal(conn, day_record_id, req.meal)
         save_sleep(conn, day_record_id, req.sleep)
 
-        generate_daily_ai_analysis(
+        generate_daily_rule_analysis(
             conn=conn,
             day_record_id=day_record_id,
             record_date=req.record_date
