@@ -73,13 +73,95 @@ def get_ai_context(target_date: date):
 
         ).mappings().all()
 
+        profile = conn.execute(
+
+            text("""
+
+                SELECT
+
+                    nickname,
+
+                    height_cm,
+
+                    birth_date,
+
+                    gender
+
+                FROM user_profile
+
+                LIMIT 1
+
+            """)
+
+        ).mappings().first()
+
+        goal = conn.execute(
+
+            text("""
+
+                SELECT
+
+                    goal_type,
+
+                    target_weight_kg,
+
+                    target_body_fat_percent,
+
+                    target_waist_cm,
+
+                    target_water_liter,
+
+                    target_protein_gram,
+
+                    target_calorie,
+
+                    weekly_workout_goal,
+
+                    workout_style
+
+                FROM user_goal
+
+                WHERE goal_status='ACTIVE'
+
+                LIMIT 1
+
+            """)
+
+        ).mappings().first()
+
+        setting = conn.execute(
+
+            text("""
+
+                SELECT
+
+                    ai_personality,
+
+                    language,
+
+                    timezone
+
+                FROM user_setting
+
+                LIMIT 1
+
+            """)
+
+        ).mappings().first()
+
     return {
 
         "target_date": str(target_date),
 
         "today": dict(today) if today else {},
 
-        "history": [dict(x) for x in history]
+        "history": [dict(x) for x in history],
+
+        "profile": dict(profile) if profile else {},
+
+        "goal": dict(goal) if goal else {},
+
+        "setting": dict(setting) if setting else {}
 
     }
 
