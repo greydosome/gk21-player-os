@@ -19,6 +19,8 @@ class Settings:
 
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 
+    database_url: str = DATABASE_URL
+
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
     AI_PROVIDER: str = os.getenv("AI_PROVIDER", "OPENAI")
