@@ -243,3 +243,143 @@ def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
 
     )
 
+def update_ai_analysis_from_llm(conn, day_record_id, llm_result):
+
+    analysis = llm_result.get("analysis") or {}
+
+    params = {
+
+        "day_record_id": day_record_id,
+
+        "analysis_type": "DAILY",
+
+        "provider": llm_result.get("provider"),
+
+        "model_name": llm_result.get("model_name"),
+
+        "prompt_version": llm_result.get("prompt_version"),
+
+        "latency_ms": llm_result.get("latency_ms"),
+
+        "token_input": llm_result.get("token_input"),
+
+        "token_output": llm_result.get("token_output"),
+
+        "overall_score": analysis.get("overall_score"),
+
+        "summary": analysis.get("summary"),
+
+        "strength": analysis.get("strength"),
+
+        "weakness": analysis.get("weakness"),
+
+        "next_goal": analysis.get("next_goal"),
+
+        "body_comment": analysis.get("body_comment"),
+
+        "workout_comment": analysis.get("workout_comment"),
+
+        "meal_comment": analysis.get("meal_comment"),
+
+        "sleep_comment": analysis.get("sleep_comment"),
+
+        "confidence": analysis.get("confidence"),
+
+        "analysis_detail": json.dumps(analysis, ensure_ascii=False, default=str),
+
+    }
+
+    conn.execute(
+
+        text("""
+
+            UPDATE ai_analysis
+
+            SET
+
+                provider = :provider,
+
+                model_name = :model_name,
+
+                prompt_version = :prompt_version,
+
+                ai_status = 'COMPLETED',
+
+                latency_ms = :latency_ms,
+
+                token_input = :token_input,
+
+                token_output = :token_output,
+
+                overall_score = :overall_score,
+
+                summary = :summary,
+
+                strength = :strength,
+
+                weakness = :weakness,
+
+                next_goal = :next_goal,
+
+                body_comment = :body_comment,
+
+                workout_comment = :workout_comment,
+
+                meal_comment = :meal_comment,
+
+                sleep_comment = :sleep_comment,
+
+                confidence = :confidence,
+
+                analysis_detail = CAST(:analysis_detail AS jsonb),
+
+                completed_at = now(),
+
+                error_message = NULL,
+
+                updated_at = now()
+
+            WHERE day_record_id = :day_record_id
+
+              AND analysis_type = :analysis_type
+
+        """),
+
+        params
+
+    )
+
+def mark_ai_analysis_failed(conn, day_record_id, error_message):
+
+    conn.execute(
+
+        text("""
+
+            UPDATE ai_analysis
+
+            SET
+
+                ai_status = 'FAILED',
+
+                error_message = :error_message,
+
+                completed_at = now(),
+
+                updated_at = now()
+
+            WHERE day_record_id = :day_record_id
+
+              AND analysis_type = 'DAILY'
+
+        """),
+
+        {
+
+            "day_record_id": day_record_id,
+
+            "error_message": str(error_message)[:2000],
+
+        }
+
+    )
+
