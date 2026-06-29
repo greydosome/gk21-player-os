@@ -39,6 +39,20 @@ class MealRecord(BaseModel):
 
     meal_score: int | None = None
 
+
+
+class SleepRecord(BaseModel):
+
+    sleep_start_time: str | None = None
+
+    sleep_end_time: str | None = None
+
+    sleep_hours: float | None = None
+
+    sleep_quality_score: int | None = None
+
+    wake_condition: str | None = None
+
 class DayRecordRequest(BaseModel):
 
     record_date: date
@@ -56,4 +70,6 @@ class DayRecordRequest(BaseModel):
     workout: WorkoutRecord | None = None
 
     meal: MealRecord | None = None
+
+    sleep: SleepRecord | None = None
 
