@@ -11,6 +11,13 @@ class BodyRecord(BaseModel):
     binge_yn: bool | None = None
 
 
+class WorkoutRecord(BaseModel):
+    planned_workout: str | None = None
+    completed_workout: str | None = None
+    bike_minutes: int | None = None
+    workout_done_yn: bool | None = None
+
+
 class DayRecordRequest(BaseModel):
     record_date: date
     score: int
@@ -19,3 +26,4 @@ class DayRecordRequest(BaseModel):
     memo: str | None = None
 
     body: BodyRecord | None = None
+    workout: WorkoutRecord | None = None
