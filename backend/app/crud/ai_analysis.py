@@ -5,6 +5,100 @@ from sqlalchemy import text
 
 from app.db.session import engine
 
+def _build_ai_response(row):
+
+    if row is None:
+
+        return None
+
+    data = dict(row)
+
+    detail = data.get("analysis_detail") or {}
+
+    return {
+
+        "analysis_id": data.get("analysis_id"),
+
+        "analysis_type": data.get("analysis_type"),
+
+        "lookback_days": data.get("lookback_days"),
+
+        "provider": data.get("provider"),
+
+        "model_name": data.get("model_name"),
+
+        "prompt_version": data.get("prompt_version"),
+
+        "ai_status": data.get("ai_status"),
+
+        "overall_score": data.get("overall_score"),
+
+        "confidence": data.get("confidence"),
+
+        "summary": data.get("summary"),
+
+        "strength": data.get("strength"),
+
+        "weakness": data.get("weakness"),
+
+        "next_goal": data.get("next_goal"),
+
+        "comments": {
+
+            "body": data.get("body_comment"),
+
+            "workout": data.get("workout_comment"),
+
+            "meal": data.get("meal_comment"),
+
+            "sleep": data.get("sleep_comment"),
+
+        },
+
+        "cards": {
+
+            "today": detail.get("today_card"),
+
+            "week": detail.get("week_card"),
+
+            "goal": detail.get("goal_card"),
+
+            "coach": detail.get("coach_card"),
+
+        },
+
+        "recommendations": {
+
+            "exercises": detail.get("recommended_exercises") or [],
+
+            "nutrition_focus": detail.get("nutrition_focus") or [],
+
+            "risk_factors": detail.get("risk_factors") or [],
+
+            "motivation": detail.get("motivation"),
+
+        },
+
+        "usage": {
+
+            "latency_ms": data.get("latency_ms"),
+
+            "token_input": data.get("token_input"),
+
+            "token_output": data.get("token_output"),
+
+            "cost_usd": data.get("cost_usd"),
+
+        },
+
+        "error_message": data.get("error_message"),
+
+        "created_at": data.get("created_at"),
+
+        "updated_at": data.get("updated_at"),
+
+    }
+
 def get_daily_ai_analysis(target_date: date):
 
     sql = text("""
@@ -89,5 +183,5 @@ def get_daily_ai_analysis(target_date: date):
 
         ).mappings().first()
 
-    return dict(row) if row else None
+    return _build_ai_response(row)
 
