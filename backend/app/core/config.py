@@ -1,18 +1,31 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
+import os
 
-class Settings(BaseSettings):
-    app_name: str = "GK21 Player OS"
-    app_env: str = "dev"
-    database_url: str
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4.1-mini"
+from pathlib import Path
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+from dotenv import load_dotenv
 
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+ENV_PATH = BASE_DIR / ".env"
+
+load_dotenv(dotenv_path=ENV_PATH)
+
+class Settings:
+
+    APP_NAME: str = os.getenv("APP_NAME", "GK21 Player OS")
+
+    APP_ENV: str = os.getenv("APP_ENV", "dev")
+
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+
+    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "OPENAI")
+
+    AI_MODEL: str = os.getenv("AI_MODEL", "gpt-5.5")
+
+    AI_PROMPT_VERSION: str = os.getenv("AI_PROMPT_VERSION", "v1.0.0")
 
 settings = Settings()
+
