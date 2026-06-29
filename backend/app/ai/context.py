@@ -7,37 +7,19 @@ from app.db.session import engine
 
 def get_ai_context(target_date: date):
 
-    sql_today = text("""
-
-        SELECT *
-
-        FROM v_day_record_summary
-
-        WHERE record_date = :record_date
-
-        LIMIT 1
-
-    """)
-
-    sql_recent = text("""
-
-        SELECT *
-
-        FROM v_day_record_summary
-
-        WHERE record_date <= :record_date
-
-        ORDER BY record_date DESC
-
-        LIMIT :limit_count
-
-    """)
-
     with engine.connect() as conn:
 
-        today_row = conn.execute(
+        today = conn.execute(
 
-            sql_today,
+            text("""
+
+                SELECT *
+
+                FROM v_day_record_summary
+
+                WHERE record_date = :record_date
+
+            """),
 
             {
 
@@ -47,29 +29,45 @@ def get_ai_context(target_date: date):
 
         ).mappings().first()
 
-        recent_7_rows = conn.execute(
+        history = conn.execute(
 
-            sql_recent,
+            text("""
+
+                SELECT
+
+                    record_date,
+
+                    score,
+
+                    weight_kg,
+
+                    waist_cm,
+
+                    water_liter,
+
+                    protein_gram,
+
+                    meal_score,
+
+                    sleep_hours,
+
+                    bike_minutes,
+
+                    workout_done_yn
+
+                FROM v_day_record_summary
+
+                WHERE record_date <= :record_date
+
+                ORDER BY record_date DESC
+
+                LIMIT 30
+
+            """),
 
             {
 
-                "record_date": target_date,
-
-                "limit_count": 7
-
-            }
-
-        ).mappings().all()
-
-        recent_30_rows = conn.execute(
-
-            sql_recent,
-
-            {
-
-                "record_date": target_date,
-
-                "limit_count": 30
+                "record_date": target_date
 
             }
 
@@ -79,11 +77,9 @@ def get_ai_context(target_date: date):
 
         "target_date": str(target_date),
 
-        "today": dict(today_row) if today_row else None,
+        "today": dict(today) if today else {},
 
-        "recent_7_days": [dict(row) for row in recent_7_rows],
-
-        "recent_30_days": [dict(row) for row in recent_30_rows],
+        "history": [dict(x) for x in history]
 
     }
 
