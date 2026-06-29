@@ -17,6 +17,16 @@ def get_daily_ai_analysis(target_date: date):
 
             a.lookback_days,
 
+            a.provider,
+
+            a.model_name,
+
+            a.prompt_version,
+
+            a.ai_status,
+
+            a.confidence,
+
             a.overall_score,
 
             a.summary,
@@ -35,9 +45,17 @@ def get_daily_ai_analysis(target_date: date):
 
             a.sleep_comment,
 
-            a.model_name,
+            a.analysis_detail,
 
-            a.prompt_version,
+            a.latency_ms,
+
+            a.token_input,
+
+            a.token_output,
+
+            a.cost_usd,
+
+            a.error_message,
 
             a.created_at,
 
