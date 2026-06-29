@@ -3,15 +3,59 @@ import json
 
 from sqlalchemy import text
 
-def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
+def build_input_snapshot(context, metrics):
 
-    input_snapshot = {
+    today = context.get("today") or {}
 
-        "context": context,
+    return {
+
+        "target_date": context.get("target_date"),
+
+        "today": {
+
+            "day_record_id": today.get("day_record_id"),
+
+            "record_date": str(today.get("record_date")) if today.get("record_date") else None,
+
+            "score": today.get("score"),
+
+            "grade": today.get("grade"),
+
+            "mood_score": today.get("mood_score"),
+
+            "weight_kg": float(today.get("weight_kg")) if today.get("weight_kg") is not None else None,
+
+            "waist_cm": float(today.get("waist_cm")) if today.get("waist_cm") is not None else None,
+
+            "water_liter": float(today.get("water_liter")) if today.get("water_liter") is not None else None,
+
+            "protein_gram": today.get("protein_gram"),
+
+            "binge_yn": today.get("binge_yn"),
+
+            "workout_done_yn": today.get("workout_done_yn"),
+
+            "bike_minutes": today.get("bike_minutes"),
+
+            "meal_score": today.get("meal_score"),
+
+            "total_calorie": today.get("total_calorie"),
+
+            "sleep_hours": float(today.get("sleep_hours")) if today.get("sleep_hours") is not None else None,
+
+            "sleep_quality_score": today.get("sleep_quality_score"),
+
+            "wake_condition": today.get("wake_condition"),
+
+        },
 
         "metrics": metrics,
 
     }
+
+def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
+
+    input_snapshot = build_input_snapshot(context, metrics)
 
     params = {
 
