@@ -65,6 +65,16 @@ def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
 
         "lookback_days": metrics.get("days_30_count") or metrics.get("days_7_count") or 1,
 
+        "provider": "RULE",
+
+        "model_name": "rule-engine-v1",
+
+        "prompt_version": "rule-v1",
+
+        "ai_status": "RULE_DONE",
+
+        "confidence": 100,
+
         "overall_score": analysis.get("overall_score"),
 
         "summary": analysis.get("summary"),
@@ -85,10 +95,6 @@ def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
 
         "input_snapshot": json.dumps(input_snapshot, ensure_ascii=False, default=str),
 
-        "model_name": "rule-engine-v1",
-
-        "prompt_version": "rule-v1",
-
     }
 
     conn.execute(
@@ -104,6 +110,16 @@ def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
                 analysis_type,
 
                 lookback_days,
+
+                provider,
+
+                model_name,
+
+                prompt_version,
+
+                ai_status,
+
+                confidence,
 
                 overall_score,
 
@@ -125,9 +141,9 @@ def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
 
                 input_snapshot,
 
-                model_name,
+                started_at,
 
-                prompt_version
+                completed_at
 
             )
 
@@ -140,6 +156,16 @@ def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
                 :analysis_type,
 
                 :lookback_days,
+
+                :provider,
+
+                :model_name,
+
+                :prompt_version,
+
+                :ai_status,
+
+                :confidence,
 
                 :overall_score,
 
@@ -161,9 +187,9 @@ def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
 
                 CAST(:input_snapshot AS jsonb),
 
-                :model_name,
+                now(),
 
-                :prompt_version
+                now()
 
             )
 
@@ -172,6 +198,16 @@ def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
             DO UPDATE SET
 
                 lookback_days = EXCLUDED.lookback_days,
+
+                provider = EXCLUDED.provider,
+
+                model_name = EXCLUDED.model_name,
+
+                prompt_version = EXCLUDED.prompt_version,
+
+                ai_status = EXCLUDED.ai_status,
+
+                confidence = EXCLUDED.confidence,
 
                 overall_score = EXCLUDED.overall_score,
 
@@ -193,9 +229,11 @@ def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
 
                 input_snapshot = EXCLUDED.input_snapshot,
 
-                model_name = EXCLUDED.model_name,
+                started_at = now(),
 
-                prompt_version = EXCLUDED.prompt_version,
+                completed_at = now(),
+
+                error_message = NULL,
 
                 updated_at = now()
 
