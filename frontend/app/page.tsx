@@ -7,6 +7,7 @@ import GKReadyCard from "@/components/GKReadyCard";
 import MedicationCard from "@/components/MedicationCard";
 import WorkoutCard from "@/components/WorkoutCard";
 import MealCard from "@/components/MealCard";
+import PhilosophyCard from "@/components/PhilosophyCard";
 
 async function getDashboard() {
   const res = await fetch(
@@ -28,33 +29,18 @@ export default async function Home() {
   const dashboard = data.dashboard;
 
   return (
-    <main className="min-h-screen bg-[#f4f1ec]">
+    <main className="min-h-screen bg-[#f4f1ec] text-zinc-900">
       <div className="mx-auto max-w-6xl px-4 py-6">
-
         <Header />
-
         <TodayCard today={dashboard} />
-
         <ScoreCard score={dashboard} />
-
         <AICoachCard ai={data.ai} />
-
         <MissionCard missions={data.missions} />
-
         <GKReadyCard dashboard={dashboard} />
-
         <MedicationCard today={dashboard} />
-
-        <WorkoutCard
-          today={dashboard}
-          ai={data.ai}
-        />
-
-        <MealCard
-          today={dashboard}
-          ai={data.ai}
-        />
-
+        <WorkoutCard today={dashboard} ai={data.ai} />
+        <MealCard today={dashboard} ai={data.ai} />
+        <PhilosophyCard philosophy={data.philosophy} />
       </div>
     </main>
   );
