@@ -4,9 +4,7 @@ import ScoreCard from "@/components/ScoreCard";
 import AICoachCard from "@/components/AICoachCard";
 import MissionCard from "@/components/MissionCard";
 import GKReadyCard from "@/components/GKReadyCard";
-import MedicationCard from "@/components/MedicationCard";
-import WorkoutCard from "@/components/WorkoutCard";
-import MealCard from "@/components/MealCard";
+import DashboardAccordion from "@/components/DashboardAccordion";
 import PhilosophyCard from "@/components/PhilosophyCard";
 
 async function getDashboard() {
@@ -30,16 +28,21 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-[#f4f1ec] text-zinc-900">
-      <div className="mx-auto max-w-6xl px-4 py-6">
+      <div className="mx-auto max-w-3xl px-4 py-5">
         <Header />
+
         <TodayCard today={dashboard} />
+
         <ScoreCard score={dashboard} />
-        <AICoachCard ai={data.ai} />
-        <MissionCard missions={data.missions} />
+
         <GKReadyCard dashboard={dashboard} />
-        <MedicationCard today={dashboard} />
-        <WorkoutCard today={dashboard} ai={data.ai} />
-        <MealCard today={dashboard} ai={data.ai} />
+
+        <MissionCard missions={data.missions} />
+
+        <AICoachCard ai={data.ai} />
+
+        <DashboardAccordion dashboard={dashboard} ai={data.ai} />
+
         <PhilosophyCard philosophy={data.philosophy} />
       </div>
     </main>
