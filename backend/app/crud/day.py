@@ -37,7 +37,20 @@ def save_day_record(conn, req):
         {"record_date": req.record_date}
     ).scalar()
 
+    params = {
+        "record_date": req.record_date,
+        "score": req.score,
+        "grade": req.grade,
+        "mood_score": req.mood_score,
+        "memo": req.memo,
+        "morning_med_taken": req.morning_med_taken,
+        "evening_med_taken": req.evening_med_taken,
+        "medication_note": req.medication_note,
+    }
+
     if existing:
+        params["day_record_id"] = existing
+
         conn.execute(
             text("""
                 UPDATE day_record
@@ -46,17 +59,15 @@ def save_day_record(conn, req):
                     grade = :grade,
                     mood_score = :mood_score,
                     memo = :memo,
+                    morning_med_taken = :morning_med_taken,
+                    evening_med_taken = :evening_med_taken,
+                    medication_note = :medication_note,
                     updated_at = now()
                 WHERE day_record_id = :day_record_id
             """),
-            {
-                "day_record_id": existing,
-                "score": req.score,
-                "grade": req.grade,
-                "mood_score": req.mood_score,
-                "memo": req.memo
-            }
+            params
         )
+
         return existing
 
     return conn.execute(
@@ -67,7 +78,10 @@ def save_day_record(conn, req):
                 score,
                 grade,
                 mood_score,
-                memo
+                memo,
+                morning_med_taken,
+                evening_med_taken,
+                medication_note
             )
             VALUES
             (
@@ -75,17 +89,14 @@ def save_day_record(conn, req):
                 :score,
                 :grade,
                 :mood_score,
-                :memo
+                :memo,
+                :morning_med_taken,
+                :evening_med_taken,
+                :medication_note
             )
             RETURNING day_record_id
         """),
-        {
-            "record_date": req.record_date,
-            "score": req.score,
-            "grade": req.grade,
-            "mood_score": req.mood_score,
-            "memo": req.memo
-        }
+        params
     ).scalar_one()
 
 
