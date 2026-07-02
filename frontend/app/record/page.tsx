@@ -100,7 +100,7 @@ export default function RecordPage() {
       setMessage("저장 완료. 오늘도 Journey는 이어졌습니다.");
 
       setTimeout(() => {
-        router.push("/");
+        router.push(`/?record_date=${recordDate}`);
         router.refresh();
       }, 700);
     } catch (error) {

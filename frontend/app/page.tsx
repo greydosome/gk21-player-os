@@ -7,8 +7,12 @@ import AICoachCard from "@/components/AICoachCard";
 import DashboardAccordion from "@/components/DashboardAccordion";
 import PhilosophyCard from "@/components/PhilosophyCard";
 
-async function getDashboard() {
-  const res = await fetch("http://127.0.0.1:8000/api/dashboard", {
+async function getDashboard(recordDate?: string) {
+  const url = recordDate
+    ? `http://127.0.0.1:8000/api/dashboard?record_date=${recordDate}`
+    : "http://127.0.0.1:8000/api/dashboard";
+
+  const res = await fetch(url, {
     cache: "no-store",
   });
 
@@ -19,8 +23,12 @@ async function getDashboard() {
   return res.json();
 }
 
-export default async function Home() {
-  const data = await getDashboard();
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: { record_date?: string };
+}) {
+  const data = await getDashboard(searchParams?.record_date);
 
   if (!data.dashboard) {
     return (
