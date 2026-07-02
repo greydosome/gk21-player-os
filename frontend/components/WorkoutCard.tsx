@@ -20,12 +20,7 @@ export default function WorkoutCard({
 }) {
   return (
     <section className="mt-5 rounded-2xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-black">🏋 오늘 운동</h2>
-        <span className="rounded-full bg-green-100 px-4 py-2 text-sm font-black text-green-700">
-          🟢 GREEN
-        </span>
-      </div>
+      <h2 className="text-xl font-black">🏋 오늘 운동</h2>
 
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <Info title="계획 운동" value={today.planned_workout ?? "기록 없음"} />

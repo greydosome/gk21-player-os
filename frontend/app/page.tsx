@@ -1,6 +1,5 @@
 import Header from "@/components/Header";
 import TodayCard from "@/components/TodayCard";
-import ScoreCard from "@/components/ScoreCard";
 import GKReadyCard from "@/components/GKReadyCard";
 import MissionCard from "@/components/MissionCard";
 import AICoachCard from "@/components/AICoachCard";
@@ -70,8 +69,7 @@ export default async function Home({
       <div className="mx-auto max-w-3xl px-4 py-5">
         <Header />
         <TodayCard today={dashboard} />
-        <ScoreCard score={dashboard} />
-        <GKReadyCard dashboard={dashboard} />
+        <GKReadyCard ai={data.ai} />
         <MissionCard missions={data.missions ?? []} />
         <AICoachCard ai={data.ai} />
         <DashboardAccordion dashboard={dashboard} ai={data.ai} />
