@@ -34,6 +34,14 @@ class SleepRecord(BaseModel):
     wake_condition: str | None = None
 
 
+class GkRecord(BaseModel):
+    lightness_score: int | None = None
+    reaction_score: int | None = None
+    side_score: int | None = None
+    shoulder_score: int | None = None
+    gk_memo: str | None = None
+
+
 class DayRecordRequest(BaseModel):
     record_date: date
     score: int = 0
@@ -49,3 +57,4 @@ class DayRecordRequest(BaseModel):
     workout: WorkoutRecord | None = None
     meal: MealRecord | None = None
     sleep: SleepRecord | None = None
+    gk: GkRecord | None = None

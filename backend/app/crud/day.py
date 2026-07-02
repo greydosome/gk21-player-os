@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from app.ai.analysis_service import generate_daily_rule_analysis
 from app.crud.body import save_body
+from app.crud.gk import save_gk
 from app.crud.meal import save_meal
 from app.crud.sleep import save_sleep
 from app.crud.workout import save_workout
@@ -108,6 +109,7 @@ def save_day(req):
         save_workout(conn, day_record_id, req.workout)
         save_meal(conn, day_record_id, req.meal)
         save_sleep(conn, day_record_id, req.sleep)
+        save_gk(conn, day_record_id, req.gk)
 
         generate_daily_rule_analysis(
             conn=conn,
