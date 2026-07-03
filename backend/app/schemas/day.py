@@ -7,6 +7,7 @@ class BodyRecord(BaseModel):
     waist_cm: float | None = None
     water_liter: float | None = None
     protein_gram: int | None = None
+    protein_items: list[str] | None = None
     binge_yn: bool | None = None
 
 
@@ -15,6 +16,12 @@ class WorkoutRecord(BaseModel):
     completed_workout: str | None = None
     bike_minutes: int | None = None
     workout_done_yn: bool | None = None
+
+
+class WorkoutItem(BaseModel):
+    workout_type: str
+    minutes: int
+    calorie_estimate: int | None = None
 
 
 class MealRecord(BaseModel):
@@ -48,6 +55,7 @@ class DayRecordRequest(BaseModel):
     grade: str = "GREEN"
     mood_score: int = 3
     memo: str | None = None
+    mvp_text: str | None = None
 
     morning_med_taken: bool | None = False
     evening_med_taken: bool | None = False
@@ -55,6 +63,7 @@ class DayRecordRequest(BaseModel):
 
     body: BodyRecord | None = None
     workout: WorkoutRecord | None = None
+    workout_items: list[WorkoutItem] = []
     meal: MealRecord | None = None
     sleep: SleepRecord | None = None
     gk: GkRecord | None = None

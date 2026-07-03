@@ -1,4 +1,6 @@
 
+import json
+
 from sqlalchemy import text
 
 def save_body(conn, day_record_id, body):
@@ -39,6 +41,8 @@ def save_body(conn, day_record_id, body):
 
         "protein_gram": body.protein_gram,
 
+        "protein_items": json.dumps(body.protein_items or [], ensure_ascii=False),
+
         "binge_yn": body.binge_yn,
 
     }
@@ -62,6 +66,8 @@ def save_body(conn, day_record_id, body):
                     water_liter = :water_liter,
 
                     protein_gram = :protein_gram,
+
+                    protein_items = CAST(:protein_items AS jsonb),
 
                     binge_yn = :binge_yn,
 
@@ -95,6 +101,8 @@ def save_body(conn, day_record_id, body):
 
                     protein_gram,
 
+                    protein_items,
+
                     binge_yn
 
                 )
@@ -112,6 +120,8 @@ def save_body(conn, day_record_id, body):
                     :water_liter,
 
                     :protein_gram,
+
+                    CAST(:protein_items AS jsonb),
 
                     :binge_yn
 

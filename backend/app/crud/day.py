@@ -8,6 +8,7 @@ from app.crud.gk import save_gk
 from app.crud.meal import save_meal
 from app.crud.sleep import save_sleep
 from app.crud.workout import save_workout
+from app.crud.workout_item import save_workout_items
 from app.db.session import engine
 
 
@@ -44,6 +45,7 @@ def save_day_record(conn, req):
         "grade": req.grade,
         "mood_score": req.mood_score,
         "memo": req.memo,
+        "mvp_text": req.mvp_text,
         "morning_med_taken": req.morning_med_taken,
         "evening_med_taken": req.evening_med_taken,
         "medication_note": req.medication_note,
@@ -60,6 +62,7 @@ def save_day_record(conn, req):
                     grade = :grade,
                     mood_score = :mood_score,
                     memo = :memo,
+                    mvp_text = :mvp_text,
                     morning_med_taken = :morning_med_taken,
                     evening_med_taken = :evening_med_taken,
                     medication_note = :medication_note,
@@ -80,6 +83,7 @@ def save_day_record(conn, req):
                 grade,
                 mood_score,
                 memo,
+                mvp_text,
                 morning_med_taken,
                 evening_med_taken,
                 medication_note
@@ -91,6 +95,7 @@ def save_day_record(conn, req):
                 :grade,
                 :mood_score,
                 :memo,
+                :mvp_text,
                 :morning_med_taken,
                 :evening_med_taken,
                 :medication_note
@@ -107,6 +112,7 @@ def save_day(req):
 
         save_body(conn, day_record_id, req.body)
         save_workout(conn, day_record_id, req.workout)
+        save_workout_items(conn, day_record_id, req.workout_items)
         save_meal(conn, day_record_id, req.meal)
         save_sleep(conn, day_record_id, req.sleep)
         save_gk(conn, day_record_id, req.gk)
