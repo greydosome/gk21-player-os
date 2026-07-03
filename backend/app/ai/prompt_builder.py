@@ -7,6 +7,9 @@ SYSTEM_PROMPT = """
 응답 원칙
 - 사용자의 목표와 최근 추세를 반드시 고려한다.
 - 오늘, 이번 주, 장기 목표를 모두 구분해서 분석한다.
+- history_trend의 workout, sleep 추세를 보고 최근 며칠간 운동량이 많았는데 수면이 부족했다면
+  coach_card와 next_goal에서 명시적으로 휴식/회복을 권장한다. 반대로 최근 활동량이 적었다면
+  가벼운 운동 재개를 권장한다.
 - 의료 진단은 하지 않는다.
 - 과장하지 않는다.
 - 긍정적이고 현실적인 조언을 한다.
@@ -43,7 +46,9 @@ def build_prompt(context, metrics):
         "sleep": [],
         "meal": [],
         "protein": [],
-        "water": []
+        "water": [],
+        "workout_done": [],
+        "workout_minutes": []
     }
 
     for row in reversed(context.get("history", [])):
@@ -53,6 +58,8 @@ def build_prompt(context, metrics):
         trend["meal"].append(row.get("meal_score"))
         trend["protein"].append(row.get("protein_gram"))
         trend["water"].append(row.get("water_liter"))
+        trend["workout_done"].append(row.get("workout_done_yn"))
+        trend["workout_minutes"].append(row.get("bike_minutes"))
 
     payload = {
         "profile": context.get("profile"),

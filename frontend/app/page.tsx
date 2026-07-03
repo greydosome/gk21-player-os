@@ -15,11 +15,41 @@ const WORKOUT_TYPES: { label: string; kcalPerMin: number }[] = [
 ];
 
 const CARDIO_PRESETS = [
-  { label: "🚴 자전거 30분", type: "자전거", minutes: 30, kcalPerMin: 7 },
-  { label: "🪜 천국의 계단 20분", type: "천국의 계단", minutes: 20, kcalPerMin: 10 },
+  { label: "자전거 30분", type: "자전거", minutes: 30, kcalPerMin: 7 },
+  { label: "계단 오르기 20분", type: "천국의 계단", minutes: 20, kcalPerMin: 10 },
 ];
 
 const ALL_WORKOUT_KCAL = [...WORKOUT_TYPES, ...CARDIO_PRESETS.map((p) => ({ label: p.type, kcalPerMin: p.kcalPerMin }))];
+
+// 0=일 1=월 2=화 3=수 4=목 5=금 6=토 (Bible 주간 일정 기준)
+const WEEKLY_SCHEDULE = [
+  { dayLabel: "회복 데이", suggestions: [] as { type: string; minutes: number }[] },
+  { dayLabel: "풋살 데이", suggestions: [{ type: "풋살", minutes: 90 }] },
+  {
+    dayLabel: "PT 데이",
+    suggestions: [
+      { type: "PT", minutes: 60 },
+      { type: "자전거", minutes: 20 },
+      { type: "Clubbell Mobility", minutes: 15 },
+    ],
+  },
+  { dayLabel: "풋살 데이", suggestions: [{ type: "풋살", minutes: 90 }] },
+  {
+    dayLabel: "PT 데이",
+    suggestions: [
+      { type: "PT", minutes: 60 },
+      { type: "자전거", minutes: 20 },
+      { type: "Clubbell Mobility", minutes: 15 },
+    ],
+  },
+  { dayLabel: "GK Performance Day", suggestions: [{ type: "GK Performance Day", minutes: 60 }] },
+  { dayLabel: "자전거 데이", suggestions: [{ type: "자전거", minutes: 50 }] },
+];
+
+function scheduleFor(dateStr: string) {
+  const dayOfWeek = new Date(`${dateStr}T00:00:00`).getDay();
+  return WEEKLY_SCHEDULE[dayOfWeek];
+}
 
 const PROTEIN_FOODS: { label: string; gram: number }[] = [
   { label: "참치", gram: 25 },
@@ -180,6 +210,7 @@ export default function Home() {
   );
 
   const workoutDone = workoutItems.length > 0;
+  const todaySchedule = useMemo(() => scheduleFor(recordDate), [recordDate]);
 
   const ready = useMemo(
     () =>
@@ -332,6 +363,10 @@ export default function Home() {
           />
         </div>
 
+        <p className="mt-2 text-sm font-bold text-zinc-500">
+          🗓️ 오늘은 <span className="text-zinc-900">{todaySchedule.dayLabel}</span>입니다
+        </p>
+
         <section
           className={[
             "mt-3 rounded-3xl p-6 text-white shadow-lg transition-colors duration-300",
@@ -376,6 +411,27 @@ export default function Home() {
         </Section>
 
         <Section title="🏋 운동">
+          {todaySchedule.suggestions.length > 0 && (
+            <div className="mb-3">
+              <p className="mb-2 text-xs font-bold text-zinc-400">
+                오늘의 추천 · {todaySchedule.dayLabel}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {todaySchedule.suggestions.map((s) => (
+                  <button
+                    key={s.type}
+                    type="button"
+                    onClick={() => addWorkoutItem(s.type, s.minutes)}
+                    className="shrink-0 rounded-full border-2 border-slate-900 bg-white px-3.5 py-2 text-sm font-bold text-slate-900 active:bg-[#f4f1ec]"
+                  >
+                    + {s.type} {s.minutes}분
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="mb-2 text-xs font-bold text-zinc-400">직접 추가</p>
           <div className="flex flex-wrap gap-2">
             {WORKOUT_TYPES.map((w) => (
               <button
@@ -395,9 +451,9 @@ export default function Home() {
                 key={preset.label}
                 type="button"
                 onClick={() => addWorkoutItem(preset.type, preset.minutes)}
-                className="shrink-0 rounded-full border border-slate-900 bg-slate-900 px-3.5 py-2 text-sm font-bold text-white"
+                className="shrink-0 rounded-full border border-[#ddd6ce] bg-[#faf7f2] px-3.5 py-2 text-sm font-bold active:bg-[#eee5d8]"
               >
-                {preset.label}
+                + {preset.label}
               </button>
             ))}
           </div>
@@ -528,9 +584,17 @@ export default function Home() {
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const [icon, ...rest] = title.split(" ");
+  const label = rest.join(" ");
+
   return (
     <section className="mt-3 rounded-3xl border border-[#ddd6ce] bg-white p-4 shadow-sm">
-      <h2 className="mb-3 text-base font-black">{title}</h2>
+      <div className="mb-3 flex items-center gap-2">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#f4f1ec] text-base">
+          {icon}
+        </span>
+        <h2 className="text-base font-black">{label}</h2>
+      </div>
       {children}
     </section>
   );
