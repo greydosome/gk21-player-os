@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const WORKOUT_TYPES: { label: string; kcalPerMin: number }[] = [
   { label: "풋살", kcalPerMin: 8 },
@@ -114,6 +114,18 @@ type WorkoutItem = {
   minutes: number;
 };
 
+type PeriodStats = {
+  days_logged: number;
+  avg_sleep_hours: number | null;
+  avg_water_liter: number | null;
+  avg_protein_gram: number | null;
+  avg_mood_score: number | null;
+  workout_days: number;
+  full_medication_days: number;
+  binge_days: number;
+  period_days: number;
+};
+
 function today() {
   const now = new Date();
   const offset = now.getTimezoneOffset() * 60000;
@@ -123,6 +135,10 @@ function today() {
 function kcalFor(type: string, minutes: number) {
   const entry = ALL_WORKOUT_KCAL.find((w) => w.label === type);
   return Math.round((entry?.kcalPerMin ?? 6) * minutes);
+}
+
+function round1(value: number | null) {
+  return value === null || value === undefined ? "-" : Math.round(value * 10) / 10;
 }
 
 function computeReady({
@@ -182,6 +198,8 @@ function buildMedicationNote(morning: boolean, evening: boolean) {
 
 export default function Home() {
   const nextItemId = useRef(1);
+  const didMountRef = useRef(false);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [recordDate, setRecordDate] = useState(today());
   const [morningMed, setMorningMed] = useState(false);
@@ -195,10 +213,13 @@ export default function Home() {
   const [mvpText, setMvpText] = useState("");
   const [memo, setMemo] = useState("");
 
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [coachStatus, setCoachStatus] = useState<"idle" | "loading" | "ready">("idle");
   const [coachText, setCoachText] = useState("");
+
+  const [view, setView] = useState<"today" | "week" | "month">("today");
+  const [stats, setStats] = useState<PeriodStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const proteinGram = useMemo(
     () =>
@@ -258,39 +279,14 @@ export default function Home() {
     });
   }
 
-  async function pollCoachFeedback(date: string, attemptsLeft: number) {
-    try {
-      const res = await fetch(`/api/dashboard?record_date=${date}`, { cache: "no-store" });
-      const data = await res.json();
-      const ai = data?.ai;
-      const text = ai?.cards?.coach ?? ai?.summary;
-
-      if (text) setCoachText(text);
-
-      if (ai?.overview?.status === "COMPLETED" || attemptsLeft <= 0) {
-        setCoachStatus("ready");
-        return;
-      }
-
-      setTimeout(() => pollCoachFeedback(date, attemptsLeft - 1), 3000);
-    } catch {
-      setCoachStatus("ready");
-    }
-  }
-
-  async function save() {
-    setSaving(true);
-    setMessage("");
-    setCoachStatus("loading");
-    setCoachText("");
-
+  function buildPayload() {
     const bikeMinutes = workoutItems
       .filter((item) => item.type === "자전거")
       .reduce((sum, item) => sum + item.minutes, 0);
 
     const completedWorkout = workoutItems.map((item) => `${item.type} ${item.minutes}분`).join(", ");
 
-    const payload = {
+    return {
       record_date: recordDate,
       score: ready.score,
       grade: ready.level.label,
@@ -324,34 +320,107 @@ export default function Home() {
         wake_condition: ready.level.label,
       },
     };
+  }
 
+  async function saveToServer() {
+    const res = await fetch("/api/day", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildPayload()),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(JSON.stringify(data));
+    return data;
+  }
+
+  async function pollCoachFeedback(date: string, attemptsLeft: number) {
     try {
-      const res = await fetch("/api/day", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
+      const res = await fetch(`/api/dashboard?record_date=${date}`, { cache: "no-store" });
       const data = await res.json();
+      const ai = data?.ai;
+      const text = ai?.cards?.coach ?? ai?.summary;
 
-      if (!res.ok || !data.success) {
-        setMessage(`저장 실패: ${JSON.stringify(data)}`);
-        setCoachStatus("idle");
+      if (text) setCoachText(text);
+
+      if (ai?.overview?.status === "COMPLETED" || attemptsLeft <= 0) {
+        setCoachStatus("ready");
         return;
       }
 
-      setMessage("저장 완료. 오늘도 Journey는 이어졌습니다.");
-      pollCoachFeedback(recordDate, 8);
-    } catch (e) {
-      setMessage(`저장 실패: ${String(e)}`);
-      setCoachStatus("idle");
-    } finally {
-      setSaving(false);
+      setTimeout(() => pollCoachFeedback(date, attemptsLeft - 1), 3000);
+    } catch {
+      setCoachStatus("ready");
     }
   }
 
+  // 자동 저장: 입력이 바뀌면 2초 후 조용히 저장. 최초 마운트에는 실행하지 않음.
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+    autoSaveTimer.current = setTimeout(async () => {
+      setAutoSaveStatus("saving");
+      try {
+        await saveToServer();
+        setAutoSaveStatus("saved");
+      } catch {
+        setAutoSaveStatus("idle");
+      }
+    }, 2000);
+
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    recordDate,
+    morningMed,
+    eveningMed,
+    workoutItems,
+    proteinFoods,
+    waterLiter,
+    sleepHours,
+    binge,
+    moodScore,
+    mvpText,
+    memo,
+  ]);
+
+  async function requestCoaching() {
+    setCoachStatus("loading");
+    setCoachText("");
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+    try {
+      setAutoSaveStatus("saving");
+      await saveToServer();
+      setAutoSaveStatus("saved");
+      pollCoachFeedback(recordDate, 8);
+    } catch (e) {
+      setCoachStatus("idle");
+      setAutoSaveStatus("idle");
+      alert(`저장 실패: ${String(e)}`);
+    }
+  }
+
+  useEffect(() => {
+    if (view === "today") return;
+
+    setStatsLoading(true);
+    fetch(`/api/stats?period=${view === "week" ? "week" : "month"}&record_date=${recordDate}`, {
+      cache: "no-store",
+    })
+      .then((res) => res.json())
+      .then((data) => setStats(data?.stats ?? null))
+      .finally(() => setStatsLoading(false));
+  }, [view, recordDate]);
+
   return (
-    <main className="min-h-screen bg-[#f4f1ec] pb-32 text-zinc-900">
+    <main className="min-h-screen bg-zinc-950 pb-32 text-zinc-100">
       <div className="mx-auto max-w-xl p-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-black">🧤 GK21</h1>
@@ -359,12 +428,12 @@ export default function Home() {
             type="date"
             value={recordDate}
             onChange={(e) => setRecordDate(e.target.value)}
-            className="rounded-full border border-[#ddd6ce] bg-white px-4 py-2 text-sm font-bold"
+            className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-bold text-zinc-100"
           />
         </div>
 
         <p className="mt-2 text-sm font-bold text-zinc-500">
-          🗓️ 오늘은 <span className="text-zinc-900">{todaySchedule.dayLabel}</span>입니다
+          🗓️ 오늘은 <span className="text-zinc-100">{todaySchedule.dayLabel}</span>입니다
         </p>
 
         <section
@@ -394,6 +463,53 @@ export default function Home() {
           </div>
         </section>
 
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {(
+            [
+              { key: "today", label: "오늘" },
+              { key: "week", label: "위클리" },
+              { key: "month", label: "먼슬리" },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setView(tab.key)}
+              className={[
+                "rounded-2xl border-2 py-2.5 text-sm font-black transition-colors",
+                view === tab.key
+                  ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+                  : "border-zinc-800 bg-zinc-900 text-zinc-400",
+              ].join(" ")}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {view !== "today" && (
+          <section className="mt-3 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
+            <h2 className="text-base font-black text-zinc-100">
+              {view === "week" ? "최근 7일" : "최근 30일"} 통계
+            </h2>
+
+            {statsLoading || !stats ? (
+              <p className="mt-3 text-sm font-bold text-zinc-500">불러오는 중...</p>
+            ) : (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <StatTile label="기록일" value={`${stats.days_logged}/${stats.period_days}일`} />
+                <StatTile label="운동일" value={`${stats.workout_days}일`} />
+                <StatTile label="평균 수면" value={`${round1(stats.avg_sleep_hours)}h`} />
+                <StatTile label="평균 수분" value={`${round1(stats.avg_water_liter)}L`} />
+                <StatTile label="평균 단백질" value={`${round1(stats.avg_protein_gram)}g`} />
+                <StatTile label="복약 완료일" value={`${stats.full_medication_days}일`} />
+                <StatTile label="평균 컨디션" value={`${round1(stats.avg_mood_score)}`} />
+                <StatTile label="폭식일" value={`${stats.binge_days}일`} />
+              </div>
+            )}
+          </section>
+        )}
+
         <Section title="⚡ 빠른 체크">
           <div className="flex flex-wrap gap-2">
             <Chip
@@ -413,7 +529,7 @@ export default function Home() {
         <Section title="🏋 운동">
           {todaySchedule.suggestions.length > 0 && (
             <div className="mb-3">
-              <p className="mb-2 text-xs font-bold text-zinc-400">
+              <p className="mb-2 text-xs font-bold text-zinc-500">
                 오늘의 추천 · {todaySchedule.dayLabel}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -422,7 +538,7 @@ export default function Home() {
                     key={s.type}
                     type="button"
                     onClick={() => addWorkoutItem(s.type, s.minutes)}
-                    className="shrink-0 rounded-full border-2 border-slate-900 bg-white px-3.5 py-2 text-sm font-bold text-slate-900 active:bg-[#f4f1ec]"
+                    className="shrink-0 rounded-full border-2 border-emerald-500 bg-zinc-950 px-3.5 py-2 text-sm font-bold text-emerald-400 active:bg-zinc-900"
                   >
                     + {s.type} {s.minutes}분
                   </button>
@@ -431,14 +547,14 @@ export default function Home() {
             </div>
           )}
 
-          <p className="mb-2 text-xs font-bold text-zinc-400">직접 추가</p>
+          <p className="mb-2 text-xs font-bold text-zinc-500">직접 추가</p>
           <div className="flex flex-wrap gap-2">
             {WORKOUT_TYPES.map((w) => (
               <button
                 key={w.label}
                 type="button"
                 onClick={() => addWorkoutItem(w.label, 20)}
-                className="shrink-0 rounded-full border border-[#ddd6ce] bg-[#faf7f2] px-3.5 py-2 text-sm font-bold active:bg-[#eee5d8]"
+                className="shrink-0 rounded-full border border-zinc-700 bg-zinc-800 px-3.5 py-2 text-sm font-bold text-zinc-200 active:bg-zinc-700"
               >
                 + {w.label}
               </button>
@@ -451,7 +567,7 @@ export default function Home() {
                 key={preset.label}
                 type="button"
                 onClick={() => addWorkoutItem(preset.type, preset.minutes)}
-                className="shrink-0 rounded-full border border-[#ddd6ce] bg-[#faf7f2] px-3.5 py-2 text-sm font-bold active:bg-[#eee5d8]"
+                className="shrink-0 rounded-full border border-zinc-700 bg-zinc-800 px-3.5 py-2 text-sm font-bold text-zinc-200 active:bg-zinc-700"
               >
                 + {preset.label}
               </button>
@@ -461,8 +577,8 @@ export default function Home() {
           {workoutItems.length > 0 && (
             <div className="mt-3 space-y-2">
               {workoutItems.map((item) => (
-                <div key={item.id} className="flex items-center gap-2 rounded-2xl bg-[#faf7f2] p-2.5">
-                  <p className="min-w-0 flex-1 truncate text-sm font-bold">{item.type}</p>
+                <div key={item.id} className="flex items-center gap-2 rounded-2xl bg-zinc-800 p-2.5">
+                  <p className="min-w-0 flex-1 truncate text-sm font-bold text-zinc-100">{item.type}</p>
 
                   <Stepper
                     value={item.minutes}
@@ -477,7 +593,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => removeWorkoutItem(item.id)}
-                    className="h-8 w-8 shrink-0 rounded-full bg-slate-900 text-sm font-black text-white"
+                    className="h-8 w-8 shrink-0 rounded-full bg-emerald-500 text-sm font-black text-zinc-950"
                   >
                     ✕
                   </button>
@@ -528,8 +644,8 @@ export default function Home() {
                 className={[
                   "rounded-2xl border-2 py-3 text-3xl transition-colors",
                   moodScore === mood.score
-                    ? "border-slate-900 bg-slate-900"
-                    : "border-[#ddd6ce] bg-[#faf7f2]",
+                    ? "border-emerald-500 bg-zinc-800"
+                    : "border-zinc-700 bg-zinc-800",
                 ].join(" ")}
               >
                 {mood.icon}
@@ -543,22 +659,25 @@ export default function Home() {
             value={mvpText}
             onChange={(e) => setMvpText(e.target.value)}
             placeholder="오늘 MVP · 가장 잘한 것 한 가지"
-            className="w-full rounded-2xl border border-[#ddd6ce] bg-[#faf7f2] p-3.5 font-bold"
+            className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3.5 font-bold text-zinc-100 placeholder-zinc-500"
           />
           <textarea
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
-            className="mt-2 min-h-20 w-full rounded-2xl border border-[#ddd6ce] bg-[#faf7f2] p-3.5 font-bold"
+            className="mt-2 min-h-20 w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3.5 font-bold text-zinc-100 placeholder-zinc-500"
             placeholder="한 줄 메모 (선택)"
           />
         </Section>
 
-        {message && <p className="mt-3 text-center text-sm font-bold text-zinc-500">{message}</p>}
+        <p className="mt-3 text-center text-xs font-bold text-zinc-600">
+          {autoSaveStatus === "saving" && "자동 저장 중..."}
+          {autoSaveStatus === "saved" && "✓ 자동 저장됨"}
+        </p>
 
         {coachStatus !== "idle" && (
-          <section className="mt-3 rounded-3xl bg-slate-900 p-6 text-white shadow-lg">
-            <h2 className="text-lg font-black">🤖 AI 코치</h2>
-            <p className="mt-3 font-bold leading-relaxed">
+          <section className="mt-3 rounded-3xl border border-emerald-500/30 bg-zinc-900 p-6 shadow-lg">
+            <h2 className="text-lg font-black text-emerald-400">🤖 AI 코치</h2>
+            <p className="mt-3 font-bold leading-relaxed text-zinc-100">
               {coachStatus === "loading" && !coachText
                 ? "코치가 오늘 하루를 분석하고 있습니다..."
                 : coachText}
@@ -567,15 +686,15 @@ export default function Home() {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#f4f1ec]/95 px-4 py-3 backdrop-blur">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-xl">
           <button
             type="button"
-            onClick={save}
-            disabled={saving}
-            className="w-full rounded-2xl bg-slate-900 py-4 text-lg font-black text-white shadow-lg disabled:opacity-50"
+            onClick={requestCoaching}
+            disabled={coachStatus === "loading"}
+            className="w-full rounded-2xl bg-emerald-500 py-4 text-lg font-black text-zinc-950 shadow-lg disabled:opacity-50"
           >
-            {saving ? "저장 중..." : "저장하기"}
+            {coachStatus === "loading" ? "코칭 받는 중..." : "🤖 AI 코칭 받기"}
           </button>
         </div>
       </div>
@@ -588,15 +707,24 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   const label = rest.join(" ");
 
   return (
-    <section className="mt-3 rounded-3xl border border-[#ddd6ce] bg-white p-4 shadow-sm">
+    <section className="mt-3 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#f4f1ec] text-base">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-zinc-800 text-base">
           {icon}
         </span>
-        <h2 className="text-base font-black">{label}</h2>
+        <h2 className="text-base font-black text-zinc-100">{label}</h2>
       </div>
       {children}
     </section>
+  );
+}
+
+function StatTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-zinc-800 p-3">
+      <p className="text-xs font-bold text-zinc-500">{label}</p>
+      <p className="mt-1 text-lg font-black text-zinc-100">{value}</p>
+    </div>
   );
 }
 
@@ -619,9 +747,9 @@ function Chip({
         "inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 px-4 py-2.5 text-sm font-bold transition-colors",
         active
           ? tone === "warn"
-            ? "border-red-700 bg-red-700 text-white"
-            : "border-slate-900 bg-slate-900 text-white"
-          : "border-[#e5ddd0] bg-[#faf7f2] text-zinc-700",
+            ? "border-red-600 bg-red-600 text-white"
+            : "border-emerald-500 bg-emerald-500 text-zinc-950"
+          : "border-zinc-700 bg-zinc-800 text-zinc-300",
       ].join(" ")}
     >
       {active && <span>✓</span>}
@@ -651,8 +779,8 @@ function ScaleRow({
           className={[
             "shrink-0 rounded-2xl border-2 px-4 py-2.5 text-sm font-black transition-colors",
             active === value
-              ? "border-slate-900 bg-slate-900 text-white"
-              : "border-[#e5ddd0] bg-[#faf7f2] text-zinc-700",
+              ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+              : "border-zinc-700 bg-zinc-800 text-zinc-300",
           ].join(" ")}
         >
           {format(value)}
@@ -676,18 +804,18 @@ function Stepper({
       <button
         type="button"
         onClick={() => onChange(value - 5)}
-        className="h-8 w-8 rounded-full border border-[#ddd6ce] bg-white text-base font-black"
+        className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-base font-black text-zinc-100"
       >
         −
       </button>
-      <span className="w-14 text-center text-sm font-black">
+      <span className="w-14 text-center text-sm font-black text-zinc-100">
         {value}
         {suffix}
       </span>
       <button
         type="button"
         onClick={() => onChange(value + 5)}
-        className="h-8 w-8 rounded-full border border-[#ddd6ce] bg-white text-base font-black"
+        className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-base font-black text-zinc-100"
       >
         +
       </button>

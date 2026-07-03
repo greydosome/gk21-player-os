@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "오늘도 Journey는 이어졌습니다.",
     start_url: "/",
     display: "standalone",
-    background_color: "#f4f1ec",
-    theme_color: "#0f172a",
+    background_color: "#09090b",
+    theme_color: "#09090b",
     icons: [
       {
         src: "/pwa-icon-192",
