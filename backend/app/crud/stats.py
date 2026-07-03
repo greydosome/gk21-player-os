@@ -15,9 +15,9 @@ def get_period_stats(end_date, days):
             AVG(water_liter) AS avg_water_liter,
             AVG(protein_gram) AS avg_protein_gram,
             AVG(mood_score) AS avg_mood_score,
-            SUM(CASE WHEN workout_done_yn THEN 1 ELSE 0 END) AS workout_days,
-            SUM(CASE WHEN morning_med_taken AND evening_med_taken THEN 1 ELSE 0 END) AS full_medication_days,
-            SUM(CASE WHEN binge_yn THEN 1 ELSE 0 END) AS binge_days
+            COALESCE(SUM(CASE WHEN workout_done_yn THEN 1 ELSE 0 END), 0) AS workout_days,
+            COALESCE(SUM(CASE WHEN morning_med_taken AND evening_med_taken THEN 1 ELSE 0 END), 0) AS full_medication_days,
+            COALESCE(SUM(CASE WHEN binge_yn THEN 1 ELSE 0 END), 0) AS binge_days
         FROM v_day_record_summary
         WHERE record_date BETWEEN :start_date AND :end_date
     """)
