@@ -46,6 +46,7 @@ def save_day_record(conn, req):
         "mood_score": req.mood_score,
         "memo": req.memo,
         "mvp_text": req.mvp_text,
+        "is_sick": req.is_sick,
         "morning_med_taken": req.morning_med_taken,
         "evening_med_taken": req.evening_med_taken,
         "medication_note": req.medication_note,
@@ -63,6 +64,7 @@ def save_day_record(conn, req):
                     mood_score = :mood_score,
                     memo = :memo,
                     mvp_text = :mvp_text,
+                    is_sick = :is_sick,
                     morning_med_taken = :morning_med_taken,
                     evening_med_taken = :evening_med_taken,
                     medication_note = :medication_note,
@@ -84,6 +86,7 @@ def save_day_record(conn, req):
                 mood_score,
                 memo,
                 mvp_text,
+                is_sick,
                 morning_med_taken,
                 evening_med_taken,
                 medication_note
@@ -96,6 +99,7 @@ def save_day_record(conn, req):
                 :mood_score,
                 :memo,
                 :mvp_text,
+                :is_sick,
                 :morning_med_taken,
                 :evening_med_taken,
                 :medication_note

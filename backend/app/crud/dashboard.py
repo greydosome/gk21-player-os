@@ -30,7 +30,7 @@ def get_day_detail(record_date: date):
         ).scalar()
 
         if not day_record_id:
-            return {"workout_items": [], "protein_items": [], "mvp_text": None}
+            return {"workout_items": [], "protein_items": [], "mvp_text": None, "is_sick": False}
 
         workout_items = conn.execute(
             text("""
@@ -47,15 +47,16 @@ def get_day_detail(record_date: date):
             {"day_record_id": day_record_id}
         ).scalar()
 
-        mvp_text = conn.execute(
-            text("SELECT mvp_text FROM day_record WHERE day_record_id = :day_record_id"),
+        day_row = conn.execute(
+            text("SELECT mvp_text, is_sick FROM day_record WHERE day_record_id = :day_record_id"),
             {"day_record_id": day_record_id}
-        ).scalar()
+        ).mappings().first()
 
     return {
         "workout_items": [dict(row) for row in workout_items],
         "protein_items": protein_items or [],
-        "mvp_text": mvp_text,
+        "mvp_text": day_row["mvp_text"] if day_row else None,
+        "is_sick": day_row["is_sick"] if day_row else False,
     }
 
 

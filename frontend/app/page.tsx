@@ -91,11 +91,11 @@ const WATER_PRESETS = [0, 0.3, 0.5, 0.8, 1.0, 1.3, 1.5, 1.8, 2.0, 2.3, 2.5, 3.0]
 const SLEEP_HOURS = Array.from({ length: 24 }, (_, i) => i + 1);
 
 const MOOD_OPTIONS = [
-  { score: 5, icon: "😀" },
-  { score: 4, icon: "🙂" },
-  { score: 3, icon: "😐" },
-  { score: 2, icon: "😔" },
-  { score: 1, icon: "😢" },
+  { score: 5, icon: "😎" },
+  { score: 4, icon: "🤓" },
+  { score: 3, icon: "🤔" },
+  { score: 2, icon: "🙃" },
+  { score: 1, icon: "🤨" },
 ];
 
 const MVP_SUGGESTIONS = [
@@ -153,7 +153,17 @@ const BLACK_LEVEL = {
   bg: "bg-black border-2 border-zinc-700",
 };
 
+const SICK_LEVEL = {
+  min: -1,
+  label: "SICK DAY",
+  icon: "🤒",
+  text: "오늘은 아픈 날이에요. 무리하지 말고 푹 쉬는 것에 집중하세요. 컨디션 관리도 훈련의 일부입니다.",
+  bg: "bg-violet-600",
+};
+
 const DEFAULT_PROTEIN_TARGET = 60;
+const DEFAULT_WATER_TARGET = 2.0;
+const SLEEP_TARGET = 7;
 
 type SelectedWorkout = {
   minutes: number;
@@ -200,6 +210,7 @@ function round1(value: number | null) {
 function computeReady({
   sleepHours,
   waterLiter,
+  waterTarget,
   proteinGram,
   proteinTarget,
   workoutDone,
@@ -209,6 +220,7 @@ function computeReady({
 }: {
   sleepHours: number;
   waterLiter: number;
+  waterTarget: number;
   proteinGram: number;
   proteinTarget: number;
   workoutDone: boolean;
@@ -218,14 +230,14 @@ function computeReady({
 }) {
   let score = 0;
 
-  if (sleepHours >= 7) score += 20;
-  else if (sleepHours >= 6) score += 15;
-  else if (sleepHours >= 5) score += 10;
+  if (sleepHours >= SLEEP_TARGET) score += 20;
+  else if (sleepHours >= SLEEP_TARGET - 1) score += 15;
+  else if (sleepHours >= SLEEP_TARGET - 2) score += 10;
   else score += 5;
 
-  if (waterLiter >= 3.0) score += 20;
-  else if (waterLiter >= 2.5) score += 15;
-  else if (waterLiter >= 2.0) score += 10;
+  if (waterLiter >= waterTarget) score += 20;
+  else if (waterLiter >= waterTarget * 0.75) score += 15;
+  else if (waterLiter >= waterTarget * 0.5) score += 10;
   else score += 5;
 
   if (proteinGram >= proteinTarget) score += 15;
@@ -253,6 +265,7 @@ function snapshotFormState(state: {
   waterLiter: number;
   sleepHours: number;
   binge: boolean;
+  isSick: boolean;
   moodScore: number;
   mvpText: string;
   selectedWorkouts: Map<string, SelectedWorkout>;
@@ -264,6 +277,7 @@ function snapshotFormState(state: {
     waterLiter: state.waterLiter,
     sleepHours: state.sleepHours,
     binge: state.binge,
+    isSick: state.isSick,
     moodScore: state.moodScore,
     mvpText: state.mvpText,
     workouts: Array.from(state.selectedWorkouts.entries())
@@ -294,8 +308,10 @@ export default function Home() {
   const [proteinCounts, setProteinCounts] = useState<Map<string, number>>(new Map());
   const [proteinTarget, setProteinTarget] = useState(DEFAULT_PROTEIN_TARGET);
   const [waterLiter, setWaterLiter] = useState(0);
-  const [sleepHours, setSleepHours] = useState(7);
+  const [waterTarget, setWaterTarget] = useState(DEFAULT_WATER_TARGET);
+  const [sleepHours, setSleepHours] = useState(SLEEP_TARGET);
   const [binge, setBinge] = useState(false);
+  const [isSick, setIsSick] = useState(false);
   const [moodScore, setMoodScore] = useState(4);
   const [mvpText, setMvpText] = useState("");
   const [showLevelLegend, setShowLevelLegend] = useState(false);
@@ -320,10 +336,12 @@ export default function Home() {
 
   const ready = useMemo(() => {
     if (!hasRecord) return { score: 0, level: BLACK_LEVEL };
+    if (isSick) return { score: 0, level: SICK_LEVEL };
 
     return computeReady({
       sleepHours,
       waterLiter,
+      waterTarget,
       proteinGram,
       proteinTarget,
       workoutDone,
@@ -333,8 +351,10 @@ export default function Home() {
     });
   }, [
     hasRecord,
+    isSick,
     sleepHours,
     waterLiter,
+    waterTarget,
     proteinGram,
     proteinTarget,
     workoutDone,
@@ -344,8 +364,8 @@ export default function Home() {
   ]);
 
   const factors = [
-    { icon: "😴", label: "수면", good: sleepHours >= 6 },
-    { icon: "💧", label: "수분", good: waterLiter >= 2.5 },
+    { icon: "😴", label: "수면", good: sleepHours >= SLEEP_TARGET - 1 },
+    { icon: "💧", label: "수분", good: waterLiter >= waterTarget * 0.75 },
     { icon: "🥩", label: "단백질", good: proteinGram >= proteinTarget * 0.75 },
     { icon: "🏋", label: "운동", good: workoutDone },
     { icon: "💊", label: "복약", good: morningMed && eveningMed },
@@ -413,6 +433,7 @@ export default function Home() {
       mood_score: moodScore,
       memo: null,
       mvp_text: mvpText || null,
+      is_sick: isSick,
       morning_med_taken: morningMed,
       evening_med_taken: eveningMed,
       medication_note: buildMedicationNote(morningMed, eveningMed),
@@ -493,8 +514,9 @@ export default function Home() {
           morningMed: d?.morning_med_taken ?? false,
           eveningMed: d?.evening_med_taken ?? false,
           waterLiter: d?.water_liter ?? 0,
-          sleepHours: d?.sleep_hours ?? 7,
+          sleepHours: d?.sleep_hours ?? SLEEP_TARGET,
           binge: d?.binge_yn ?? false,
+          isSick: detail?.is_sick ?? false,
           moodScore: d?.mood_score ?? 4,
           mvpText: detail?.mvp_text ?? "",
         };
@@ -524,6 +546,7 @@ export default function Home() {
         setWaterLiter(loaded.waterLiter);
         setSleepHours(loaded.sleepHours);
         setBinge(loaded.binge);
+        setIsSick(loaded.isSick);
         setMoodScore(loaded.moodScore);
         setMvpText(loaded.mvpText);
         setSelectedWorkouts(workoutMap);
@@ -531,6 +554,9 @@ export default function Home() {
 
         if (data?.goal?.target_protein_gram) {
           setProteinTarget(data.goal.target_protein_gram);
+        }
+        if (data?.goal?.target_water_liter) {
+          setWaterTarget(data.goal.target_water_liter);
         }
 
         setHasRecord(!!d);
@@ -549,6 +575,7 @@ export default function Home() {
       waterLiter,
       sleepHours,
       binge,
+      isSick,
       moodScore,
       mvpText,
       selectedWorkouts,
@@ -585,6 +612,7 @@ export default function Home() {
     waterLiter,
     sleepHours,
     binge,
+    isSick,
     moodScore,
     mvpText,
   ]);
@@ -603,6 +631,7 @@ export default function Home() {
         waterLiter,
         sleepHours,
         binge,
+        isSick,
         moodScore,
         mvpText,
         selectedWorkouts,
@@ -668,7 +697,7 @@ export default function Home() {
           </p>
           <p className="mt-2 font-bold text-white/90">{ready.level.text}</p>
 
-          {hasRecord && (
+          {hasRecord && !isSick && (
             <>
               <p className="mt-2 text-sm font-bold text-white/80">
                 {missingFactors.length > 0
@@ -707,9 +736,12 @@ export default function Home() {
               </p>
               {READY_LEVELS.map((l) => (
                 <p key={l.label} className="text-xs font-bold text-white/90">
-                  {l.icon} {l.label} ({l.min}%~) — {l.text}
+                  {l.icon} {l.label} — {l.text}
                 </p>
               ))}
+              <p className="text-xs font-bold text-white/90">
+                {SICK_LEVEL.icon} {SICK_LEVEL.label} (아픈 날 체크 시) — {SICK_LEVEL.text}
+              </p>
             </div>
           )}
         </section>
@@ -770,7 +802,7 @@ export default function Home() {
                   unit="L"
                   data={history.map((h) => h.water_liter)}
                   dates={history.map((h) => h.record_date)}
-                  targetValue={3.0}
+                  targetValue={waterTarget}
                 />
                 <TrendChart
                   title="🥩 단백질"
@@ -798,6 +830,7 @@ export default function Home() {
                   onClick={() => setEveningMed(!eveningMed)}
                 />
                 <Chip label="🍽 폭식함" active={binge} onClick={() => setBinge(!binge)} tone="warn" />
+                <Chip label="🤒 아픈 날" active={isSick} onClick={() => setIsSick(!isSick)} tone="warn" />
               </div>
             </Section>
 
@@ -906,7 +939,7 @@ export default function Home() {
               </div>
             </Section>
 
-            <Section title={`💧 물 · ${waterLiter.toFixed(1)}L`}>
+            <Section title={`💧 물 · ${waterLiter.toFixed(1)}L / 목표 ${waterTarget.toFixed(1)}L`}>
               <ScaleRow
                 values={WATER_PRESETS}
                 active={waterLiter}
