@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+
+const readyLevels = [
+  { label: "ELITE", icon: "🔵", score: 100, text: "최상의 컨디션" },
+  { label: "READY", icon: "🟢", score: 90, text: "계획대로 수행" },
+  { label: "NORMAL", icon: "🟡", score: 75, text: "무난하게 이어감" },
+  { label: "CARE", icon: "🟠", score: 60, text: "관리 필요" },
+  { label: "RECOVERY", icon: "🔴", score: 40, text: "회복 우선" },
+];
 
 const workoutOptions = [
   "풋살",
@@ -9,55 +16,50 @@ const workoutOptions = [
   "PT 하체",
   "개인운동 어깨강화",
   "개인운동 키퍼체력",
-  "유산소 자전거",
-  "유산소 천국의 계단",
+  "유산소 자전거 30분",
+  "유산소 천국의 계단 20분",
   "폼롤러 스트레칭",
 ];
 
-export default function RecordPage() {
-  const router = useRouter();
-  const today = new Date().toISOString().slice(0, 10);
+const waterOptions = ["0L", "1.0L", "1.5L", "2.0L", "2.5L"];
+const proteinOptions = ["0g", "40g", "60g", "80g", "100g"];
+const sleepOptions = ["0h", "4h", "5h", "6h", "7h"];
 
-  const [recordDate, setRecordDate] = useState(today);
+function localToday() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
+
+export default function RecordPage() {
+  const [recordDate, setRecordDate] = useState(localToday());
+  const [level, setLevel] = useState("NORMAL");
   const [morningMed, setMorningMed] = useState(false);
   const [eveningMed, setEveningMed] = useState(false);
+
   const [selectedWorkouts, setSelectedWorkouts] = useState<string[]>([]);
-  const [workoutSelect, setWorkoutSelect] = useState("");
-  const [customWorkout, setCustomWorkout] = useState("");
-  const [bikeMinutes, setBikeMinutes] = useState("0");
-  const [waterLiter, setWaterLiter] = useState("3.0");
-  const [proteinGram, setProteinGram] = useState("160");
-  const [sleepHours, setSleepHours] = useState("7.0");
-  const [moodScore, setMoodScore] = useState(4);
-  const [lightnessScore, setLightnessScore] = useState(3);
-  const [reactionScore, setReactionScore] = useState(3);
-  const [sideScore, setSideScore] = useState(3);
-  const [shoulderScore, setShoulderScore] = useState(3);
-  const [gkMemo, setGkMemo] = useState("");
+  const [selectedWater, setSelectedWater] = useState("2.5L");
+  const [selectedProtein, setSelectedProtein] = useState("100g");
+  const [selectedSleep, setSelectedSleep] = useState("7h");
+
   const [memo, setMemo] = useState("");
+  const [coachNote, setCoachNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  function addWorkout(name: string) {
-    if (!name) return;
-    if (selectedWorkouts.includes(name)) return;
-    setSelectedWorkouts((prev) => [...prev, name]);
-  }
+  const selectedLevel =
+    readyLevels.find((item) => item.label === level) ?? readyLevels[2];
 
-  function removeWorkout(name: string) {
-    setSelectedWorkouts((prev) => prev.filter((item) => item !== name));
-  }
-
-  function addSelectedWorkout() {
-    addWorkout(workoutSelect);
-    setWorkoutSelect("");
-  }
-
-  function addCustomWorkout() {
-    const value = customWorkout.trim();
-    if (!value) return;
-    addWorkout(value);
-    setCustomWorkout("");
+  function toggleItem(
+    value: string,
+    selected: string[],
+    setter: (value: string[]) => void
+  ) {
+    if (selected.includes(value)) {
+      setter(selected.filter((item) => item !== value));
+    } else {
+      setter([...selected, value]);
+    }
   }
 
   async function saveRecord() {
@@ -65,40 +67,40 @@ export default function RecordPage() {
     setMessage("");
 
     const completedWorkout = selectedWorkouts.join(", ");
+    const bikeMinutes = selectedWorkouts.includes("유산소 자전거 30분") ? 30 : 0;
+
+    const mergedMemo = [
+      memo ? `[메모]\n${memo}` : "",
+      coachNote ? `[코치 피드백]\n${coachNote}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     const payload = {
       record_date: recordDate,
-      score: 0,
-      grade: "GREEN",
-      mood_score: moodScore,
-      memo,
+      score: selectedLevel.score,
+      grade: selectedLevel.label,
+      mood_score: levelToMoodScore(selectedLevel.label),
+      memo: mergedMemo,
       morning_med_taken: morningMed,
       evening_med_taken: eveningMed,
       medication_note: buildMedicationNote(morningMed, eveningMed),
       body: {
-        water_liter: Number(waterLiter || 0),
-        protein_gram: Number(proteinGram || 0),
+        water_liter: parseNumber(selectedWater),
+        protein_gram: parseNumber(selectedProtein),
         binge_yn: false,
       },
       workout: {
-        planned_workout: selectedWorkouts.length > 0 ? completedWorkout : null,
-        completed_workout: selectedWorkouts.length > 0 ? completedWorkout : null,
-        bike_minutes: Number(bikeMinutes || 0),
-        workout_done_yn:
-          selectedWorkouts.length > 0 || Number(bikeMinutes || 0) > 0,
+        planned_workout: completedWorkout || null,
+        completed_workout: completedWorkout || null,
+        bike_minutes: bikeMinutes,
+        workout_done_yn: selectedWorkouts.length > 0,
       },
       meal: null,
       sleep: {
-        sleep_hours: Number(sleepHours || 0),
-        sleep_quality_score: moodScore >= 4 ? 85 : 70,
-        wake_condition: moodScore >= 4 ? "GOOD" : "NORMAL",
-      },
-      gk: {
-        lightness_score: lightnessScore,
-        reaction_score: reactionScore,
-        side_score: sideScore,
-        shoulder_score: shoulderScore,
-        gk_memo: gkMemo || null,
+        sleep_hours: parseNumber(selectedSleep),
+        sleep_quality_score: levelToSleepScore(selectedLevel.label),
+        wake_condition: selectedLevel.label,
       },
     };
 
@@ -114,240 +116,235 @@ export default function RecordPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(JSON.stringify(data));
+        setMessage(`저장 실패: ${JSON.stringify(data)}`);
+        return;
       }
 
       setMessage("저장 완료. 오늘도 Journey는 이어졌습니다.");
 
       setTimeout(() => {
-        router.push(`/?record_date=${recordDate}`);
-        router.refresh();
+        window.location.href = `/?record_date=${recordDate}`;
       }, 700);
     } catch (error) {
       console.error(error);
-      setMessage("저장 실패. /api/day 또는 백엔드 상태를 확인해주세요.");
+      setMessage(`저장 실패: ${String(error)}`);
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f1ec] pb-40 text-zinc-900">
-      <div className="mx-auto max-w-md space-y-4 p-4">
-        <h1 className="text-3xl font-black">📝 오늘 체크</h1>
-
-        <Card>
-          <p className="text-sm font-bold text-zinc-500">날짜</p>
-          <input
-            type="date"
-            value={recordDate}
-            onChange={(event) => setRecordDate(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-[#ddd6ce] p-3 text-lg font-bold"
-          />
-        </Card>
-
-        <Card>
-          <h2 className="text-xl font-black">💊 약</h2>
-
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <ToggleButton
-              label="아침약"
-              active={morningMed}
-              onClick={() => setMorningMed(!morningMed)}
-            />
-            <ToggleButton
-              label="저녁약"
-              active={eveningMed}
-              onClick={() => setEveningMed(!eveningMed)}
-            />
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="text-xl font-black">🏋 운동</h2>
-
-          <div className="mt-4 flex gap-2">
-            <select
-              value={workoutSelect}
-              onChange={(event) => setWorkoutSelect(event.target.value)}
-              className="min-w-0 flex-1 rounded-xl border border-[#ddd6ce] bg-white p-3 font-bold"
-            >
-              <option value="">운동 선택</option>
-              {workoutOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              onClick={addSelectedWorkout}
-              className="rounded-xl bg-slate-900 px-4 font-bold text-white"
-            >
-              추가
-            </button>
-          </div>
-
-          <div className="mt-3 flex gap-2">
-            <input
-              value={customWorkout}
-              onChange={(event) => setCustomWorkout(event.target.value)}
-              placeholder="운동 직접 추가"
-              className="min-w-0 flex-1 rounded-xl border border-[#ddd6ce] p-3"
-            />
-            <button
-              type="button"
-              onClick={addCustomWorkout}
-              className="rounded-xl bg-slate-900 px-4 font-bold text-white"
-            >
-              추가
-            </button>
-          </div>
-
-          {selectedWorkouts.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {selectedWorkouts.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => removeWorkout(name)}
-                  className="rounded-full bg-slate-900 px-4 py-2 text-sm font-bold text-white"
-                >
-                  {name} ✕
-                </button>
-              ))}
-            </div>
-          )}
-
-          <Input
-            label="자전거"
-            value={bikeMinutes}
-            onChange={setBikeMinutes}
-            suffix="분"
-          />
-        </Card>
-
-        <Card>
-          <h2 className="text-xl font-black">💧 물</h2>
-          <Input label="수분" value={waterLiter} onChange={setWaterLiter} suffix="L" />
-        </Card>
-
-        <Card>
-          <h2 className="text-xl font-black">🥩 단백질</h2>
-          <Input label="단백질" value={proteinGram} onChange={setProteinGram} suffix="g" />
-        </Card>
-
-        <Card>
-          <h2 className="text-xl font-black">😴 수면</h2>
-          <Input label="수면" value={sleepHours} onChange={setSleepHours} suffix="시간" />
-        </Card>
-
-        <Card>
-          <h2 className="text-xl font-black">😊 오늘 기분</h2>
-
-          <div className="mt-4 grid grid-cols-5 gap-2 text-2xl">
-            {[5, 4, 3, 2, 1].map((score) => (
-              <button
-                key={score}
-                type="button"
-                onClick={() => setMoodScore(score)}
-                className={[
-                  "rounded-2xl border p-3",
-                  moodScore === score
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-[#ddd6ce] bg-white",
-                ].join(" ")}
-              >
-                {moodIcon(score)}
-              </button>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="text-xl font-black">🧤 GK 체크</h2>
-          <p className="mt-1 text-sm font-bold text-zinc-500">
-            풋살 없는 날은 3(보통)으로 둬도 됩니다.
+    <main className="min-h-screen bg-[#f4f1ec] pb-36 text-zinc-900">
+      <div className="mx-auto max-w-5xl p-4 md:p-6">
+        <header className="rounded-3xl bg-slate-900 p-6 text-white shadow-lg">
+          <h1 className="text-3xl font-black">🧤 GK21 Daily Check v1</h1>
+          <p className="mt-2 font-bold text-slate-300">
+            저장 + 피드백 + 5단계 컨디션 라벨
           </p>
+        </header>
 
-          <ScoreScale
-            label="몸이 가벼움"
-            value={lightnessScore}
-            onChange={setLightnessScore}
-          />
-          <ScoreScale
-            label="반응속도"
-            value={reactionScore}
-            onChange={setReactionScore}
-          />
-          <ScoreScale
-            label="사이드 이동"
-            value={sideScore}
-            onChange={setSideScore}
-          />
-          <ScoreScale
-            label="어깨 상태"
-            value={shoulderScore}
-            onChange={setShoulderScore}
-          />
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <Card title="📅 오늘 기록">
+            <Field label="날짜">
+              <input
+                type="date"
+                value={recordDate}
+                onChange={(event) => setRecordDate(event.target.value)}
+                className="input"
+              />
+            </Field>
 
-          <label className="mt-4 block">
-            <p className="mb-2 text-sm font-bold text-zinc-500">GK 메모</p>
-            <textarea
-              rows={3}
-              value={gkMemo}
-              onChange={(event) => setGkMemo(event.target.value)}
-              className="w-full rounded-xl border border-[#ddd6ce] p-3"
-              placeholder="예: 사이드 스텝에서 오른쪽 무릎이 불편했다."
+            <Field label="오늘 상태">
+              <select
+                value={level}
+                onChange={(event) => setLevel(event.target.value)}
+                className="input"
+              >
+                {readyLevels.map((item) => (
+                  <option key={item.label} value={item.label}>
+                    {item.icon} {item.label} - {item.text}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </Card>
+
+          <Card title="💊 약">
+            <div className="grid grid-cols-2 gap-3">
+              <Toggle
+                label="☀️ 아침약"
+                active={morningMed}
+                onClick={() => setMorningMed(!morningMed)}
+              />
+              <Toggle
+                label="🌙 저녁약"
+                active={eveningMed}
+                onClick={() => setEveningMed(!eveningMed)}
+              />
+            </div>
+          </Card>
+
+          <Card title="🏋 운동">
+            <SelectList
+              options={workoutOptions}
+              selected={selectedWorkouts}
+              onToggle={(value) =>
+                toggleItem(value, selectedWorkouts, setSelectedWorkouts)
+              }
             />
-          </label>
-        </Card>
+          </Card>
 
-        <Card>
-          <h2 className="text-xl font-black">📝 메모</h2>
+          <Card title="💧 수분">
+            <SingleSelectList
+              options={waterOptions}
+              selected={selectedWater}
+              onSelect={setSelectedWater}
+            />
+          </Card>
 
-          <textarea
-            rows={4}
-            value={memo}
-            onChange={(event) => setMemo(event.target.value)}
-            className="mt-4 w-full rounded-xl border border-[#ddd6ce] p-3"
-            placeholder="오늘 한 줄만 남겨도 충분합니다."
-          />
-        </Card>
+          <Card title="🥩 단백질">
+            <SingleSelectList
+              options={proteinOptions}
+              selected={selectedProtein}
+              onSelect={setSelectedProtein}
+            />
+          </Card>
+
+          <Card title="😴 수면">
+            <SingleSelectList
+              options={sleepOptions}
+              selected={selectedSleep}
+              onSelect={setSelectedSleep}
+            />
+          </Card>
+
+          <Card title="📝 오늘 메모">
+            <textarea
+              value={memo}
+              onChange={(event) => setMemo(event.target.value)}
+              className="textarea"
+              placeholder="오늘 한 줄만 남겨도 충분합니다."
+            />
+          </Card>
+
+          <Card title="🧑‍🏫 코치 피드백 저장">
+            <textarea
+              value={coachNote}
+              onChange={(event) => setCoachNote(event.target.value)}
+              className="textarea"
+              placeholder="AI 코치 피드백이나 직접 남기고 싶은 피드백을 저장합니다."
+            />
+          </Card>
+        </div>
 
         {message && (
-          <p className="rounded-2xl bg-white p-4 text-center font-bold text-zinc-700 shadow-sm">
+          <p className="mt-4 rounded-2xl bg-white p-4 text-center text-sm font-black shadow-sm">
             {message}
           </p>
         )}
       </div>
 
       <div className="fixed bottom-20 left-0 right-0 z-40 bg-[#f4f1ec]/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-md">
+        <div className="mx-auto max-w-5xl">
           <button
             type="button"
             onClick={saveRecord}
             disabled={saving}
-            className="w-full rounded-2xl bg-slate-900 py-4 text-lg font-bold text-white shadow-lg disabled:opacity-50"
+            className="w-full rounded-2xl bg-slate-900 py-4 text-lg font-black text-white shadow-lg disabled:opacity-50"
           >
             {saving ? "저장 중..." : "저장하기"}
           </button>
         </div>
       </div>
+
+      <style jsx>{`
+        .input {
+          width: 100%;
+          border: 1px solid #ddd6ce;
+          border-radius: 12px;
+          padding: 12px;
+          background: #fff;
+          font-weight: 800;
+        }
+        .textarea {
+          width: 100%;
+          min-height: 120px;
+          border: 1px solid #ddd6ce;
+          border-radius: 12px;
+          padding: 12px;
+          background: #fff;
+          font-weight: 700;
+        }
+      `}</style>
     </main>
   );
 }
 
-function Card({ children }: { children: React.ReactNode }) {
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
+    <section className="rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
+      <h2 className="mb-4 text-xl font-black">{title}</h2>
       {children}
     </section>
   );
 }
 
-function ToggleButton({
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="mt-3 block">
+      <p className="mb-2 text-sm font-black text-zinc-500">{label}</p>
+      {children}
+    </label>
+  );
+}
+
+function SelectList({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      {options.map((item) => (
+        <Toggle
+          key={item}
+          label={item}
+          active={selected.includes(item)}
+          onClick={() => onToggle(item)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SingleSelectList({
+  options,
+  selected,
+  onSelect,
+}: {
+  options: string[];
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      {options.map((item) => (
+        <Toggle
+          key={item}
+          label={item}
+          active={selected === item}
+          onClick={() => onSelect(item)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Toggle({
   label,
   active,
   onClick,
@@ -364,7 +361,7 @@ function ToggleButton({
         "rounded-2xl border p-4 text-center text-base font-black",
         active
           ? "border-slate-900 bg-slate-900 text-white"
-          : "border-[#ddd6ce] bg-white text-zinc-900",
+          : "border-[#ddd6ce] bg-[#faf7f2] text-zinc-900",
       ].join(" ")}
     >
       {active ? "✅ " : "⬜ "}
@@ -373,76 +370,24 @@ function ToggleButton({
   );
 }
 
-function Input({
-  label,
-  value,
-  onChange,
-  suffix,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  suffix: string;
-}) {
-  return (
-    <label className="mt-4 block">
-      <p className="mb-2 text-sm font-bold text-zinc-500">{label}</p>
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="w-full rounded-xl border border-[#ddd6ce] p-3 text-lg font-bold"
-        />
-        <span className="font-bold text-zinc-500">{suffix}</span>
-      </div>
-    </label>
-  );
+function parseNumber(value: string) {
+  return Number(value.replace(/[^\d.]/g, "") || 0);
 }
 
-function ScoreScale({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div className="mt-4">
-      <p className="mb-2 text-sm font-bold text-zinc-500">{label}</p>
-      <div className="grid grid-cols-5 gap-2">
-        {[1, 2, 3, 4, 5].map((score) => (
-          <button
-            key={score}
-            type="button"
-            onClick={() => onChange(score)}
-            className={[
-              "rounded-xl border p-2 text-center font-black",
-              value === score
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-[#ddd6ce] bg-white text-zinc-900",
-            ].join(" ")}
-          >
-            {score}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+function levelToMoodScore(level: string) {
+  if (level === "ELITE") return 5;
+  if (level === "READY") return 5;
+  if (level === "NORMAL") return 4;
+  if (level === "CARE") return 3;
+  return 2;
 }
 
-function moodIcon(score: number) {
-  const icons: Record<number, string> = {
-    5: "😀",
-    4: "🙂",
-    3: "😐",
-    2: "😔",
-    1: "😢",
-  };
-
-  return icons[score] ?? "😐";
+function levelToSleepScore(level: string) {
+  if (level === "ELITE") return 95;
+  if (level === "READY") return 85;
+  if (level === "NORMAL") return 75;
+  if (level === "CARE") return 60;
+  return 45;
 }
 
 function buildMedicationNote(morning: boolean, evening: boolean) {
