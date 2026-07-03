@@ -2,7 +2,7 @@ from datetime import date
 
 from fastapi import APIRouter, Query
 
-from app.crud.dashboard import get_dashboard
+from app.crud.dashboard import get_active_goal, get_dashboard, get_day_detail
 from app.crud.ai_analysis import get_daily_ai_analysis
 from app.services.mission import build_today_missions
 from app.services.philosophy import get_daily_philosophy
@@ -17,6 +17,8 @@ def api_get_dashboard(record_date: date | None = Query(default=None)):
     dashboard = get_dashboard(target)
     ai = get_daily_ai_analysis(target)
     missions = build_today_missions(dashboard)
+    detail = get_day_detail(target)
+    goal = get_active_goal()
 
     day_no = dashboard.get("day_no") if dashboard else 1
     philosophy = get_daily_philosophy(day_no)
@@ -28,4 +30,6 @@ def api_get_dashboard(record_date: date | None = Query(default=None)):
         "ai": ai,
         "missions": missions,
         "philosophy": philosophy,
+        "detail": detail,
+        "goal": goal,
     }

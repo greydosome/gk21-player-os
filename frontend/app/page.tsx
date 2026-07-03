@@ -109,28 +109,28 @@ const MVP_SUGGESTIONS = [
 
 const READY_LEVELS = [
   {
-    min: 95,
-    label: "ELITE",
+    min: 90,
+    label: "AWESOME",
     icon: "🔵",
     text: "최상의 컨디션입니다. 적극적으로 움직여도 좋습니다.",
     bg: "bg-blue-600",
   },
   {
-    min: 80,
-    label: "READY",
+    min: 61,
+    label: "Good",
     icon: "🟢",
     text: "오늘은 계획한 훈련을 진행하기 좋은 상태입니다.",
     bg: "bg-emerald-600",
   },
   {
-    min: 60,
-    label: "NORMAL",
+    min: 41,
+    label: "Not too bad",
     icon: "🟡",
     text: "오늘은 평소 루틴을 유지하면 충분합니다.",
-    bg: "bg-amber-500",
+    bg: "bg-yellow-500",
   },
   {
-    min: 40,
+    min: 21,
     label: "CARE",
     icon: "🟠",
     text: "오늘은 강도보다 회복을 함께 고려하세요.",
@@ -144,6 +144,16 @@ const READY_LEVELS = [
     bg: "bg-red-600",
   },
 ];
+
+const BLACK_LEVEL = {
+  min: -1,
+  label: "Break",
+  icon: "⚫",
+  text: "아직 오늘 기록이 없습니다. 체크를 시작하면 상태가 계산됩니다.",
+  bg: "bg-black border-2 border-zinc-700",
+};
+
+const DEFAULT_PROTEIN_TARGET = 60;
 
 type SelectedWorkout = {
   minutes: number;
@@ -160,6 +170,16 @@ type PeriodStats = {
   full_medication_days: number;
   binge_days: number;
   period_days: number;
+};
+
+type HistoryRow = {
+  record_date: string;
+  sleep_hours: number | null;
+  water_liter: number | null;
+  protein_gram: number | null;
+  workout_done_yn: boolean | null;
+  mood_score: number | null;
+  binge_yn: boolean | null;
 };
 
 function today() {
@@ -181,6 +201,7 @@ function computeReady({
   sleepHours,
   waterLiter,
   proteinGram,
+  proteinTarget,
   workoutDone,
   morningMed,
   eveningMed,
@@ -189,6 +210,7 @@ function computeReady({
   sleepHours: number;
   waterLiter: number;
   proteinGram: number;
+  proteinTarget: number;
   workoutDone: boolean;
   morningMed: boolean;
   eveningMed: boolean;
@@ -206,9 +228,9 @@ function computeReady({
   else if (waterLiter >= 2.0) score += 10;
   else score += 5;
 
-  if (proteinGram >= 160) score += 15;
-  else if (proteinGram >= 120) score += 10;
-  else if (proteinGram >= 80) score += 5;
+  if (proteinGram >= proteinTarget) score += 15;
+  else if (proteinGram >= proteinTarget * 0.75) score += 10;
+  else if (proteinGram >= proteinTarget * 0.5) score += 5;
 
   score += workoutDone ? 20 : 10;
 
@@ -225,6 +247,34 @@ function computeReady({
   return { score, level };
 }
 
+function snapshotFormState(state: {
+  morningMed: boolean;
+  eveningMed: boolean;
+  waterLiter: number;
+  sleepHours: number;
+  binge: boolean;
+  moodScore: number;
+  mvpText: string;
+  selectedWorkouts: Map<string, SelectedWorkout>;
+  proteinCounts: Map<string, number>;
+}) {
+  return JSON.stringify({
+    morningMed: state.morningMed,
+    eveningMed: state.eveningMed,
+    waterLiter: state.waterLiter,
+    sleepHours: state.sleepHours,
+    binge: state.binge,
+    moodScore: state.moodScore,
+    mvpText: state.mvpText,
+    workouts: Array.from(state.selectedWorkouts.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([type, w]) => [type, w.minutes, Array.from(w.details).sort()]),
+    protein: Array.from(state.proteinCounts.entries())
+      .filter(([, count]) => count > 0)
+      .sort(([a], [b]) => a.localeCompare(b)),
+  });
+}
+
 function buildMedicationNote(morning: boolean, evening: boolean) {
   if (morning && evening) return "아침약, 저녁약 복용 완료";
   if (morning && !evening) return "아침약 완료, 저녁약 체크 필요";
@@ -233,14 +283,16 @@ function buildMedicationNote(morning: boolean, evening: boolean) {
 }
 
 export default function Home() {
-  const didMountRef = useRef(false);
+  const lastLoadedSnapshotRef = useRef<string | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [recordDate, setRecordDate] = useState(today());
+  const [hasRecord, setHasRecord] = useState(false);
   const [morningMed, setMorningMed] = useState(false);
   const [eveningMed, setEveningMed] = useState(false);
   const [selectedWorkouts, setSelectedWorkouts] = useState<Map<string, SelectedWorkout>>(new Map());
-  const [proteinFoods, setProteinFoods] = useState<Set<string>>(new Set());
+  const [proteinCounts, setProteinCounts] = useState<Map<string, number>>(new Map());
+  const [proteinTarget, setProteinTarget] = useState(DEFAULT_PROTEIN_TARGET);
   const [waterLiter, setWaterLiter] = useState(0);
   const [sleepHours, setSleepHours] = useState(7);
   const [binge, setBinge] = useState(false);
@@ -254,38 +306,47 @@ export default function Home() {
 
   const [view, setView] = useState<"today" | "week" | "month">("today");
   const [stats, setStats] = useState<PeriodStats | null>(null);
+  const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
   const proteinGram = useMemo(
     () =>
-      PROTEIN_FOODS.filter((food) => proteinFoods.has(food.label)).reduce(
-        (sum, food) => sum + food.gram,
-        0
-      ),
-    [proteinFoods]
+      PROTEIN_FOODS.reduce((sum, food) => sum + food.gram * (proteinCounts.get(food.label) ?? 0), 0),
+    [proteinCounts]
   );
 
   const workoutDone = selectedWorkouts.size > 0;
   const todaySchedule = useMemo(() => scheduleFor(recordDate), [recordDate]);
 
-  const ready = useMemo(
-    () =>
-      computeReady({
-        sleepHours,
-        waterLiter,
-        proteinGram,
-        workoutDone,
-        morningMed,
-        eveningMed,
-        moodScore,
-      }),
-    [sleepHours, waterLiter, proteinGram, workoutDone, morningMed, eveningMed, moodScore]
-  );
+  const ready = useMemo(() => {
+    if (!hasRecord) return { score: 0, level: BLACK_LEVEL };
+
+    return computeReady({
+      sleepHours,
+      waterLiter,
+      proteinGram,
+      proteinTarget,
+      workoutDone,
+      morningMed,
+      eveningMed,
+      moodScore,
+    });
+  }, [
+    hasRecord,
+    sleepHours,
+    waterLiter,
+    proteinGram,
+    proteinTarget,
+    workoutDone,
+    morningMed,
+    eveningMed,
+    moodScore,
+  ]);
 
   const factors = [
     { icon: "😴", label: "수면", good: sleepHours >= 6 },
     { icon: "💧", label: "수분", good: waterLiter >= 2.5 },
-    { icon: "🥩", label: "단백질", good: proteinGram >= 120 },
+    { icon: "🥩", label: "단백질", good: proteinGram >= proteinTarget * 0.75 },
     { icon: "🏋", label: "운동", good: workoutDone },
     { icon: "💊", label: "복약", good: morningMed && eveningMed },
     { icon: "🙂", label: "컨디션", good: moodScore >= 4 },
@@ -323,11 +384,10 @@ export default function Home() {
     });
   }
 
-  function toggleProtein(label: string) {
-    setProteinFoods((prev) => {
-      const next = new Set(prev);
-      if (next.has(label)) next.delete(label);
-      else next.add(label);
+  function setProteinCount(label: string, count: number) {
+    setProteinCounts((prev) => {
+      const next = new Map(prev);
+      next.set(label, Math.max(0, count));
       return next;
     });
   }
@@ -342,6 +402,10 @@ export default function Home() {
       })
       .join(", ");
 
+    const proteinItems = PROTEIN_FOODS.flatMap((food) =>
+      Array.from({ length: proteinCounts.get(food.label) ?? 0 }, () => food.label)
+    );
+
     return {
       record_date: recordDate,
       score: ready.score,
@@ -355,7 +419,7 @@ export default function Home() {
       body: {
         water_liter: waterLiter,
         protein_gram: proteinGram,
-        protein_items: Array.from(proteinFoods),
+        protein_items: proteinItems,
         binge_yn: binge,
       },
       workout: {
@@ -410,12 +474,90 @@ export default function Home() {
     }
   }
 
-  // 자동 저장: 입력이 바뀌면 2초 후 조용히 저장. 최초 마운트에는 실행하지 않음.
+  // 날짜가 바뀌면 그 날짜의 기존 기록을 불러와서 폼을 채운다 (없으면 기본값으로 초기화).
   useEffect(() => {
-    if (!didMountRef.current) {
-      didMountRef.current = true;
-      return;
-    }
+    let cancelled = false;
+    setCoachStatus("idle");
+    setCoachText("");
+    setAutoSaveStatus("idle");
+
+    fetch(`/api/dashboard?record_date=${recordDate}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+
+        const d = data?.dashboard;
+        const detail = data?.detail;
+
+        const loaded = {
+          morningMed: d?.morning_med_taken ?? false,
+          eveningMed: d?.evening_med_taken ?? false,
+          waterLiter: d?.water_liter ?? 0,
+          sleepHours: d?.sleep_hours ?? 7,
+          binge: d?.binge_yn ?? false,
+          moodScore: d?.mood_score ?? 4,
+          mvpText: detail?.mvp_text ?? "",
+        };
+
+        const workoutMap = new Map<string, SelectedWorkout>();
+        (detail?.workout_items ?? []).forEach((item: { workout_type: string; minutes: number; detail: string | null }) => {
+          workoutMap.set(item.workout_type, {
+            minutes: item.minutes,
+            details: new Set(item.detail ? item.detail.split(", ") : []),
+          });
+        });
+
+        const proteinMap = new Map<string, number>();
+        (detail?.protein_items ?? []).forEach((label: string) => {
+          proteinMap.set(label, (proteinMap.get(label) ?? 0) + 1);
+        });
+
+        // 자동저장 effect가 "방금 불러온 값 그대로"인 경우 저장을 건너뛸 수 있도록 스냅샷을 먼저 기록해둔다.
+        lastLoadedSnapshotRef.current = snapshotFormState({
+          ...loaded,
+          selectedWorkouts: workoutMap,
+          proteinCounts: proteinMap,
+        });
+
+        setMorningMed(loaded.morningMed);
+        setEveningMed(loaded.eveningMed);
+        setWaterLiter(loaded.waterLiter);
+        setSleepHours(loaded.sleepHours);
+        setBinge(loaded.binge);
+        setMoodScore(loaded.moodScore);
+        setMvpText(loaded.mvpText);
+        setSelectedWorkouts(workoutMap);
+        setProteinCounts(proteinMap);
+
+        if (data?.goal?.target_protein_gram) {
+          setProteinTarget(data.goal.target_protein_gram);
+        }
+
+        setHasRecord(!!d);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [recordDate]);
+
+  // 자동 저장: 방금 불러온 값과 달라졌을 때만 2초 후 조용히 저장한다.
+  useEffect(() => {
+    const currentSnapshot = snapshotFormState({
+      morningMed,
+      eveningMed,
+      waterLiter,
+      sleepHours,
+      binge,
+      moodScore,
+      mvpText,
+      selectedWorkouts,
+      proteinCounts,
+    });
+
+    if (currentSnapshot === lastLoadedSnapshotRef.current) return;
+
+    setHasRecord(true);
 
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
@@ -423,6 +565,7 @@ export default function Home() {
       setAutoSaveStatus("saving");
       try {
         await saveToServer();
+        lastLoadedSnapshotRef.current = currentSnapshot;
         setAutoSaveStatus("saved");
       } catch {
         setAutoSaveStatus("idle");
@@ -438,7 +581,7 @@ export default function Home() {
     morningMed,
     eveningMed,
     selectedWorkouts,
-    proteinFoods,
+    proteinCounts,
     waterLiter,
     sleepHours,
     binge,
@@ -454,6 +597,17 @@ export default function Home() {
     try {
       setAutoSaveStatus("saving");
       await saveToServer();
+      lastLoadedSnapshotRef.current = snapshotFormState({
+        morningMed,
+        eveningMed,
+        waterLiter,
+        sleepHours,
+        binge,
+        moodScore,
+        mvpText,
+        selectedWorkouts,
+        proteinCounts,
+      });
       setAutoSaveStatus("saved");
       pollCoachFeedback(recordDate, 8);
     } catch (e) {
@@ -467,11 +621,18 @@ export default function Home() {
     if (view === "today") return;
 
     setStatsLoading(true);
-    fetch(`/api/stats?period=${view === "week" ? "week" : "month"}&record_date=${recordDate}`, {
-      cache: "no-store",
-    })
-      .then((res) => res.json())
-      .then((data) => setStats(data?.stats ?? null))
+    Promise.all([
+      fetch(`/api/stats?period=${view}&record_date=${recordDate}`, { cache: "no-store" }).then((res) =>
+        res.json()
+      ),
+      fetch(`/api/stats/history?period=${view}&record_date=${recordDate}`, { cache: "no-store" }).then(
+        (res) => res.json()
+      ),
+    ])
+      .then(([statsData, historyData]) => {
+        setStats(statsData?.stats ?? null);
+        setHistory(historyData?.history ?? null);
+      })
       .finally(() => setStatsLoading(false));
   }, [view, recordDate]);
 
@@ -489,7 +650,8 @@ export default function Home() {
         </div>
 
         <p className="mt-2 text-sm font-bold text-zinc-500">
-          🗓️ 오늘은 <span className="text-zinc-100">{todaySchedule.dayLabel}</span>입니다
+          🗓️ {recordDate === today() ? "오늘은" : `${recordDate}은(는)`}{" "}
+          <span className="text-zinc-100">{todaySchedule.dayLabel}</span>입니다
         </p>
 
         <section
@@ -498,30 +660,37 @@ export default function Home() {
             ready.level.bg,
           ].join(" ")}
         >
-          <p className="text-sm font-black uppercase tracking-wide text-white/70">오늘 상태</p>
+          <p className="text-sm font-black uppercase tracking-wide text-white/70">
+            {recordDate === today() ? "오늘 상태" : `${recordDate} 상태`}
+          </p>
           <p className="mt-2 text-4xl font-black">
             {ready.level.icon} {ready.level.label}
           </p>
           <p className="mt-2 font-bold text-white/90">{ready.level.text}</p>
-          <p className="mt-2 text-sm font-bold text-white/80">
-            {missingFactors.length > 0
-              ? `부족한 부분: ${missingFactors.join(", ")}`
-              : "모든 항목이 좋은 상태입니다"}
-          </p>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {factors.map((f) => (
-              <span
-                key={f.label}
-                className={[
-                  "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors",
-                  f.good ? "bg-white text-zinc-900" : "bg-white/15 text-white/70",
-                ].join(" ")}
-              >
-                {f.icon} {f.label}
-              </span>
-            ))}
-          </div>
+          {hasRecord && (
+            <>
+              <p className="mt-2 text-sm font-bold text-white/80">
+                {missingFactors.length > 0
+                  ? `부족한 부분: ${missingFactors.join(", ")}`
+                  : "모든 항목이 좋은 상태입니다"}
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {factors.map((f) => (
+                  <span
+                    key={f.label}
+                    className={[
+                      "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors",
+                      f.good ? "bg-white text-zinc-900" : "bg-white/15 text-white/70",
+                    ].join(" ")}
+                  >
+                    {f.icon} {f.label}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
 
           <button
             type="button"
@@ -533,6 +702,9 @@ export default function Home() {
 
           {showLevelLegend && (
             <div className="mt-2 space-y-1.5 rounded-2xl bg-black/20 p-3">
+              <p className="text-xs font-bold text-white/90">
+                {BLACK_LEVEL.icon} {BLACK_LEVEL.label} (기록 없음) — {BLACK_LEVEL.text}
+              </p>
               {READY_LEVELS.map((l) => (
                 <p key={l.label} className="text-xs font-bold text-white/90">
                   {l.icon} {l.label} ({l.min}점~) — {l.text}
@@ -566,220 +738,258 @@ export default function Home() {
           ))}
         </div>
 
-        {view !== "today" && (
-          <section className="mt-3 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
-            <h2 className="text-base font-black text-zinc-100">
-              {view === "week" ? "최근 7일" : "최근 30일"} 통계
-            </h2>
+        {view !== "today" ? (
+          <section className="mt-3 space-y-3">
+            <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
+              <h2 className="text-base font-black text-zinc-100">
+                {view === "week" ? "최근 7일" : "최근 30일"} 요약
+              </h2>
 
-            {statsLoading || !stats ? (
-              <p className="mt-3 text-sm font-bold text-zinc-500">불러오는 중...</p>
-            ) : (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <StatTile label="기록일" value={`${stats.days_logged}/${stats.period_days}일`} />
-                <StatTile label="운동일" value={`${stats.workout_days}일`} />
-                <StatTile label="평균 수면" value={`${round1(stats.avg_sleep_hours)}h`} />
-                <StatTile label="평균 수분" value={`${round1(stats.avg_water_liter)}L`} />
-                <StatTile label="평균 단백질" value={`${round1(stats.avg_protein_gram)}g`} />
-                <StatTile label="복약 완료일" value={`${stats.full_medication_days}일`} />
-                <StatTile label="평균 컨디션" value={`${round1(stats.avg_mood_score)}`} />
-                <StatTile label="폭식일" value={`${stats.binge_days}일`} />
-              </div>
+              {statsLoading || !stats ? (
+                <p className="mt-3 text-sm font-bold text-zinc-500">불러오는 중...</p>
+              ) : (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <StatTile label="기록일" value={`${stats.days_logged}/${stats.period_days}일`} />
+                  <StatTile label="운동일" value={`${stats.workout_days}일`} />
+                  <StatTile label="복약 완료일" value={`${stats.full_medication_days}일`} />
+                  <StatTile label="폭식일" value={`${stats.binge_days}일`} />
+                </div>
+              )}
+            </div>
+
+            {!statsLoading && history && (
+              <>
+                <TrendChart
+                  title="😴 수면"
+                  unit="h"
+                  data={history.map((h) => h.sleep_hours)}
+                  dates={history.map((h) => h.record_date)}
+                />
+                <TrendChart
+                  title="💧 수분"
+                  unit="L"
+                  data={history.map((h) => h.water_liter)}
+                  dates={history.map((h) => h.record_date)}
+                  targetValue={3.0}
+                />
+                <TrendChart
+                  title="🥩 단백질"
+                  unit="g"
+                  data={history.map((h) => h.protein_gram)}
+                  dates={history.map((h) => h.record_date)}
+                  targetValue={proteinTarget}
+                />
+                <WorkoutDots data={history.map((h) => h.workout_done_yn)} dates={history.map((h) => h.record_date)} />
+              </>
             )}
           </section>
-        )}
+        ) : (
+          <>
+            <Section title="⚡ 빠른 체크">
+              <div className="flex flex-wrap gap-2">
+                <Chip
+                  label="☀️ 아침약"
+                  active={morningMed}
+                  onClick={() => setMorningMed(!morningMed)}
+                />
+                <Chip
+                  label="🌙 저녁약"
+                  active={eveningMed}
+                  onClick={() => setEveningMed(!eveningMed)}
+                />
+                <Chip label="🍽 폭식함" active={binge} onClick={() => setBinge(!binge)} tone="warn" />
+              </div>
+            </Section>
 
-        <Section title="⚡ 빠른 체크">
-          <div className="flex flex-wrap gap-2">
-            <Chip
-              label="☀️ 아침약"
-              active={morningMed}
-              onClick={() => setMorningMed(!morningMed)}
-            />
-            <Chip
-              label="🌙 저녁약"
-              active={eveningMed}
-              onClick={() => setEveningMed(!eveningMed)}
-            />
-            <Chip label="🍽 폭식함" active={binge} onClick={() => setBinge(!binge)} tone="warn" />
-          </div>
-        </Section>
+            <Section title="🏋 운동">
+              <div className="flex flex-wrap gap-2">
+                {WORKOUT_TYPES.map((w) => {
+                  const suggestion = todaySchedule.suggestions.find((s) => s.type === w.label);
+                  const isSelected = selectedWorkouts.has(w.label);
 
-        <Section title="🏋 운동">
-          <div className="flex flex-wrap gap-2">
-            {WORKOUT_TYPES.map((w) => {
-              const suggestion = todaySchedule.suggestions.find((s) => s.type === w.label);
-              const isSelected = selectedWorkouts.has(w.label);
+                  return (
+                    <button
+                      key={w.label}
+                      type="button"
+                      onClick={() => toggleWorkout(w.label, suggestion?.minutes ?? w.defaultMinutes)}
+                      className={[
+                        "shrink-0 rounded-full border-2 px-3.5 py-2 text-sm font-bold transition-colors",
+                        isSelected
+                          ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+                          : suggestion
+                            ? "border-amber-500 bg-zinc-900 text-amber-400"
+                            : "border-zinc-700 bg-zinc-800 text-zinc-200",
+                      ].join(" ")}
+                    >
+                      {isSelected ? "✓ " : suggestion ? "⭐ " : ""}
+                      {w.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-              return (
-                <button
-                  key={w.label}
-                  type="button"
-                  onClick={() => toggleWorkout(w.label, suggestion?.minutes ?? w.defaultMinutes)}
-                  className={[
-                    "shrink-0 rounded-full border-2 px-3.5 py-2 text-sm font-bold transition-colors",
-                    isSelected
-                      ? "border-emerald-500 bg-emerald-500 text-zinc-950"
-                      : suggestion
-                        ? "border-amber-500 bg-zinc-900 text-amber-400"
-                        : "border-zinc-700 bg-zinc-800 text-zinc-200",
-                  ].join(" ")}
-                >
-                  {isSelected ? "✓ " : suggestion ? "⭐ " : ""}
-                  {w.label}
-                </button>
-              );
-            })}
-          </div>
+              {selectedWorkouts.size > 0 && (
+                <div className="mt-3 space-y-2">
+                  {Array.from(selectedWorkouts.entries()).map(([type, w]) => {
+                    const typeInfo = WORKOUT_TYPES.find((x) => x.label === type);
+                    return (
+                      <div key={type} className="rounded-2xl bg-zinc-800 p-2.5">
+                        <div className="flex items-center gap-2">
+                          <p className="min-w-0 flex-1 truncate text-sm font-bold text-zinc-100">{type}</p>
 
-          {selectedWorkouts.size > 0 && (
-            <div className="mt-3 space-y-2">
-              {Array.from(selectedWorkouts.entries()).map(([type, w]) => {
-                const typeInfo = WORKOUT_TYPES.find((x) => x.label === type);
-                return (
-                  <div key={type} className="rounded-2xl bg-zinc-800 p-2.5">
-                    <div className="flex items-center gap-2">
-                      <p className="min-w-0 flex-1 truncate text-sm font-bold text-zinc-100">{type}</p>
+                          <Stepper
+                            value={w.minutes}
+                            onChange={(v) => updateWorkoutMinutes(type, v)}
+                            suffix="분"
+                            step={5}
+                          />
 
-                      <Stepper
-                        value={w.minutes}
-                        onChange={(v) => updateWorkoutMinutes(type, v)}
-                        suffix="분"
-                      />
+                          <span className="w-14 shrink-0 text-right text-xs font-bold text-zinc-500">
+                            {kcalFor(type, w.minutes)}kcal
+                          </span>
 
-                      <span className="w-14 shrink-0 text-right text-xs font-bold text-zinc-500">
-                        {kcalFor(type, w.minutes)}kcal
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => toggleWorkout(type, w.minutes)}
-                        className="h-8 w-8 shrink-0 rounded-full bg-emerald-500 text-sm font-black text-zinc-950"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    {typeInfo?.subExercises && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {typeInfo.subExercises.map((exercise) => (
                           <button
-                            key={exercise}
                             type="button"
-                            onClick={() => toggleWorkoutDetail(type, exercise)}
-                            className={[
-                              "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors",
-                              w.details.has(exercise)
-                                ? "border-emerald-500 bg-emerald-500 text-zinc-950"
-                                : "border-zinc-700 bg-zinc-900 text-zinc-400",
-                            ].join(" ")}
+                            onClick={() => toggleWorkout(type, w.minutes)}
+                            className="h-8 w-8 shrink-0 rounded-full bg-emerald-500 text-sm font-black text-zinc-950"
                           >
-                            {w.details.has(exercise) && "✓ "}
-                            {exercise}
+                            ✕
                           </button>
-                        ))}
+                        </div>
+
+                        {typeInfo?.subExercises && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {typeInfo.subExercises.map((exercise) => (
+                              <button
+                                key={exercise}
+                                type="button"
+                                onClick={() => toggleWorkoutDetail(type, exercise)}
+                                className={[
+                                  "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors",
+                                  w.details.has(exercise)
+                                    ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+                                    : "border-zinc-700 bg-zinc-900 text-zinc-400",
+                                ].join(" ")}
+                              >
+                                {w.details.has(exercise) && "✓ "}
+                                {exercise}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    );
+                  })}
+                </div>
+              )}
+            </Section>
+
+            <Section title={`🥩 단백질 · ${proteinGram}g / 목표 ${proteinTarget}g`}>
+              <div className="space-y-2">
+                {PROTEIN_FOODS.map((food) => (
+                  <div
+                    key={food.label}
+                    className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
+                  >
+                    <div>
+                      <p className="font-bold text-zinc-100">{food.label}</p>
+                      <p className="text-xs text-zinc-500">{food.gram}g / 1회</p>
+                    </div>
+                    <Stepper
+                      value={proteinCounts.get(food.label) ?? 0}
+                      onChange={(v) => setProteinCount(food.label, v)}
+                      suffix="회"
+                      step={1}
+                    />
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </Section>
+                ))}
+              </div>
+            </Section>
 
-        <Section title={`🥩 단백질 · ${proteinGram}g`}>
-          <div className="flex flex-wrap gap-2">
-            {PROTEIN_FOODS.map((food) => (
-              <Chip
-                key={food.label}
-                label={`${food.label} ${food.gram}g`}
-                active={proteinFoods.has(food.label)}
-                onClick={() => toggleProtein(food.label)}
+            <Section title={`💧 물 · ${waterLiter.toFixed(1)}L`}>
+              <ScaleRow
+                values={WATER_PRESETS}
+                active={waterLiter}
+                onSelect={setWaterLiter}
+                format={(v) => `${v.toFixed(1)}L`}
               />
-            ))}
-          </div>
-        </Section>
+            </Section>
 
-        <Section title={`💧 물 · ${waterLiter.toFixed(1)}L`}>
-          <ScaleRow
-            values={WATER_PRESETS}
-            active={waterLiter}
-            onSelect={setWaterLiter}
-            format={(v) => `${v.toFixed(1)}L`}
-          />
-        </Section>
-
-        <Section title={`😴 수면 · ${sleepHours}시간`}>
-          <ScaleRow
-            values={SLEEP_HOURS}
-            active={sleepHours}
-            onSelect={setSleepHours}
-            format={(v) => `${v}h`}
-          />
-        </Section>
-
-        <Section title="🙂 컨디션">
-          <div className="grid grid-cols-5 gap-2">
-            {MOOD_OPTIONS.map((mood) => (
-              <button
-                key={mood.score}
-                type="button"
-                onClick={() => setMoodScore(mood.score)}
-                className={[
-                  "rounded-2xl border-2 py-3 text-3xl transition-colors",
-                  moodScore === mood.score
-                    ? "border-emerald-500 bg-zinc-800"
-                    : "border-zinc-700 bg-zinc-800",
-                ].join(" ")}
-              >
-                {mood.icon}
-              </button>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="🏅 오늘의 한마디">
-          <div className="flex flex-wrap gap-2">
-            {MVP_SUGGESTIONS.map((phrase) => (
-              <Chip
-                key={phrase}
-                label={phrase}
-                active={mvpText === phrase}
-                onClick={() => setMvpText(mvpText === phrase ? "" : phrase)}
+            <Section title={`😴 수면 · ${sleepHours}시간`}>
+              <ScaleRow
+                values={SLEEP_HOURS}
+                active={sleepHours}
+                onSelect={setSleepHours}
+                format={(v) => `${v}h`}
               />
-            ))}
-          </div>
-        </Section>
+            </Section>
 
-        <p className="mt-3 text-center text-xs font-bold text-zinc-600">
-          {autoSaveStatus === "saving" && "자동 저장 중..."}
-          {autoSaveStatus === "saved" && "✓ 자동 저장됨"}
-        </p>
+            <Section title="🙂 컨디션">
+              <div className="grid grid-cols-5 gap-2">
+                {MOOD_OPTIONS.map((mood) => (
+                  <button
+                    key={mood.score}
+                    type="button"
+                    onClick={() => setMoodScore(mood.score)}
+                    className={[
+                      "rounded-2xl border-2 py-3 text-3xl transition-colors",
+                      moodScore === mood.score
+                        ? "border-emerald-500 bg-zinc-800"
+                        : "border-zinc-700 bg-zinc-800",
+                    ].join(" ")}
+                  >
+                    {mood.icon}
+                  </button>
+                ))}
+              </div>
+            </Section>
 
-        {coachStatus !== "idle" && (
-          <section className="mt-3 rounded-3xl border border-emerald-500/30 bg-zinc-900 p-6 shadow-lg">
-            <h2 className="text-lg font-black text-emerald-400">🤖 AI 코치</h2>
-            <p className="mt-3 font-bold leading-relaxed text-zinc-100">
-              {coachStatus === "loading" && !coachText
-                ? "코치가 오늘 하루를 분석하고 있습니다..."
-                : coachText}
+            <Section title="🏅 오늘의 한마디">
+              <div className="flex flex-wrap gap-2">
+                {MVP_SUGGESTIONS.map((phrase) => (
+                  <Chip
+                    key={phrase}
+                    label={phrase}
+                    active={mvpText === phrase}
+                    onClick={() => setMvpText(mvpText === phrase ? "" : phrase)}
+                  />
+                ))}
+              </div>
+            </Section>
+
+            <p className="mt-3 text-center text-xs font-bold text-zinc-600">
+              {autoSaveStatus === "saving" && "자동 저장 중..."}
+              {autoSaveStatus === "saved" && "✓ 자동 저장됨"}
             </p>
-          </section>
+
+            {coachStatus !== "idle" && (
+              <section className="mt-3 rounded-3xl border border-emerald-500/30 bg-zinc-900 p-6 shadow-lg">
+                <h2 className="text-lg font-black text-emerald-400">🤖 AI 코치</h2>
+                <p className="mt-3 font-bold leading-relaxed text-zinc-100">
+                  {coachStatus === "loading" && !coachText
+                    ? "코치가 오늘 하루를 분석하고 있습니다..."
+                    : coachText}
+                </p>
+              </section>
+            )}
+          </>
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-xl">
-          <button
-            type="button"
-            onClick={requestCoaching}
-            disabled={coachStatus === "loading"}
-            className="w-full rounded-2xl bg-emerald-500 py-4 text-lg font-black text-zinc-950 shadow-lg disabled:opacity-50"
-          >
-            {coachStatus === "loading" ? "코칭 받는 중..." : "🤖 AI 코칭 받기"}
-          </button>
+      {view === "today" && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 px-4 py-3 backdrop-blur">
+          <div className="mx-auto max-w-xl">
+            <button
+              type="button"
+              onClick={requestCoaching}
+              disabled={coachStatus === "loading"}
+              className="w-full rounded-2xl bg-emerald-500 py-4 text-lg font-black text-zinc-950 shadow-lg disabled:opacity-50"
+            >
+              {coachStatus === "loading" ? "코칭 받는 중..." : "🤖 AI 코칭 받기"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </main>
   );
 }
@@ -806,6 +1016,107 @@ function StatTile({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl bg-zinc-800 p-3">
       <p className="text-xs font-bold text-zinc-500">{label}</p>
       <p className="mt-1 text-lg font-black text-zinc-100">{value}</p>
+    </div>
+  );
+}
+
+const CHART_ACCENT = "#10b981"; // emerald-500, app brand accent used as the sequential hue
+
+function TrendChart({
+  title,
+  unit,
+  data,
+  dates,
+  targetValue,
+}: {
+  title: string;
+  unit: string;
+  data: (number | null)[];
+  dates: string[];
+  targetValue?: number;
+}) {
+  const width = 300;
+  const height = 70;
+  const padding = 6;
+
+  const validValues = data.filter((v): v is number => v !== null && v !== undefined);
+  const maxValue = Math.max(targetValue ?? 0, ...validValues, 1) * 1.1;
+  const stepX = data.length > 1 ? (width - padding * 2) / (data.length - 1) : 0;
+
+  const points = data.map((v, i) => {
+    if (v === null || v === undefined) return null;
+    const x = padding + i * stepX;
+    const y = height - padding - (v / maxValue) * (height - padding * 2);
+    return { x, y };
+  });
+
+  const pathParts: string[] = [];
+  let drawing = false;
+  points.forEach((p) => {
+    if (!p) {
+      drawing = false;
+      return;
+    }
+    pathParts.push(`${drawing ? "L" : "M"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`);
+    drawing = true;
+  });
+
+  const lastPoint = [...points].reverse().find((p) => p !== null) ?? null;
+  const lastValue = [...validValues].pop();
+  const targetY = targetValue ? height - padding - (targetValue / maxValue) * (height - padding * 2) : null;
+
+  return (
+    <div className="rounded-2xl bg-zinc-800 p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold text-zinc-400">{title}</p>
+        <p className="text-sm font-black text-zinc-100">
+          {lastValue !== undefined ? `${lastValue}${unit}` : "-"}
+        </p>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="mt-2 w-full" style={{ height: 56 }}>
+        {targetY !== null && (
+          <line x1={padding} x2={width - padding} y1={targetY} y2={targetY} stroke="#52525b" strokeWidth="1" />
+        )}
+        {pathParts.length > 0 && (
+          <path
+            d={pathParts.join(" ")}
+            fill="none"
+            stroke={CHART_ACCENT}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
+        {lastPoint && <circle cx={lastPoint.x} cy={lastPoint.y} r="4" fill={CHART_ACCENT} stroke="#27272a" strokeWidth="2" />}
+      </svg>
+      <div className="flex justify-between text-xs font-bold text-zinc-600">
+        <span>{dates[0]?.slice(5)}</span>
+        <span>{dates[dates.length - 1]?.slice(5)}</span>
+      </div>
+    </div>
+  );
+}
+
+function WorkoutDots({ data, dates }: { data: (boolean | null)[]; dates: string[] }) {
+  return (
+    <div className="rounded-2xl bg-zinc-800 p-3">
+      <p className="text-xs font-bold text-zinc-400">🏋 운동일</p>
+      <div className="mt-2 flex gap-1.5">
+        {data.map((done, i) => (
+          <div
+            key={dates[i] ?? i}
+            title={dates[i]}
+            className={[
+              "h-6 flex-1 rounded-full",
+              done === true ? "bg-emerald-500" : done === false ? "bg-zinc-700" : "bg-zinc-900",
+            ].join(" ")}
+          />
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between text-xs font-bold text-zinc-600">
+        <span>{dates[0]?.slice(5)}</span>
+        <span>{dates[dates.length - 1]?.slice(5)}</span>
+      </div>
     </div>
   );
 }
@@ -876,16 +1187,18 @@ function Stepper({
   value,
   onChange,
   suffix,
+  step = 5,
 }: {
   value: number;
   onChange: (value: number) => void;
   suffix: string;
+  step?: number;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       <button
         type="button"
-        onClick={() => onChange(value - 5)}
+        onClick={() => onChange(value - step)}
         className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-base font-black text-zinc-100"
       >
         −
@@ -896,7 +1209,7 @@ function Stepper({
       </span>
       <button
         type="button"
-        onClick={() => onChange(value + 5)}
+        onClick={() => onChange(value + step)}
         className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-base font-black text-zinc-100"
       >
         +

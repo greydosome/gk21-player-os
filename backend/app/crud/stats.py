@@ -31,3 +31,26 @@ def get_period_stats(end_date, days):
     result["period_days"] = days
 
     return result
+
+
+def get_period_history(end_date, days):
+    start_date = end_date - timedelta(days=days - 1)
+
+    sql = text("""
+        SELECT
+            gs.day::date AS record_date,
+            v.sleep_hours,
+            v.water_liter,
+            v.protein_gram,
+            v.workout_done_yn,
+            v.mood_score,
+            v.binge_yn
+        FROM generate_series(:start_date, :end_date, interval '1 day') AS gs(day)
+        LEFT JOIN v_day_record_summary v ON v.record_date = gs.day::date
+        ORDER BY gs.day
+    """)
+
+    with engine.connect() as conn:
+        rows = conn.execute(sql, {"start_date": start_date, "end_date": end_date}).mappings().all()
+
+    return [dict(row) for row in rows]
