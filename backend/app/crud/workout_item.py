@@ -39,7 +39,9 @@ def save_workout_items(conn, day_record_id, items):
 
                 minutes,
 
-                calorie_estimate
+                calorie_estimate,
+
+                detail
 
             )
 
@@ -53,7 +55,9 @@ def save_workout_items(conn, day_record_id, items):
 
                 :minutes,
 
-                :calorie_estimate
+                :calorie_estimate,
+
+                :detail
 
             )
 
@@ -69,6 +73,8 @@ def save_workout_items(conn, day_record_id, items):
                 "minutes": item.minutes,
 
                 "calorie_estimate": item.calorie_estimate,
+
+                "detail": item.detail,
 
             }
             for item in items

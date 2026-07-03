@@ -22,6 +22,7 @@ class WorkoutItem(BaseModel):
     workout_type: str
     minutes: int
     calorie_estimate: int | None = None
+    detail: str | None = None
 
 
 class MealRecord(BaseModel):

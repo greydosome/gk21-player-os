@@ -2,24 +2,52 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const WORKOUT_TYPES: { label: string; kcalPerMin: number }[] = [
-  { label: "풋살", kcalPerMin: 8 },
-  { label: "PT", kcalPerMin: 7 },
-  { label: "GK Performance Day", kcalPerMin: 9 },
-  { label: "Clubbell Mobility", kcalPerMin: 4 },
-  { label: "하체모빌리티", kcalPerMin: 3 },
-  { label: "가슴운동", kcalPerMin: 6 },
-  { label: "등운동", kcalPerMin: 6 },
-  { label: "팔운동", kcalPerMin: 5 },
-  { label: "하체운동", kcalPerMin: 7 },
-];
+type WorkoutType = {
+  label: string;
+  kcalPerMin: number;
+  defaultMinutes: number;
+  subExercises?: string[];
+};
 
-const CARDIO_PRESETS = [
-  { label: "자전거 30분", type: "자전거", minutes: 30, kcalPerMin: 7 },
-  { label: "계단 오르기 20분", type: "천국의 계단", minutes: 20, kcalPerMin: 10 },
+const WORKOUT_TYPES: WorkoutType[] = [
+  { label: "풋살", kcalPerMin: 8, defaultMinutes: 90 },
+  { label: "PT", kcalPerMin: 7, defaultMinutes: 60 },
+  { label: "GK Performance Day", kcalPerMin: 9, defaultMinutes: 60 },
+  { label: "Clubbell Mobility", kcalPerMin: 4, defaultMinutes: 15 },
+  { label: "하체모빌리티", kcalPerMin: 3, defaultMinutes: 15 },
+  {
+    label: "가슴운동",
+    kcalPerMin: 6,
+    defaultMinutes: 30,
+    subExercises: ["벤치프레스", "인클라인 벤치프레스", "덤벨 플라이", "딥스", "푸시업"],
+  },
+  {
+    label: "등운동",
+    kcalPerMin: 6,
+    defaultMinutes: 30,
+    subExercises: ["랫풀다운", "티바로우", "데드리프트", "풀업", "시티드로우"],
+  },
+  {
+    label: "팔운동",
+    kcalPerMin: 5,
+    defaultMinutes: 20,
+    subExercises: ["바벨컬", "덤벨컬", "트라이셉스 익스텐션", "케이블 푸시다운", "해머컬"],
+  },
+  {
+    label: "하체운동",
+    kcalPerMin: 7,
+    defaultMinutes: 30,
+    subExercises: ["스쿼트", "레그프레스", "런지", "레그컬", "카프레이즈"],
+  },
+  {
+    label: "코어운동",
+    kcalPerMin: 5,
+    defaultMinutes: 15,
+    subExercises: ["플랭크", "크런치", "레그레이즈", "러시안트위스트", "사이드플랭크"],
+  },
+  { label: "자전거", kcalPerMin: 7, defaultMinutes: 30 },
+  { label: "계단 오르기", kcalPerMin: 10, defaultMinutes: 20 },
 ];
-
-const ALL_WORKOUT_KCAL = [...WORKOUT_TYPES, ...CARDIO_PRESETS.map((p) => ({ label: p.type, kcalPerMin: p.kcalPerMin }))];
 
 // 0=일 1=월 2=화 3=수 4=목 5=금 6=토 (Bible 주간 일정 기준)
 const WEEKLY_SCHEDULE = [
@@ -70,6 +98,15 @@ const MOOD_OPTIONS = [
   { score: 1, icon: "😢" },
 ];
 
+const MVP_SUGGESTIONS = [
+  "오늘도 출석했다",
+  "오늘도 시즌을 이어갔다",
+  "작은 것 하나는 해냈다",
+  "완벽하지 않아도 이어갔다",
+  "오늘은 회복이 필요했다",
+  "다음을 위해 오늘을 버텼다",
+];
+
 const READY_LEVELS = [
   {
     min: 95,
@@ -108,10 +145,9 @@ const READY_LEVELS = [
   },
 ];
 
-type WorkoutItem = {
-  id: number;
-  type: string;
+type SelectedWorkout = {
   minutes: number;
+  details: Set<string>;
 };
 
 type PeriodStats = {
@@ -133,7 +169,7 @@ function today() {
 }
 
 function kcalFor(type: string, minutes: number) {
-  const entry = ALL_WORKOUT_KCAL.find((w) => w.label === type);
+  const entry = WORKOUT_TYPES.find((w) => w.label === type);
   return Math.round((entry?.kcalPerMin ?? 6) * minutes);
 }
 
@@ -197,21 +233,20 @@ function buildMedicationNote(morning: boolean, evening: boolean) {
 }
 
 export default function Home() {
-  const nextItemId = useRef(1);
   const didMountRef = useRef(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [recordDate, setRecordDate] = useState(today());
   const [morningMed, setMorningMed] = useState(false);
   const [eveningMed, setEveningMed] = useState(false);
-  const [workoutItems, setWorkoutItems] = useState<WorkoutItem[]>([]);
+  const [selectedWorkouts, setSelectedWorkouts] = useState<Map<string, SelectedWorkout>>(new Map());
   const [proteinFoods, setProteinFoods] = useState<Set<string>>(new Set());
   const [waterLiter, setWaterLiter] = useState(0);
   const [sleepHours, setSleepHours] = useState(7);
   const [binge, setBinge] = useState(false);
   const [moodScore, setMoodScore] = useState(4);
   const [mvpText, setMvpText] = useState("");
-  const [memo, setMemo] = useState("");
+  const [showLevelLegend, setShowLevelLegend] = useState(false);
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [coachStatus, setCoachStatus] = useState<"idle" | "loading" | "ready">("idle");
@@ -230,7 +265,7 @@ export default function Home() {
     [proteinFoods]
   );
 
-  const workoutDone = workoutItems.length > 0;
+  const workoutDone = selectedWorkouts.size > 0;
   const todaySchedule = useMemo(() => scheduleFor(recordDate), [recordDate]);
 
   const ready = useMemo(
@@ -255,19 +290,37 @@ export default function Home() {
     { icon: "💊", label: "복약", good: morningMed && eveningMed },
     { icon: "🙂", label: "컨디션", good: moodScore >= 4 },
   ];
+  const missingFactors = factors.filter((f) => !f.good).map((f) => f.label);
 
-  function addWorkoutItem(type: string, minutes: number) {
-    setWorkoutItems((prev) => [...prev, { id: nextItemId.current++, type, minutes }]);
+  function toggleWorkout(type: string, defaultMinutes: number) {
+    setSelectedWorkouts((prev) => {
+      const next = new Map(prev);
+      if (next.has(type)) next.delete(type);
+      else next.set(type, { minutes: defaultMinutes, details: new Set() });
+      return next;
+    });
   }
 
-  function updateWorkoutMinutes(id: number, minutes: number) {
-    setWorkoutItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, minutes: Math.max(0, minutes) } : item))
-    );
+  function updateWorkoutMinutes(type: string, minutes: number) {
+    setSelectedWorkouts((prev) => {
+      const next = new Map(prev);
+      const current = next.get(type);
+      if (current) next.set(type, { ...current, minutes: Math.max(0, minutes) });
+      return next;
+    });
   }
 
-  function removeWorkoutItem(id: number) {
-    setWorkoutItems((prev) => prev.filter((item) => item.id !== id));
+  function toggleWorkoutDetail(type: string, exercise: string) {
+    setSelectedWorkouts((prev) => {
+      const next = new Map(prev);
+      const current = next.get(type);
+      if (!current) return prev;
+      const details = new Set(current.details);
+      if (details.has(exercise)) details.delete(exercise);
+      else details.add(exercise);
+      next.set(type, { ...current, details });
+      return next;
+    });
   }
 
   function toggleProtein(label: string) {
@@ -280,18 +333,21 @@ export default function Home() {
   }
 
   function buildPayload() {
-    const bikeMinutes = workoutItems
-      .filter((item) => item.type === "자전거")
-      .reduce((sum, item) => sum + item.minutes, 0);
+    const bikeMinutes = selectedWorkouts.get("자전거")?.minutes ?? 0;
 
-    const completedWorkout = workoutItems.map((item) => `${item.type} ${item.minutes}분`).join(", ");
+    const completedWorkout = Array.from(selectedWorkouts.entries())
+      .map(([type, w]) => {
+        const detailText = w.details.size > 0 ? ` (${Array.from(w.details).join(", ")})` : "";
+        return `${type} ${w.minutes}분${detailText}`;
+      })
+      .join(", ");
 
     return {
       record_date: recordDate,
       score: ready.score,
       grade: ready.level.label,
       mood_score: moodScore,
-      memo,
+      memo: null,
       mvp_text: mvpText || null,
       morning_med_taken: morningMed,
       evening_med_taken: eveningMed,
@@ -308,10 +364,11 @@ export default function Home() {
         bike_minutes: bikeMinutes,
         workout_done_yn: workoutDone,
       },
-      workout_items: workoutItems.map((item) => ({
-        workout_type: item.type,
-        minutes: item.minutes,
-        calorie_estimate: kcalFor(item.type, item.minutes),
+      workout_items: Array.from(selectedWorkouts.entries()).map(([type, w]) => ({
+        workout_type: type,
+        minutes: w.minutes,
+        calorie_estimate: kcalFor(type, w.minutes),
+        detail: w.details.size > 0 ? Array.from(w.details).join(", ") : null,
       })),
       meal: null,
       sleep: {
@@ -380,14 +437,13 @@ export default function Home() {
     recordDate,
     morningMed,
     eveningMed,
-    workoutItems,
+    selectedWorkouts,
     proteinFoods,
     waterLiter,
     sleepHours,
     binge,
     moodScore,
     mvpText,
-    memo,
   ]);
 
   async function requestCoaching() {
@@ -447,6 +503,11 @@ export default function Home() {
             {ready.level.icon} {ready.level.label}
           </p>
           <p className="mt-2 font-bold text-white/90">{ready.level.text}</p>
+          <p className="mt-2 text-sm font-bold text-white/80">
+            {missingFactors.length > 0
+              ? `부족한 부분: ${missingFactors.join(", ")}`
+              : "모든 항목이 좋은 상태입니다"}
+          </p>
 
           <div className="mt-4 flex flex-wrap gap-2">
             {factors.map((f) => (
@@ -461,6 +522,24 @@ export default function Home() {
               </span>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShowLevelLegend((v) => !v)}
+            className="mt-3 text-xs font-bold text-white/70 underline"
+          >
+            {showLevelLegend ? "등급 설명 닫기" : "등급 5단계 보기"}
+          </button>
+
+          {showLevelLegend && (
+            <div className="mt-2 space-y-1.5 rounded-2xl bg-black/20 p-3">
+              {READY_LEVELS.map((l) => (
+                <p key={l.label} className="text-xs font-bold text-white/90">
+                  {l.icon} {l.label} ({l.min}점~) — {l.text}
+                </p>
+              ))}
+            </div>
+          )}
         </section>
 
         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -527,78 +606,83 @@ export default function Home() {
         </Section>
 
         <Section title="🏋 운동">
-          {todaySchedule.suggestions.length > 0 && (
-            <div className="mb-3">
-              <p className="mb-2 text-xs font-bold text-zinc-500">
-                오늘의 추천 · {todaySchedule.dayLabel}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {todaySchedule.suggestions.map((s) => (
-                  <button
-                    key={s.type}
-                    type="button"
-                    onClick={() => addWorkoutItem(s.type, s.minutes)}
-                    className="shrink-0 rounded-full border-2 border-emerald-500 bg-zinc-950 px-3.5 py-2 text-sm font-bold text-emerald-400 active:bg-zinc-900"
-                  >
-                    + {s.type} {s.minutes}분
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <p className="mb-2 text-xs font-bold text-zinc-500">직접 추가</p>
           <div className="flex flex-wrap gap-2">
-            {WORKOUT_TYPES.map((w) => (
-              <button
-                key={w.label}
-                type="button"
-                onClick={() => addWorkoutItem(w.label, 20)}
-                className="shrink-0 rounded-full border border-zinc-700 bg-zinc-800 px-3.5 py-2 text-sm font-bold text-zinc-200 active:bg-zinc-700"
-              >
-                + {w.label}
-              </button>
-            ))}
+            {WORKOUT_TYPES.map((w) => {
+              const suggestion = todaySchedule.suggestions.find((s) => s.type === w.label);
+              const isSelected = selectedWorkouts.has(w.label);
+
+              return (
+                <button
+                  key={w.label}
+                  type="button"
+                  onClick={() => toggleWorkout(w.label, suggestion?.minutes ?? w.defaultMinutes)}
+                  className={[
+                    "shrink-0 rounded-full border-2 px-3.5 py-2 text-sm font-bold transition-colors",
+                    isSelected
+                      ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+                      : suggestion
+                        ? "border-amber-500 bg-zinc-900 text-amber-400"
+                        : "border-zinc-700 bg-zinc-800 text-zinc-200",
+                  ].join(" ")}
+                >
+                  {isSelected ? "✓ " : suggestion ? "⭐ " : ""}
+                  {w.label}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-2">
-            {CARDIO_PRESETS.map((preset) => (
-              <button
-                key={preset.label}
-                type="button"
-                onClick={() => addWorkoutItem(preset.type, preset.minutes)}
-                className="shrink-0 rounded-full border border-zinc-700 bg-zinc-800 px-3.5 py-2 text-sm font-bold text-zinc-200 active:bg-zinc-700"
-              >
-                + {preset.label}
-              </button>
-            ))}
-          </div>
-
-          {workoutItems.length > 0 && (
+          {selectedWorkouts.size > 0 && (
             <div className="mt-3 space-y-2">
-              {workoutItems.map((item) => (
-                <div key={item.id} className="flex items-center gap-2 rounded-2xl bg-zinc-800 p-2.5">
-                  <p className="min-w-0 flex-1 truncate text-sm font-bold text-zinc-100">{item.type}</p>
+              {Array.from(selectedWorkouts.entries()).map(([type, w]) => {
+                const typeInfo = WORKOUT_TYPES.find((x) => x.label === type);
+                return (
+                  <div key={type} className="rounded-2xl bg-zinc-800 p-2.5">
+                    <div className="flex items-center gap-2">
+                      <p className="min-w-0 flex-1 truncate text-sm font-bold text-zinc-100">{type}</p>
 
-                  <Stepper
-                    value={item.minutes}
-                    onChange={(v) => updateWorkoutMinutes(item.id, v)}
-                    suffix="분"
-                  />
+                      <Stepper
+                        value={w.minutes}
+                        onChange={(v) => updateWorkoutMinutes(type, v)}
+                        suffix="분"
+                      />
 
-                  <span className="w-14 shrink-0 text-right text-xs font-bold text-zinc-500">
-                    {kcalFor(item.type, item.minutes)}kcal
-                  </span>
+                      <span className="w-14 shrink-0 text-right text-xs font-bold text-zinc-500">
+                        {kcalFor(type, w.minutes)}kcal
+                      </span>
 
-                  <button
-                    type="button"
-                    onClick={() => removeWorkoutItem(item.id)}
-                    className="h-8 w-8 shrink-0 rounded-full bg-emerald-500 text-sm font-black text-zinc-950"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+                      <button
+                        type="button"
+                        onClick={() => toggleWorkout(type, w.minutes)}
+                        className="h-8 w-8 shrink-0 rounded-full bg-emerald-500 text-sm font-black text-zinc-950"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {typeInfo?.subExercises && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {typeInfo.subExercises.map((exercise) => (
+                          <button
+                            key={exercise}
+                            type="button"
+                            onClick={() => toggleWorkoutDetail(type, exercise)}
+                            className={[
+                              "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors",
+                              w.details.has(exercise)
+                                ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+                                : "border-zinc-700 bg-zinc-900 text-zinc-400",
+                            ].join(" ")}
+                          >
+                            {w.details.has(exercise) && "✓ "}
+                            {exercise}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </Section>
@@ -655,18 +739,16 @@ export default function Home() {
         </Section>
 
         <Section title="🏅 오늘의 한마디">
-          <input
-            value={mvpText}
-            onChange={(e) => setMvpText(e.target.value)}
-            placeholder="오늘 MVP · 가장 잘한 것 한 가지"
-            className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3.5 font-bold text-zinc-100 placeholder-zinc-500"
-          />
-          <textarea
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            className="mt-2 min-h-20 w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3.5 font-bold text-zinc-100 placeholder-zinc-500"
-            placeholder="한 줄 메모 (선택)"
-          />
+          <div className="flex flex-wrap gap-2">
+            {MVP_SUGGESTIONS.map((phrase) => (
+              <Chip
+                key={phrase}
+                label={phrase}
+                active={mvpText === phrase}
+                onClick={() => setMvpText(mvpText === phrase ? "" : phrase)}
+              />
+            ))}
+          </div>
         </Section>
 
         <p className="mt-3 text-center text-xs font-bold text-zinc-600">

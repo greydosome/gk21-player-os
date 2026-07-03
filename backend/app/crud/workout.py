@@ -35,9 +35,9 @@ def save_workout(conn, day_record_id, workout):
 
         "completed_workout": workout.completed_workout,
 
-        "bike_minutes": workout.bike_minutes,
+        "bike_minutes": workout.bike_minutes if workout.bike_minutes is not None else 0,
 
-        "workout_done_yn": workout.workout_done_yn,
+        "workout_done_yn": workout.workout_done_yn if workout.workout_done_yn is not None else False,
 
     }
 
