@@ -112,44 +112,44 @@ const READY_LEVELS = [
     min: 90,
     label: "AWESOME",
     icon: "🔵",
-    text: "최상의 컨디션입니다. 적극적으로 움직여도 좋습니다.",
+    text: "오늘 정말 완벽하게 챙기고 있어요! 이 흐름 그대로 이어가세요.",
     bg: "bg-blue-600",
   },
   {
     min: 61,
-    label: "Good",
+    label: "GOOD",
     icon: "🟢",
-    text: "오늘은 계획한 훈련을 진행하기 좋은 상태입니다.",
+    text: "좋은 흐름이에요. 계획한 훈련을 진행하기 좋은 상태입니다.",
     bg: "bg-emerald-600",
   },
   {
     min: 41,
-    label: "Not too bad",
+    label: "SOSO",
     icon: "🟡",
-    text: "오늘은 평소 루틴을 유지하면 충분합니다.",
+    text: "나쁘지 않아요. 지금의 루틴을 유지하면 충분합니다.",
     bg: "bg-yellow-500",
   },
   {
     min: 21,
     label: "CARE",
     icon: "🟠",
-    text: "오늘은 강도보다 회복을 함께 고려하세요.",
+    text: "아직 갈 길이 남았어요. 무리보다는 회복과 균형을 먼저 챙기세요.",
     bg: "bg-orange-600",
   },
   {
     min: 0,
     label: "RECOVERY",
     icon: "🔴",
-    text: "오늘은 회복이 훈련입니다. 무리하지 않아도 괜찮습니다.",
+    text: "지금은 회복이 우선인 시간이에요. 쉬는 것도 훈련의 일부입니다.",
     bg: "bg-red-600",
   },
 ];
 
 const BLACK_LEVEL = {
   min: -1,
-  label: "Break",
+  label: "BREAK",
   icon: "⚫",
-  text: "아직 오늘 기록이 없습니다. 체크를 시작하면 상태가 계산됩니다.",
+  text: "아직 시작 전이에요. 체크 하나만 눌러도 오늘이 시작됩니다.",
   bg: "bg-black border-2 border-zinc-700",
 };
 
@@ -707,7 +707,7 @@ export default function Home() {
               </p>
               {READY_LEVELS.map((l) => (
                 <p key={l.label} className="text-xs font-bold text-white/90">
-                  {l.icon} {l.label} ({l.min}점~) — {l.text}
+                  {l.icon} {l.label} ({l.min}%~) — {l.text}
                 </p>
               ))}
             </div>
