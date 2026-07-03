@@ -12,14 +12,14 @@ const WORKOUT_TYPES: { label: string; kcalPerMin: number }[] = [
   { label: "등운동", kcalPerMin: 6 },
   { label: "팔운동", kcalPerMin: 5 },
   { label: "하체운동", kcalPerMin: 7 },
-  { label: "자전거", kcalPerMin: 7 },
-  { label: "천국의 계단", kcalPerMin: 10 },
 ];
 
 const CARDIO_PRESETS = [
-  { label: "🚴 자전거 30분", type: "자전거", minutes: 30 },
-  { label: "🪜 천국의 계단 20분", type: "천국의 계단", minutes: 20 },
+  { label: "🚴 자전거 30분", type: "자전거", minutes: 30, kcalPerMin: 7 },
+  { label: "🪜 천국의 계단 20분", type: "천국의 계단", minutes: 20, kcalPerMin: 10 },
 ];
+
+const ALL_WORKOUT_KCAL = [...WORKOUT_TYPES, ...CARDIO_PRESETS.map((p) => ({ label: p.type, kcalPerMin: p.kcalPerMin }))];
 
 const PROTEIN_FOODS: { label: string; gram: number }[] = [
   { label: "참치", gram: 25 },
@@ -41,11 +41,41 @@ const MOOD_OPTIONS = [
 ];
 
 const READY_LEVELS = [
-  { min: 95, label: "ELITE", icon: "🔵", text: "최상의 컨디션입니다. 적극적으로 움직여도 좋습니다." },
-  { min: 80, label: "READY", icon: "🟢", text: "오늘은 계획한 훈련을 진행하기 좋은 상태입니다." },
-  { min: 60, label: "NORMAL", icon: "🟡", text: "오늘은 평소 루틴을 유지하면 충분합니다." },
-  { min: 40, label: "CARE", icon: "🟠", text: "오늘은 강도보다 회복을 함께 고려하세요." },
-  { min: 0, label: "RECOVERY", icon: "🔴", text: "오늘은 회복이 훈련입니다. 무리하지 않아도 괜찮습니다." },
+  {
+    min: 95,
+    label: "ELITE",
+    icon: "🔵",
+    text: "최상의 컨디션입니다. 적극적으로 움직여도 좋습니다.",
+    bg: "bg-blue-600",
+  },
+  {
+    min: 80,
+    label: "READY",
+    icon: "🟢",
+    text: "오늘은 계획한 훈련을 진행하기 좋은 상태입니다.",
+    bg: "bg-emerald-600",
+  },
+  {
+    min: 60,
+    label: "NORMAL",
+    icon: "🟡",
+    text: "오늘은 평소 루틴을 유지하면 충분합니다.",
+    bg: "bg-amber-500",
+  },
+  {
+    min: 40,
+    label: "CARE",
+    icon: "🟠",
+    text: "오늘은 강도보다 회복을 함께 고려하세요.",
+    bg: "bg-orange-600",
+  },
+  {
+    min: 0,
+    label: "RECOVERY",
+    icon: "🔴",
+    text: "오늘은 회복이 훈련입니다. 무리하지 않아도 괜찮습니다.",
+    bg: "bg-red-600",
+  },
 ];
 
 type WorkoutItem = {
@@ -61,7 +91,7 @@ function today() {
 }
 
 function kcalFor(type: string, minutes: number) {
-  const entry = WORKOUT_TYPES.find((w) => w.label === type);
+  const entry = ALL_WORKOUT_KCAL.find((w) => w.label === type);
   return Math.round((entry?.kcalPerMin ?? 6) * minutes);
 }
 
@@ -165,12 +195,23 @@ export default function Home() {
     [sleepHours, waterLiter, proteinGram, workoutDone, morningMed, eveningMed, moodScore]
   );
 
+  const factors = [
+    { icon: "😴", label: "수면", good: sleepHours >= 6 },
+    { icon: "💧", label: "수분", good: waterLiter >= 2.5 },
+    { icon: "🥩", label: "단백질", good: proteinGram >= 120 },
+    { icon: "🏋", label: "운동", good: workoutDone },
+    { icon: "💊", label: "복약", good: morningMed && eveningMed },
+    { icon: "🙂", label: "컨디션", good: moodScore >= 4 },
+  ];
+
   function addWorkoutItem(type: string, minutes: number) {
     setWorkoutItems((prev) => [...prev, { id: nextItemId.current++, type, minutes }]);
   }
 
   function updateWorkoutMinutes(id: number, minutes: number) {
-    setWorkoutItems((prev) => prev.map((item) => (item.id === id ? { ...item, minutes } : item)));
+    setWorkoutItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, minutes: Math.max(0, minutes) } : item))
+    );
   }
 
   function removeWorkoutItem(id: number) {
@@ -281,60 +322,80 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f4f1ec] pb-32 text-zinc-900">
       <div className="mx-auto max-w-xl p-4">
-        <header className="rounded-3xl bg-slate-900 p-6 text-white shadow-lg">
-          <h1 className="text-3xl font-black">🧤 GK21 Player OS</h1>
-          <p className="mt-2 font-bold text-slate-300">오늘 체크 · 자동 READY · 저장</p>
-        </header>
-
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-6 shadow-sm">
-          <p className="text-sm font-black text-zinc-500">오늘 상태</p>
-          <p className="mt-3 text-4xl font-black">
-            {ready.level.icon} {ready.level.label}
-          </p>
-          <p className="mt-2 font-bold text-zinc-500">{ready.level.text}</p>
-        </section>
-
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-          <p className="text-sm font-black text-zinc-500">날짜</p>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-black">🧤 GK21</h1>
           <input
             type="date"
             value={recordDate}
             onChange={(e) => setRecordDate(e.target.value)}
-            className="mt-2 w-full rounded-2xl border border-[#ddd6ce] p-4 text-lg font-black"
+            className="rounded-full border border-[#ddd6ce] bg-white px-4 py-2 text-sm font-bold"
           />
-        </section>
+        </div>
 
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">💊 약</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <Toggle label="☀️ 아침약" active={morningMed} onClick={() => setMorningMed(!morningMed)} />
-            <Toggle label="🌙 저녁약" active={eveningMed} onClick={() => setEveningMed(!eveningMed)} />
+        <section
+          className={[
+            "mt-3 rounded-3xl p-6 text-white shadow-lg transition-colors duration-300",
+            ready.level.bg,
+          ].join(" ")}
+        >
+          <p className="text-sm font-black uppercase tracking-wide text-white/70">오늘 상태</p>
+          <p className="mt-2 text-4xl font-black">
+            {ready.level.icon} {ready.level.label}
+          </p>
+          <p className="mt-2 font-bold text-white/90">{ready.level.text}</p>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {factors.map((f) => (
+              <span
+                key={f.label}
+                className={[
+                  "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors",
+                  f.good ? "bg-white text-zinc-900" : "bg-white/15 text-white/70",
+                ].join(" ")}
+              >
+                {f.icon} {f.label}
+              </span>
+            ))}
           </div>
         </section>
 
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">🏋 운동</h2>
+        <Section title="⚡ 빠른 체크">
+          <div className="flex flex-wrap gap-2">
+            <Chip
+              label="☀️ 아침약"
+              active={morningMed}
+              onClick={() => setMorningMed(!morningMed)}
+            />
+            <Chip
+              label="🌙 저녁약"
+              active={eveningMed}
+              onClick={() => setEveningMed(!eveningMed)}
+            />
+            <Chip label="🍽 폭식함" active={binge} onClick={() => setBinge(!binge)} tone="warn" />
+          </div>
+        </Section>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+        <Section title="🏋 운동">
+          <div className="flex flex-wrap gap-2">
             {WORKOUT_TYPES.map((w) => (
               <button
                 key={w.label}
                 type="button"
                 onClick={() => addWorkoutItem(w.label, 20)}
-                className="rounded-full border border-[#ddd6ce] bg-[#faf7f2] px-4 py-2 text-sm font-bold"
+                className="shrink-0 rounded-full border border-[#ddd6ce] bg-[#faf7f2] px-3.5 py-2 text-sm font-bold active:bg-[#eee5d8]"
               >
                 + {w.label}
               </button>
             ))}
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {CARDIO_PRESETS.map((preset) => (
               <button
                 key={preset.label}
                 type="button"
                 onClick={() => addWorkoutItem(preset.type, preset.minutes)}
-                className="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-bold text-white"
+                className="shrink-0 rounded-full border border-slate-900 bg-slate-900 px-3.5 py-2 text-sm font-bold text-white"
               >
                 {preset.label}
               </button>
@@ -342,27 +403,25 @@ export default function Home() {
           </div>
 
           {workoutItems.length > 0 && (
-            <div className="mt-4 space-y-2">
+            <div className="mt-3 space-y-2">
               {workoutItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-2 rounded-2xl bg-[#faf7f2] p-3"
-                >
-                  <p className="flex-1 font-bold">{item.type}</p>
-                  <input
-                    type="number"
+                <div key={item.id} className="flex items-center gap-2 rounded-2xl bg-[#faf7f2] p-2.5">
+                  <p className="min-w-0 flex-1 truncate text-sm font-bold">{item.type}</p>
+
+                  <Stepper
                     value={item.minutes}
-                    onChange={(e) => updateWorkoutMinutes(item.id, Number(e.target.value || 0))}
-                    className="w-16 rounded-xl border border-[#ddd6ce] p-2 text-center font-bold"
+                    onChange={(v) => updateWorkoutMinutes(item.id, v)}
+                    suffix="분"
                   />
-                  <span className="text-sm font-bold text-zinc-500">분</span>
-                  <span className="w-16 text-right text-sm font-bold text-zinc-500">
+
+                  <span className="w-14 shrink-0 text-right text-xs font-bold text-zinc-500">
                     {kcalFor(item.type, item.minutes)}kcal
                   </span>
+
                   <button
                     type="button"
                     onClick={() => removeWorkoutItem(item.id)}
-                    className="rounded-full bg-slate-900 px-3 py-1 text-sm font-bold text-white"
+                    className="h-8 w-8 shrink-0 rounded-full bg-slate-900 text-sm font-black text-white"
                   >
                     ✕
                   </button>
@@ -370,90 +429,50 @@ export default function Home() {
               ))}
             </div>
           )}
-        </section>
+        </Section>
 
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">🥩 단백질</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3">
+        <Section title={`🥩 단백질 · ${proteinGram}g`}>
+          <div className="flex flex-wrap gap-2">
             {PROTEIN_FOODS.map((food) => (
-              <Toggle
+              <Chip
                 key={food.label}
-                label={`${food.label} (${food.gram}g)`}
+                label={`${food.label} ${food.gram}g`}
                 active={proteinFoods.has(food.label)}
                 onClick={() => toggleProtein(food.label)}
               />
             ))}
           </div>
-          <p className="mt-3 text-sm font-bold text-zinc-500">오늘 합계: {proteinGram}g</p>
-        </section>
+        </Section>
 
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">💧 물</h2>
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-            {WATER_PRESETS.map((liter) => (
-              <button
-                key={liter}
-                type="button"
-                onClick={() => setWaterLiter(liter)}
-                className={[
-                  "shrink-0 rounded-2xl border px-4 py-3 font-black",
-                  waterLiter === liter
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-[#ddd6ce] bg-[#faf7f2]",
-                ].join(" ")}
-              >
-                {liter.toFixed(1)}L
-              </button>
-            ))}
-          </div>
-        </section>
+        <Section title={`💧 물 · ${waterLiter.toFixed(1)}L`}>
+          <ScaleRow
+            values={WATER_PRESETS}
+            active={waterLiter}
+            onSelect={setWaterLiter}
+            format={(v) => `${v.toFixed(1)}L`}
+          />
+        </Section>
 
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">😴 수면</h2>
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-            {SLEEP_HOURS.map((hour) => (
-              <button
-                key={hour}
-                type="button"
-                onClick={() => setSleepHours(hour)}
-                className={[
-                  "shrink-0 rounded-2xl border px-4 py-3 font-black",
-                  sleepHours === hour
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-[#ddd6ce] bg-[#faf7f2]",
-                ].join(" ")}
-              >
-                {hour}h
-              </button>
-            ))}
-          </div>
-        </section>
+        <Section title={`😴 수면 · ${sleepHours}시간`}>
+          <ScaleRow
+            values={SLEEP_HOURS}
+            active={sleepHours}
+            onSelect={setSleepHours}
+            format={(v) => `${v}h`}
+          />
+        </Section>
 
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">🍽 폭식</h2>
-          <label className="mt-4 flex items-center gap-3 font-bold">
-            <input
-              type="checkbox"
-              checked={binge}
-              onChange={(e) => setBinge(e.target.checked)}
-              className="h-6 w-6 accent-slate-900"
-            />
-            오늘 밤 폭식했다
-          </label>
-        </section>
-
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">🙂 컨디션</h2>
-          <div className="mt-4 grid grid-cols-5 gap-2 text-2xl">
+        <Section title="🙂 컨디션">
+          <div className="grid grid-cols-5 gap-2">
             {MOOD_OPTIONS.map((mood) => (
               <button
                 key={mood.score}
                 type="button"
                 onClick={() => setMoodScore(mood.score)}
                 className={[
-                  "rounded-2xl border p-3",
+                  "rounded-2xl border-2 py-3 text-3xl transition-colors",
                   moodScore === mood.score
-                    ? "border-slate-900 bg-slate-900 text-white"
+                    ? "border-slate-900 bg-slate-900"
                     : "border-[#ddd6ce] bg-[#faf7f2]",
                 ].join(" ")}
               >
@@ -461,37 +480,32 @@ export default function Home() {
               </button>
             ))}
           </div>
-        </section>
+        </Section>
 
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">🏅 오늘 MVP</h2>
+        <Section title="🏅 오늘의 한마디">
           <input
             value={mvpText}
             onChange={(e) => setMvpText(e.target.value)}
-            placeholder="오늘 가장 잘한 것 한 가지"
-            className="mt-3 w-full rounded-2xl border border-[#ddd6ce] p-4 font-bold"
+            placeholder="오늘 MVP · 가장 잘한 것 한 가지"
+            className="w-full rounded-2xl border border-[#ddd6ce] bg-[#faf7f2] p-3.5 font-bold"
           />
-        </section>
-
-        <section className="mt-4 rounded-3xl border border-[#ddd6ce] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">📝 한 줄 메모</h2>
           <textarea
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
-            className="mt-3 min-h-28 w-full rounded-2xl border border-[#ddd6ce] p-4 font-bold"
-            placeholder="오늘 한 줄만 남겨도 충분합니다."
+            className="mt-2 min-h-20 w-full rounded-2xl border border-[#ddd6ce] bg-[#faf7f2] p-3.5 font-bold"
+            placeholder="한 줄 메모 (선택)"
           />
-        </section>
+        </Section>
 
-        {message && (
-          <p className="mt-4 rounded-2xl bg-white p-4 text-center font-black shadow-sm">{message}</p>
-        )}
+        {message && <p className="mt-3 text-center text-sm font-bold text-zinc-500">{message}</p>}
 
         {coachStatus !== "idle" && (
-          <section className="mt-4 rounded-3xl bg-slate-900 p-6 text-white shadow-lg">
+          <section className="mt-3 rounded-3xl bg-slate-900 p-6 text-white shadow-lg">
             <h2 className="text-lg font-black">🤖 AI 코치</h2>
             <p className="mt-3 font-bold leading-relaxed">
-              {coachStatus === "loading" && !coachText ? "코치가 오늘 하루를 분석하고 있습니다..." : coachText}
+              {coachStatus === "loading" && !coachText
+                ? "코치가 오늘 하루를 분석하고 있습니다..."
+                : coachText}
             </p>
           </section>
         )}
@@ -513,19 +527,106 @@ export default function Home() {
   );
 }
 
-function Toggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-3 rounded-3xl border border-[#ddd6ce] bg-white p-4 shadow-sm">
+      <h2 className="mb-3 text-base font-black">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Chip({
+  label,
+  active,
+  onClick,
+  tone = "default",
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  tone?: "default" | "warn";
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        "rounded-2xl border p-4 text-left text-lg font-black",
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 px-4 py-2.5 text-sm font-bold transition-colors",
         active
-          ? "border-slate-900 bg-slate-900 text-white"
-          : "border-[#ddd6ce] bg-[#faf7f2] text-zinc-900",
+          ? tone === "warn"
+            ? "border-red-700 bg-red-700 text-white"
+            : "border-slate-900 bg-slate-900 text-white"
+          : "border-[#e5ddd0] bg-[#faf7f2] text-zinc-700",
       ].join(" ")}
     >
-      {active ? "✅ " : "⬜ "} {label}
+      {active && <span>✓</span>}
+      {label}
     </button>
+  );
+}
+
+function ScaleRow({
+  values,
+  active,
+  onSelect,
+  format,
+}: {
+  values: number[];
+  active: number;
+  onSelect: (value: number) => void;
+  format: (value: number) => string;
+}) {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {values.map((value) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => onSelect(value)}
+          className={[
+            "shrink-0 rounded-2xl border-2 px-4 py-2.5 text-sm font-black transition-colors",
+            active === value
+              ? "border-slate-900 bg-slate-900 text-white"
+              : "border-[#e5ddd0] bg-[#faf7f2] text-zinc-700",
+          ].join(" ")}
+        >
+          {format(value)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Stepper({
+  value,
+  onChange,
+  suffix,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  suffix: string;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => onChange(value - 5)}
+        className="h-8 w-8 rounded-full border border-[#ddd6ce] bg-white text-base font-black"
+      >
+        −
+      </button>
+      <span className="w-14 text-center text-sm font-black">
+        {value}
+        {suffix}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(value + 5)}
+        className="h-8 w-8 rounded-full border border-[#ddd6ce] bg-white text-base font-black"
+      >
+        +
+      </button>
+    </div>
   );
 }
