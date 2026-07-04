@@ -112,35 +112,35 @@ const READY_LEVELS = [
     min: 90,
     label: "AWESOME",
     icon: "🔵",
-    text: "완벽 그 자체! 오늘 감독이 봤으면 바로 주전 도장 찍었어요.",
+    text: "컨디션 최상이에요! 오늘같은 날이 자주 있으면 좋겠네요.",
     bg: "bg-blue-600",
   },
   {
     min: 61,
     label: "GOOD",
     icon: "🟢",
-    text: "좋아요, 이 정도면 실전에 나가도 든든한 컨디션이에요.",
+    text: "좋은 상태예요. 지금 이 페이스, 딱 좋아요.",
     bg: "bg-emerald-600",
   },
   {
     min: 41,
     label: "SOSO",
     icon: "🟡",
-    text: "무난무난! 이 페이스만 지켜도 충분히 잘하고 있는 거예요.",
+    text: "무난해요. 크게 무리 없이 하루를 챙기고 있어요.",
     bg: "bg-yellow-500",
   },
   {
     min: 21,
     label: "CARE",
     icon: "🟠",
-    text: "몸이 신호를 보내고 있어요. 오늘은 무리보다 회복에 한 표.",
+    text: "몸이 살짝 신호를 보내고 있어요. 오늘은 무리하지 말아요.",
     bg: "bg-orange-600",
   },
   {
     min: 0,
     label: "RECOVERY",
     icon: "🔴",
-    text: "지금은 벤치에서 숨 고르는 시간. 쉬는 것도 훈련이에요.",
+    text: "지금은 회복이 먼저예요. 잘 쉬는 것도 관리의 일부니까요.",
     bg: "bg-red-600",
   },
 ];
@@ -149,7 +149,7 @@ const BLACK_LEVEL = {
   min: -1,
   label: "BREAK",
   icon: "⚫",
-  text: "아직 킥오프 전이에요. 아무거나 하나만 체크해도 경기 시작!",
+  text: "아직 아무것도 체크 안 했어요. 하나만 눌러도 오늘이 시작돼요.",
   bg: "bg-black border-2 border-zinc-700",
 };
 
@@ -157,7 +157,7 @@ const SICK_LEVEL = {
   min: -1,
   label: "SICK DAY",
   icon: "🤒",
-  text: "오늘은 셀프 부상자 명단(DL)이에요. 무리 금지, 회복이 오늘의 훈련.",
+  text: "오늘은 아픈 날이에요. 무리하지 말고 푹 쉬는 게 우선이에요.",
   bg: "bg-violet-600",
 };
 
@@ -303,7 +303,6 @@ export default function Home() {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [recordDate, setRecordDate] = useState(today());
-  const [hasRecord, setHasRecord] = useState(false);
   const [morningMed, setMorningMed] = useState(false);
   const [eveningMed, setEveningMed] = useState(false);
   const [selectedWorkouts, setSelectedWorkouts] = useState<Map<string, SelectedWorkout>>(new Map());
@@ -338,9 +337,26 @@ export default function Home() {
   const workoutDone = selectedWorkouts.size > 0;
   const todaySchedule = useMemo(() => scheduleFor(recordDate), [recordDate]);
 
+  // DB에 기록 행이 존재하는지가 아니라, 실제로 뭔가 하나라도 체크했는지로 BREAK 여부를 판단한다.
+  const hasAnyInput = useMemo(() => {
+    const hasProtein = Array.from(proteinCounts.values()).some((count) => count > 0);
+    return (
+      morningMed ||
+      eveningMed ||
+      selectedWorkouts.size > 0 ||
+      hasProtein ||
+      waterLiter > 0 ||
+      sleepHours > 0 ||
+      binge ||
+      moodScore !== null ||
+      mvpText.trim().length > 0 ||
+      isSick
+    );
+  }, [morningMed, eveningMed, selectedWorkouts, proteinCounts, waterLiter, sleepHours, binge, moodScore, mvpText, isSick]);
+
   const ready = useMemo(() => {
-    if (!hasRecord) return { score: 0, level: BLACK_LEVEL };
     if (isSick) return { score: 0, level: SICK_LEVEL };
+    if (!hasAnyInput) return { score: 0, level: BLACK_LEVEL };
 
     return computeReady({
       sleepHours,
@@ -354,7 +370,7 @@ export default function Home() {
       moodScore,
     });
   }, [
-    hasRecord,
+    hasAnyInput,
     isSick,
     sleepHours,
     waterLiter,
@@ -417,22 +433,6 @@ export default function Home() {
   }
 
   function buildPayload() {
-    // 저장이 실제로 일어난다는 것은 이 시점에 기록이 존재한다는 뜻이므로,
-    // 아직 리렌더 전이라 hasRecord가 stale할 수 있는 `ready`(BREAK) 대신 항상 실제 값 기준으로 등급을 다시 계산한다.
-    const effectiveReady = isSick
-      ? { score: 0, level: SICK_LEVEL }
-      : computeReady({
-          sleepHours,
-          waterLiter,
-          waterTarget,
-          proteinGram,
-          proteinTarget,
-          workoutDone,
-          morningMed,
-          eveningMed,
-          moodScore,
-        });
-
     const bikeMinutes = selectedWorkouts.get("자전거")?.minutes ?? 0;
 
     const completedWorkout = Array.from(selectedWorkouts.entries())
@@ -448,8 +448,8 @@ export default function Home() {
 
     return {
       record_date: recordDate,
-      score: effectiveReady.score,
-      grade: effectiveReady.level.label,
+      score: ready.score,
+      grade: ready.level.label,
       mood_score: moodScore,
       memo: null,
       mvp_text: mvpText || null,
@@ -479,7 +479,7 @@ export default function Home() {
       sleep: {
         sleep_hours: sleepHours,
         sleep_quality_score: sleepHours >= 7 ? 85 : 70,
-        wake_condition: effectiveReady.level.label,
+        wake_condition: ready.level.label,
       },
     };
   }
@@ -606,7 +606,6 @@ export default function Home() {
           setWaterTarget(data.goal.target_water_liter);
         }
 
-        setHasRecord(!!d);
         loadedDateRef.current = recordDate;
       });
 
@@ -634,8 +633,6 @@ export default function Home() {
     });
 
     if (currentSnapshot === lastLoadedSnapshotRef.current) return;
-
-    setHasRecord(true);
 
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
@@ -748,7 +745,7 @@ export default function Home() {
           </p>
           <p className="mt-2 font-bold text-white/90">{ready.level.text}</p>
 
-          {hasRecord && !isSick && (
+          {hasAnyInput && !isSick && (
             <>
               <p className="mt-2 text-sm font-bold text-white/80">
                 {missingFactors.length > 0
