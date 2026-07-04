@@ -785,10 +785,10 @@ export default function Home() {
                 </p>
               ))}
               <p className="text-xs font-bold text-white/90">
-                {SICK_LEVEL.icon} {SICK_LEVEL.label} — {SICK_LEVEL.text}
+                {BLACK_LEVEL.icon} {BLACK_LEVEL.label} — {BLACK_LEVEL.text}
               </p>
               <p className="text-xs font-bold text-white/90">
-                {BLACK_LEVEL.icon} {BLACK_LEVEL.label} — {BLACK_LEVEL.text}
+                {SICK_LEVEL.icon} {SICK_LEVEL.label} — {SICK_LEVEL.text}
               </p>
             </div>
           )}
