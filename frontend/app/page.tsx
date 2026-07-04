@@ -88,7 +88,7 @@ const PROTEIN_FOODS: { label: string; gram: number }[] = [
 
 const WATER_PRESETS = [0, 0.3, 0.5, 0.8, 1.0, 1.3, 1.5, 1.8, 2.0, 2.3, 2.5, 3.0];
 
-const SLEEP_HOURS = Array.from({ length: 24 }, (_, i) => i + 1);
+const SLEEP_HOURS = Array.from({ length: 25 }, (_, i) => i);
 
 const MOOD_OPTIONS = [
   { score: 1, icon: "🤨" },
@@ -112,35 +112,35 @@ const READY_LEVELS = [
     min: 90,
     label: "AWESOME",
     icon: "🔵",
-    text: "오늘 정말 완벽하게 챙기고 있어요! 이 흐름 그대로 이어가세요.",
+    text: "완벽 그 자체! 오늘 감독이 봤으면 바로 주전 도장 찍었어요.",
     bg: "bg-blue-600",
   },
   {
     min: 61,
     label: "GOOD",
     icon: "🟢",
-    text: "좋은 흐름이에요. 계획한 훈련을 진행하기 좋은 상태입니다.",
+    text: "좋아요, 이 정도면 실전에 나가도 든든한 컨디션이에요.",
     bg: "bg-emerald-600",
   },
   {
     min: 41,
     label: "SOSO",
     icon: "🟡",
-    text: "나쁘지 않아요. 지금의 루틴을 유지하면 충분합니다.",
+    text: "무난무난! 이 페이스만 지켜도 충분히 잘하고 있는 거예요.",
     bg: "bg-yellow-500",
   },
   {
     min: 21,
     label: "CARE",
     icon: "🟠",
-    text: "아직 갈 길이 남았어요. 무리보다는 회복과 균형을 먼저 챙기세요.",
+    text: "몸이 신호를 보내고 있어요. 오늘은 무리보다 회복에 한 표.",
     bg: "bg-orange-600",
   },
   {
     min: 0,
     label: "RECOVERY",
     icon: "🔴",
-    text: "지금은 회복이 우선인 시간이에요. 쉬는 것도 훈련의 일부입니다.",
+    text: "지금은 벤치에서 숨 고르는 시간. 쉬는 것도 훈련이에요.",
     bg: "bg-red-600",
   },
 ];
@@ -149,7 +149,7 @@ const BLACK_LEVEL = {
   min: -1,
   label: "BREAK",
   icon: "⚫",
-  text: "아직 시작 전이에요. 체크 하나만 눌러도 오늘이 시작됩니다.",
+  text: "아직 킥오프 전이에요. 아무거나 하나만 체크해도 경기 시작!",
   bg: "bg-black border-2 border-zinc-700",
 };
 
@@ -157,7 +157,7 @@ const SICK_LEVEL = {
   min: -1,
   label: "SICK DAY",
   icon: "🤒",
-  text: "오늘은 아픈 날이에요. 무리하지 말고 푹 쉬는 것에 집중하세요. 컨디션 관리도 훈련의 일부입니다.",
+  text: "오늘은 셀프 부상자 명단(DL)이에요. 무리 금지, 회복이 오늘의 훈련.",
   bg: "bg-violet-600",
 };
 
@@ -299,6 +299,7 @@ function buildMedicationNote(morning: boolean, evening: boolean) {
 
 export default function Home() {
   const lastLoadedSnapshotRef = useRef<string | null>(null);
+  const loadedDateRef = useRef<string | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [recordDate, setRecordDate] = useState(today());
@@ -310,7 +311,7 @@ export default function Home() {
   const [proteinTarget, setProteinTarget] = useState(DEFAULT_PROTEIN_TARGET);
   const [waterLiter, setWaterLiter] = useState(0);
   const [waterTarget, setWaterTarget] = useState(DEFAULT_WATER_TARGET);
-  const [sleepHours, setSleepHours] = useState(SLEEP_TARGET);
+  const [sleepHours, setSleepHours] = useState(0);
   const [binge, setBinge] = useState(false);
   const [isSick, setIsSick] = useState(false);
   const [moodScore, setMoodScore] = useState<number | null>(null);
@@ -416,6 +417,22 @@ export default function Home() {
   }
 
   function buildPayload() {
+    // 저장이 실제로 일어난다는 것은 이 시점에 기록이 존재한다는 뜻이므로,
+    // 아직 리렌더 전이라 hasRecord가 stale할 수 있는 `ready`(BREAK) 대신 항상 실제 값 기준으로 등급을 다시 계산한다.
+    const effectiveReady = isSick
+      ? { score: 0, level: SICK_LEVEL }
+      : computeReady({
+          sleepHours,
+          waterLiter,
+          waterTarget,
+          proteinGram,
+          proteinTarget,
+          workoutDone,
+          morningMed,
+          eveningMed,
+          moodScore,
+        });
+
     const bikeMinutes = selectedWorkouts.get("자전거")?.minutes ?? 0;
 
     const completedWorkout = Array.from(selectedWorkouts.entries())
@@ -431,8 +448,8 @@ export default function Home() {
 
     return {
       record_date: recordDate,
-      score: ready.score,
-      grade: ready.level.label,
+      score: effectiveReady.score,
+      grade: effectiveReady.level.label,
       mood_score: moodScore,
       memo: null,
       mvp_text: mvpText || null,
@@ -462,7 +479,7 @@ export default function Home() {
       sleep: {
         sleep_hours: sleepHours,
         sleep_quality_score: sleepHours >= 7 ? 85 : 70,
-        wake_condition: ready.level.label,
+        wake_condition: effectiveReady.level.label,
       },
     };
   }
@@ -544,7 +561,7 @@ export default function Home() {
           morningMed: d?.morning_med_taken ?? false,
           eveningMed: d?.evening_med_taken ?? false,
           waterLiter: d?.water_liter ?? 0,
-          sleepHours: d?.sleep_hours ?? SLEEP_TARGET,
+          sleepHours: d?.sleep_hours ?? 0,
           binge: d?.binge_yn ?? false,
           isSick: detail?.is_sick ?? false,
           moodScore: d?.mood_score ?? null,
@@ -590,6 +607,7 @@ export default function Home() {
         }
 
         setHasRecord(!!d);
+        loadedDateRef.current = recordDate;
       });
 
     return () => {
@@ -598,7 +616,10 @@ export default function Home() {
   }, [recordDate]);
 
   // 자동 저장: 방금 불러온 값과 달라졌을 때만 2초 후 조용히 저장한다.
+  // loadedDateRef가 현재 날짜와 아직 일치하지 않으면(로딩 완료 전) 절대 저장을 트리거하지 않는다.
   useEffect(() => {
+    if (loadedDateRef.current !== recordDate) return;
+
     const currentSnapshot = snapshotFormState({
       morningMed,
       eveningMed,
@@ -761,16 +782,16 @@ export default function Home() {
 
           {showLevelLegend && (
             <div className="mt-2 space-y-1.5 rounded-2xl bg-black/20 p-3">
-              <p className="text-xs font-bold text-white/90">
-                {BLACK_LEVEL.icon} {BLACK_LEVEL.label} (기록 없음) — {BLACK_LEVEL.text}
-              </p>
               {READY_LEVELS.map((l) => (
                 <p key={l.label} className="text-xs font-bold text-white/90">
                   {l.icon} {l.label} — {l.text}
                 </p>
               ))}
               <p className="text-xs font-bold text-white/90">
-                {SICK_LEVEL.icon} {SICK_LEVEL.label} (아픈 날 체크 시) — {SICK_LEVEL.text}
+                {SICK_LEVEL.icon} {SICK_LEVEL.label} — {SICK_LEVEL.text}
+              </p>
+              <p className="text-xs font-bold text-white/90">
+                {BLACK_LEVEL.icon} {BLACK_LEVEL.label} — {BLACK_LEVEL.text}
               </p>
             </div>
           )}
