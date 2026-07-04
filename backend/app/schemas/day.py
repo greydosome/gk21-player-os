@@ -54,7 +54,7 @@ class DayRecordRequest(BaseModel):
     record_date: date
     score: int = 0
     grade: str = "GREEN"
-    mood_score: int = 3
+    mood_score: int | None = None
     memo: str | None = None
     mvp_text: str | None = None
     is_sick: bool = False

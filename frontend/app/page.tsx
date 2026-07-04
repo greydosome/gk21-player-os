@@ -91,14 +91,14 @@ const WATER_PRESETS = [0, 0.3, 0.5, 0.8, 1.0, 1.3, 1.5, 1.8, 2.0, 2.3, 2.5, 3.0]
 const SLEEP_HOURS = Array.from({ length: 24 }, (_, i) => i + 1);
 
 const MOOD_OPTIONS = [
-  { score: 5, icon: "😎" },
-  { score: 4, icon: "🤓" },
-  { score: 3, icon: "🤔" },
-  { score: 2, icon: "🙃" },
   { score: 1, icon: "🤨" },
+  { score: 2, icon: "🙃" },
+  { score: 3, icon: "🤔" },
+  { score: 4, icon: "🤓" },
+  { score: 5, icon: "😎" },
 ];
 
-const MVP_SUGGESTIONS = [
+const FALLBACK_MVP_SUGGESTIONS = [
   "오늘도 출석했다",
   "오늘도 시즌을 이어갔다",
   "작은 것 하나는 해냈다",
@@ -226,7 +226,7 @@ function computeReady({
   workoutDone: boolean;
   morningMed: boolean;
   eveningMed: boolean;
-  moodScore: number;
+  moodScore: number | null;
 }) {
   let score = 0;
 
@@ -249,7 +249,8 @@ function computeReady({
   if (morningMed && eveningMed) score += 15;
   else if (morningMed || eveningMed) score += 8;
 
-  if (moodScore >= 5) score += 10;
+  if (moodScore === null) score += 0;
+  else if (moodScore >= 5) score += 10;
   else if (moodScore >= 4) score += 8;
   else if (moodScore >= 3) score += 5;
   else score += 2;
@@ -266,7 +267,7 @@ function snapshotFormState(state: {
   sleepHours: number;
   binge: boolean;
   isSick: boolean;
-  moodScore: number;
+  moodScore: number | null;
   mvpText: string;
   selectedWorkouts: Map<string, SelectedWorkout>;
   proteinCounts: Map<string, number>;
@@ -312,8 +313,10 @@ export default function Home() {
   const [sleepHours, setSleepHours] = useState(SLEEP_TARGET);
   const [binge, setBinge] = useState(false);
   const [isSick, setIsSick] = useState(false);
-  const [moodScore, setMoodScore] = useState(4);
+  const [moodScore, setMoodScore] = useState<number | null>(null);
   const [mvpText, setMvpText] = useState("");
+  const [mvpSuggestions, setMvpSuggestions] = useState<string[]>(FALLBACK_MVP_SUGGESTIONS);
+  const [mvpSuggestionsLoading, setMvpSuggestionsLoading] = useState(false);
   const [showLevelLegend, setShowLevelLegend] = useState(false);
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -369,7 +372,7 @@ export default function Home() {
     { icon: "🥩", label: "단백질", good: proteinGram >= proteinTarget * 0.75 },
     { icon: "🏋", label: "운동", good: workoutDone },
     { icon: "💊", label: "복약", good: morningMed && eveningMed },
-    { icon: "🙂", label: "컨디션", good: moodScore >= 4 },
+    { icon: "🙂", label: "컨디션", good: moodScore !== null && moodScore >= 4 },
   ];
   const missingFactors = factors.filter((f) => !f.good).map((f) => f.label);
 
@@ -495,6 +498,33 @@ export default function Home() {
     }
   }
 
+  // 날짜가 바뀌면 그 날짜의 "오늘의 한마디" 추천 문구를 OpenAI로부터 받아온다(해당 날짜 최초 요청시 생성 후 캐시).
+  useEffect(() => {
+    let cancelled = false;
+    setMvpSuggestionsLoading(true);
+
+    fetch(`/api/mvp-suggestions?record_date=${recordDate}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (Array.isArray(data?.suggestions) && data.suggestions.length > 0) {
+          setMvpSuggestions(data.suggestions);
+        } else {
+          setMvpSuggestions(FALLBACK_MVP_SUGGESTIONS);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setMvpSuggestions(FALLBACK_MVP_SUGGESTIONS);
+      })
+      .finally(() => {
+        if (!cancelled) setMvpSuggestionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [recordDate]);
+
   // 날짜가 바뀌면 그 날짜의 기존 기록을 불러와서 폼을 채운다 (없으면 기본값으로 초기화).
   useEffect(() => {
     let cancelled = false;
@@ -517,7 +547,7 @@ export default function Home() {
           sleepHours: d?.sleep_hours ?? SLEEP_TARGET,
           binge: d?.binge_yn ?? false,
           isSick: detail?.is_sick ?? false,
-          moodScore: d?.mood_score ?? 4,
+          moodScore: d?.mood_score ?? null,
           mvpText: detail?.mvp_text ?? "",
         };
 
@@ -802,14 +832,12 @@ export default function Home() {
                   unit="L"
                   data={history.map((h) => h.water_liter)}
                   dates={history.map((h) => h.record_date)}
-                  targetValue={waterTarget}
                 />
                 <TrendChart
                   title="🥩 단백질"
                   unit="g"
                   data={history.map((h) => h.protein_gram)}
                   dates={history.map((h) => h.record_date)}
-                  targetValue={proteinTarget}
                 />
                 <WorkoutDots data={history.map((h) => h.workout_done_yn)} dates={history.map((h) => h.record_date)} />
               </>
@@ -963,7 +991,7 @@ export default function Home() {
                   <button
                     key={mood.score}
                     type="button"
-                    onClick={() => setMoodScore(mood.score)}
+                    onClick={() => setMoodScore(moodScore === mood.score ? null : mood.score)}
                     className={[
                       "rounded-2xl border-2 py-3 text-3xl transition-colors",
                       moodScore === mood.score
@@ -978,16 +1006,20 @@ export default function Home() {
             </Section>
 
             <Section title="🏅 오늘의 한마디">
-              <div className="flex flex-wrap gap-2">
-                {MVP_SUGGESTIONS.map((phrase) => (
-                  <Chip
-                    key={phrase}
-                    label={phrase}
-                    active={mvpText === phrase}
-                    onClick={() => setMvpText(mvpText === phrase ? "" : phrase)}
-                  />
-                ))}
-              </div>
+              {mvpSuggestionsLoading ? (
+                <p className="text-sm font-bold text-zinc-500">AI가 오늘의 문구를 준비하고 있어요...</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {mvpSuggestions.map((phrase) => (
+                    <Chip
+                      key={phrase}
+                      label={phrase}
+                      active={mvpText === phrase}
+                      onClick={() => setMvpText(mvpText === phrase ? "" : phrase)}
+                    />
+                  ))}
+                </div>
+              )}
             </Section>
 
             <p className="mt-3 text-center text-xs font-bold text-zinc-600">
@@ -1060,20 +1092,19 @@ function TrendChart({
   unit,
   data,
   dates,
-  targetValue,
 }: {
   title: string;
   unit: string;
   data: (number | null)[];
   dates: string[];
-  targetValue?: number;
 }) {
   const width = 300;
   const height = 70;
   const padding = 6;
 
   const validValues = data.filter((v): v is number => v !== null && v !== undefined);
-  const maxValue = Math.max(targetValue ?? 0, ...validValues, 1) * 1.1;
+  const bestValue = validValues.length > 0 ? Math.max(...validValues) : null;
+  const maxValue = Math.max(bestValue ?? 0, 1) * 1.1;
   const stepX = data.length > 1 ? (width - padding * 2) / (data.length - 1) : 0;
 
   const points = data.map((v, i) => {
@@ -1096,7 +1127,8 @@ function TrendChart({
 
   const lastPoint = [...points].reverse().find((p) => p !== null) ?? null;
   const lastValue = [...validValues].pop();
-  const targetY = targetValue ? height - padding - (targetValue / maxValue) * (height - padding * 2) : null;
+  const targetY =
+    bestValue !== null ? height - padding - (bestValue / maxValue) * (height - padding * 2) : null;
 
   return (
     <div className="rounded-2xl bg-zinc-800 p-3">
