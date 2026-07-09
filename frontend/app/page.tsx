@@ -89,14 +89,15 @@ type FoodItem = { label: string; unit: string; kcal: number };
 
 const PROTEIN_FOODS: FoodItem[] = [
   { label: "참치 마일드", unit: "95g", kcal: 120 },
-  { label: "닭가슴살", unit: "350g", kcal: 120 },
   { label: "달걀", unit: "1개", kcal: 100 },
+  { label: "닭가슴살", unit: "100g", kcal: 100 },
+  { label: "닭가슴살스팸", unit: "100g", kcal: 170 },
 ];
 
 const CARB_FOODS: FoodItem[] = [
-  { label: "햇반 작은공기", unit: "1개", kcal: 195 },
-  { label: "감자", unit: "100g", kcal: 77 },
-  { label: "생고구마", unit: "1개", kcal: 114 },
+  { label: "햇반", unit: "130g", kcal: 195 },
+  { label: "생고구마", unit: "100g", kcal: 120 },
+  { label: "감자", unit: "100g", kcal: 80 },
 ];
 
 const FAT_FOODS: FoodItem[] = [
@@ -133,28 +134,28 @@ const FALLBACK_MVP_SUGGESTIONS = [
 
 const READY_LEVELS = [
   {
-    min: 90,
+    min: 80,
     label: "AWESOME",
     icon: "🔵",
     text: "컨디션 최상이에요! 오늘같은 날이 자주 있으면 좋겠네요.",
     bg: "bg-blue-600",
   },
   {
-    min: 61,
+    min: 50,
     label: "GOOD",
     icon: "🟢",
     text: "좋은 상태예요. 지금 이 페이스, 딱 좋아요.",
     bg: "bg-emerald-600",
   },
   {
-    min: 41,
+    min: 30,
     label: "SOSO",
     icon: "🟡",
     text: "무난해요. 크게 무리 없이 하루를 챙기고 있어요.",
     bg: "bg-yellow-500",
   },
   {
-    min: 21,
+    min: 10,
     label: "CARE",
     icon: "🟠",
     text: "몸이 살짝 신호를 보내고 있어요. 오늘은 무리하지 말아요.",
@@ -246,7 +247,6 @@ function computeReady({
   workoutDone,
   morningMed,
   eveningMed,
-  moodScore,
 }: {
   sleepHours: number;
   waterLiter: number;
@@ -256,7 +256,6 @@ function computeReady({
   workoutDone: boolean;
   morningMed: boolean;
   eveningMed: boolean;
-  moodScore: number | null;
 }) {
   let score = 0;
 
@@ -278,12 +277,6 @@ function computeReady({
 
   if (morningMed && eveningMed) score += 15;
   else if (morningMed || eveningMed) score += 8;
-
-  if (moodScore === null) score += 0;
-  else if (moodScore >= 5) score += 10;
-  else if (moodScore >= 4) score += 8;
-  else if (moodScore >= 3) score += 5;
-  else score += 2;
 
   const level = READY_LEVELS.find((l) => score >= l.min) ?? READY_LEVELS[READY_LEVELS.length - 1];
 
@@ -430,7 +423,6 @@ export default function Home() {
       workoutDone,
       morningMed,
       eveningMed,
-      moodScore,
     });
   }, [
     hasAnyInput,
@@ -443,7 +435,6 @@ export default function Home() {
     workoutDone,
     morningMed,
     eveningMed,
-    moodScore,
   ]);
 
   const factors = [
@@ -1125,7 +1116,7 @@ export default function Home() {
                   >
                     <div>
                       <p className="font-bold text-zinc-100">{food.label}</p>
-                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal / 1회</p>
+                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
                     </div>
                     <Stepper
                       value={proteinCounts.get(food.label) ?? 0}
@@ -1147,7 +1138,7 @@ export default function Home() {
                   >
                     <div>
                       <p className="font-bold text-zinc-100">{food.label}</p>
-                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal / 1회</p>
+                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
                     </div>
                     <Stepper
                       value={carbCounts.get(food.label) ?? 0}
@@ -1169,7 +1160,7 @@ export default function Home() {
                   >
                     <div>
                       <p className="font-bold text-zinc-100">{food.label}</p>
-                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal / 1회</p>
+                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
                     </div>
                     <Stepper
                       value={fatCounts.get(food.label) ?? 0}
