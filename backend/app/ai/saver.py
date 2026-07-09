@@ -89,7 +89,11 @@ def build_input_snapshot(context, metrics):
 
             "water_liter": float(today.get("water_liter")) if today.get("water_liter") is not None else None,
 
-            "protein_gram": today.get("protein_gram"),
+            "protein_kcal": today.get("protein_kcal"),
+
+            "carb_kcal": today.get("carb_kcal"),
+
+            "fat_kcal": today.get("fat_kcal"),
 
             "binge_yn": today.get("binge_yn"),
 

@@ -43,7 +43,11 @@ def get_ai_context(target_date: date):
 
                     water_liter,
 
-                    protein_gram,
+                    protein_kcal,
+
+                    carb_kcal,
+
+                    fat_kcal,
 
                     meal_score,
 
@@ -105,7 +109,11 @@ def get_ai_context(target_date: date):
 
                     target_water_liter,
 
-                    target_protein_gram,
+                    target_protein_kcal,
+
+                    target_carb_kcal,
+
+                    target_fat_kcal,
 
                     target_calorie,
 

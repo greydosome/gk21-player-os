@@ -79,11 +79,29 @@ function scheduleFor(dateStr: string) {
   return WEEKLY_SCHEDULE[dayOfWeek];
 }
 
-const PROTEIN_FOODS: { label: string; gram: number }[] = [
-  { label: "참치", gram: 25 },
-  { label: "닭가슴살", gram: 25 },
-  { label: "달걀", gram: 6 },
-  { label: "그릭요거트", gram: 10 },
+type FoodItem = { label: string; unit: string; kcal: number };
+
+const PROTEIN_FOODS: FoodItem[] = [
+  { label: "참치 마일드", unit: "95g", kcal: 120 },
+  { label: "닭가슴살", unit: "350g", kcal: 120 },
+  { label: "달걀", unit: "1개", kcal: 100 },
+];
+
+const CARB_FOODS: FoodItem[] = [
+  { label: "햇반 작은공기", unit: "1개", kcal: 195 },
+  { label: "감자", unit: "100g", kcal: 77 },
+  { label: "생고구마", unit: "1개", kcal: 114 },
+];
+
+const FAT_FOODS: FoodItem[] = [
+  { label: "아보카도", unit: "100g", kcal: 160 },
+  { label: "브로콜리", unit: "100g", kcal: 30 },
+];
+
+const SUPPLEMENT_FOODS: { label: string; unit: string }[] = [
+  { label: "블루베리", unit: "30g" },
+  { label: "방울토마토", unit: "30g" },
+  { label: "올리브오일", unit: "한스푼" },
 ];
 
 const WATER_PRESETS = [0, 0.3, 0.5, 0.8, 1.0, 1.3, 1.5, 1.8, 2.0, 2.3, 2.5, 3.0];
@@ -161,7 +179,9 @@ const SICK_LEVEL = {
   bg: "bg-violet-600",
 };
 
-const DEFAULT_PROTEIN_TARGET = 60;
+const DEFAULT_PROTEIN_TARGET = 430;
+const DEFAULT_CARB_TARGET = 700;
+const DEFAULT_FAT_TARGET = 160;
 const DEFAULT_WATER_TARGET = 2.0;
 const SLEEP_TARGET = 7;
 
@@ -174,7 +194,9 @@ type PeriodStats = {
   days_logged: number;
   avg_sleep_hours: number | null;
   avg_water_liter: number | null;
-  avg_protein_gram: number | null;
+  avg_protein_kcal: number | null;
+  avg_carb_kcal: number | null;
+  avg_fat_kcal: number | null;
   avg_mood_score: number | null;
   workout_days: number;
   full_medication_days: number;
@@ -186,7 +208,9 @@ type HistoryRow = {
   record_date: string;
   sleep_hours: number | null;
   water_liter: number | null;
-  protein_gram: number | null;
+  protein_kcal: number | null;
+  carb_kcal: number | null;
+  fat_kcal: number | null;
   workout_done_yn: boolean | null;
   mood_score: number | null;
   binge_yn: boolean | null;
@@ -211,7 +235,7 @@ function computeReady({
   sleepHours,
   waterLiter,
   waterTarget,
-  proteinGram,
+  proteinKcal,
   proteinTarget,
   workoutDone,
   morningMed,
@@ -221,7 +245,7 @@ function computeReady({
   sleepHours: number;
   waterLiter: number;
   waterTarget: number;
-  proteinGram: number;
+  proteinKcal: number;
   proteinTarget: number;
   workoutDone: boolean;
   morningMed: boolean;
@@ -240,9 +264,9 @@ function computeReady({
   else if (waterLiter >= waterTarget * 0.5) score += 10;
   else score += 5;
 
-  if (proteinGram >= proteinTarget) score += 15;
-  else if (proteinGram >= proteinTarget * 0.75) score += 10;
-  else if (proteinGram >= proteinTarget * 0.5) score += 5;
+  if (proteinKcal >= proteinTarget) score += 15;
+  else if (proteinKcal >= proteinTarget * 0.75) score += 10;
+  else if (proteinKcal >= proteinTarget * 0.5) score += 5;
 
   score += workoutDone ? 20 : 10;
 
@@ -271,6 +295,9 @@ function snapshotFormState(state: {
   mvpText: string;
   selectedWorkouts: Map<string, SelectedWorkout>;
   proteinCounts: Map<string, number>;
+  carbCounts: Map<string, number>;
+  fatCounts: Map<string, number>;
+  supplementItems: Set<string>;
 }) {
   return JSON.stringify({
     morningMed: state.morningMed,
@@ -287,6 +314,13 @@ function snapshotFormState(state: {
     protein: Array.from(state.proteinCounts.entries())
       .filter(([, count]) => count > 0)
       .sort(([a], [b]) => a.localeCompare(b)),
+    carb: Array.from(state.carbCounts.entries())
+      .filter(([, count]) => count > 0)
+      .sort(([a], [b]) => a.localeCompare(b)),
+    fat: Array.from(state.fatCounts.entries())
+      .filter(([, count]) => count > 0)
+      .sort(([a], [b]) => a.localeCompare(b)),
+    supplement: Array.from(state.supplementItems).sort(),
   });
 }
 
@@ -308,6 +342,11 @@ export default function Home() {
   const [selectedWorkouts, setSelectedWorkouts] = useState<Map<string, SelectedWorkout>>(new Map());
   const [proteinCounts, setProteinCounts] = useState<Map<string, number>>(new Map());
   const [proteinTarget, setProteinTarget] = useState(DEFAULT_PROTEIN_TARGET);
+  const [carbCounts, setCarbCounts] = useState<Map<string, number>>(new Map());
+  const [carbTarget, setCarbTarget] = useState(DEFAULT_CARB_TARGET);
+  const [fatCounts, setFatCounts] = useState<Map<string, number>>(new Map());
+  const [fatTarget, setFatTarget] = useState(DEFAULT_FAT_TARGET);
+  const [supplementItems, setSupplementItems] = useState<Set<string>>(new Set());
   const [waterLiter, setWaterLiter] = useState(0);
   const [waterTarget, setWaterTarget] = useState(DEFAULT_WATER_TARGET);
   const [sleepHours, setSleepHours] = useState(0);
@@ -328,10 +367,20 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const proteinGram = useMemo(
+  const proteinKcal = useMemo(
     () =>
-      PROTEIN_FOODS.reduce((sum, food) => sum + food.gram * (proteinCounts.get(food.label) ?? 0), 0),
+      PROTEIN_FOODS.reduce((sum, food) => sum + food.kcal * (proteinCounts.get(food.label) ?? 0), 0),
     [proteinCounts]
+  );
+
+  const carbKcal = useMemo(
+    () => CARB_FOODS.reduce((sum, food) => sum + food.kcal * (carbCounts.get(food.label) ?? 0), 0),
+    [carbCounts]
+  );
+
+  const fatKcal = useMemo(
+    () => FAT_FOODS.reduce((sum, food) => sum + food.kcal * (fatCounts.get(food.label) ?? 0), 0),
+    [fatCounts]
   );
 
   const workoutDone = selectedWorkouts.size > 0;
@@ -340,11 +389,16 @@ export default function Home() {
   // DB에 기록 행이 존재하는지가 아니라, 실제로 뭔가 하나라도 체크했는지로 BREAK 여부를 판단한다.
   const hasAnyInput = useMemo(() => {
     const hasProtein = Array.from(proteinCounts.values()).some((count) => count > 0);
+    const hasCarb = Array.from(carbCounts.values()).some((count) => count > 0);
+    const hasFat = Array.from(fatCounts.values()).some((count) => count > 0);
     return (
       morningMed ||
       eveningMed ||
       selectedWorkouts.size > 0 ||
       hasProtein ||
+      hasCarb ||
+      hasFat ||
+      supplementItems.size > 0 ||
       waterLiter > 0 ||
       sleepHours > 0 ||
       binge ||
@@ -352,7 +406,7 @@ export default function Home() {
       mvpText.trim().length > 0 ||
       isSick
     );
-  }, [morningMed, eveningMed, selectedWorkouts, proteinCounts, waterLiter, sleepHours, binge, moodScore, mvpText, isSick]);
+  }, [morningMed, eveningMed, selectedWorkouts, proteinCounts, carbCounts, fatCounts, supplementItems, waterLiter, sleepHours, binge, moodScore, mvpText, isSick]);
 
   const ready = useMemo(() => {
     if (isSick) return { score: 0, level: SICK_LEVEL };
@@ -362,7 +416,7 @@ export default function Home() {
       sleepHours,
       waterLiter,
       waterTarget,
-      proteinGram,
+      proteinKcal,
       proteinTarget,
       workoutDone,
       morningMed,
@@ -375,7 +429,7 @@ export default function Home() {
     sleepHours,
     waterLiter,
     waterTarget,
-    proteinGram,
+    proteinKcal,
     proteinTarget,
     workoutDone,
     morningMed,
@@ -386,7 +440,7 @@ export default function Home() {
   const factors = [
     { icon: "😴", label: "수면", good: sleepHours >= SLEEP_TARGET - 1 },
     { icon: "💧", label: "수분", good: waterLiter >= waterTarget * 0.75 },
-    { icon: "🥩", label: "단백질", good: proteinGram >= proteinTarget * 0.75 },
+    { icon: "🥩", label: "단백질", good: proteinKcal >= proteinTarget * 0.75 },
     { icon: "🏋", label: "운동", good: workoutDone },
     { icon: "💊", label: "복약", good: morningMed && eveningMed },
     { icon: "🙂", label: "컨디션", good: moodScore !== null && moodScore >= 4 },
@@ -432,6 +486,31 @@ export default function Home() {
     });
   }
 
+  function setCarbCount(label: string, count: number) {
+    setCarbCounts((prev) => {
+      const next = new Map(prev);
+      next.set(label, Math.max(0, count));
+      return next;
+    });
+  }
+
+  function setFatCount(label: string, count: number) {
+    setFatCounts((prev) => {
+      const next = new Map(prev);
+      next.set(label, Math.max(0, count));
+      return next;
+    });
+  }
+
+  function toggleSupplement(label: string) {
+    setSupplementItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  }
+
   function buildPayload() {
     const bikeMinutes = selectedWorkouts.get("자전거")?.minutes ?? 0;
 
@@ -444,6 +523,12 @@ export default function Home() {
 
     const proteinItems = PROTEIN_FOODS.flatMap((food) =>
       Array.from({ length: proteinCounts.get(food.label) ?? 0 }, () => food.label)
+    );
+    const carbItems = CARB_FOODS.flatMap((food) =>
+      Array.from({ length: carbCounts.get(food.label) ?? 0 }, () => food.label)
+    );
+    const fatItems = FAT_FOODS.flatMap((food) =>
+      Array.from({ length: fatCounts.get(food.label) ?? 0 }, () => food.label)
     );
 
     return {
@@ -459,8 +544,13 @@ export default function Home() {
       medication_note: buildMedicationNote(morningMed, eveningMed),
       body: {
         water_liter: waterLiter,
-        protein_gram: proteinGram,
+        protein_kcal: proteinKcal,
         protein_items: proteinItems,
+        carb_kcal: carbKcal,
+        carb_items: carbItems,
+        fat_kcal: fatKcal,
+        fat_items: fatItems,
+        supplement_items: Array.from(supplementItems),
         binge_yn: binge,
       },
       workout: {
@@ -576,16 +666,25 @@ export default function Home() {
           });
         });
 
-        const proteinMap = new Map<string, number>();
-        (detail?.protein_items ?? []).forEach((label: string) => {
-          proteinMap.set(label, (proteinMap.get(label) ?? 0) + 1);
-        });
+        const countMapFrom = (labels: string[]) => {
+          const map = new Map<string, number>();
+          labels.forEach((label) => map.set(label, (map.get(label) ?? 0) + 1));
+          return map;
+        };
+
+        const proteinMap = countMapFrom(detail?.protein_items ?? []);
+        const carbMap = countMapFrom(detail?.carb_items ?? []);
+        const fatMap = countMapFrom(detail?.fat_items ?? []);
+        const supplementSet = new Set<string>(detail?.supplement_items ?? []);
 
         // 자동저장 effect가 "방금 불러온 값 그대로"인 경우 저장을 건너뛸 수 있도록 스냅샷을 먼저 기록해둔다.
         lastLoadedSnapshotRef.current = snapshotFormState({
           ...loaded,
           selectedWorkouts: workoutMap,
           proteinCounts: proteinMap,
+          carbCounts: carbMap,
+          fatCounts: fatMap,
+          supplementItems: supplementSet,
         });
 
         setMorningMed(loaded.morningMed);
@@ -598,9 +697,18 @@ export default function Home() {
         setMvpText(loaded.mvpText);
         setSelectedWorkouts(workoutMap);
         setProteinCounts(proteinMap);
+        setCarbCounts(carbMap);
+        setFatCounts(fatMap);
+        setSupplementItems(supplementSet);
 
-        if (data?.goal?.target_protein_gram) {
-          setProteinTarget(data.goal.target_protein_gram);
+        if (data?.goal?.target_protein_kcal) {
+          setProteinTarget(data.goal.target_protein_kcal);
+        }
+        if (data?.goal?.target_carb_kcal) {
+          setCarbTarget(data.goal.target_carb_kcal);
+        }
+        if (data?.goal?.target_fat_kcal) {
+          setFatTarget(data.goal.target_fat_kcal);
         }
         if (data?.goal?.target_water_liter) {
           setWaterTarget(data.goal.target_water_liter);
@@ -630,6 +738,9 @@ export default function Home() {
       mvpText,
       selectedWorkouts,
       proteinCounts,
+      carbCounts,
+      fatCounts,
+      supplementItems,
     });
 
     if (currentSnapshot === lastLoadedSnapshotRef.current) return;
@@ -657,6 +768,9 @@ export default function Home() {
     eveningMed,
     selectedWorkouts,
     proteinCounts,
+    carbCounts,
+    fatCounts,
+    supplementItems,
     waterLiter,
     sleepHours,
     binge,
@@ -684,6 +798,9 @@ export default function Home() {
         mvpText,
         selectedWorkouts,
         proteinCounts,
+        carbCounts,
+        fatCounts,
+        supplementItems,
       });
       setAutoSaveStatus("saved");
       pollCoachFeedback(recordDate, 8);
@@ -853,8 +970,20 @@ export default function Home() {
                 />
                 <TrendChart
                   title="🥩 단백질"
-                  unit="g"
-                  data={history.map((h) => h.protein_gram)}
+                  unit="kcal"
+                  data={history.map((h) => h.protein_kcal)}
+                  dates={history.map((h) => h.record_date)}
+                />
+                <TrendChart
+                  title="🍚 탄수화물"
+                  unit="kcal"
+                  data={history.map((h) => h.carb_kcal)}
+                  dates={history.map((h) => h.record_date)}
+                />
+                <TrendChart
+                  title="🥑 지방"
+                  unit="kcal"
+                  data={history.map((h) => h.fat_kcal)}
                   dates={history.map((h) => h.record_date)}
                 />
                 <WorkoutDots data={history.map((h) => h.workout_done_yn)} dates={history.map((h) => h.record_date)} />
@@ -963,7 +1092,7 @@ export default function Home() {
               )}
             </Section>
 
-            <Section title={`🥩 단백질 · ${proteinGram}g / 목표 ${proteinTarget}g`}>
+            <Section title={`🥩 단백질 · ${proteinKcal}kcal / 목표 ${proteinTarget}kcal`}>
               <div className="space-y-2">
                 {PROTEIN_FOODS.map((food) => (
                   <div
@@ -972,7 +1101,7 @@ export default function Home() {
                   >
                     <div>
                       <p className="font-bold text-zinc-100">{food.label}</p>
-                      <p className="text-xs text-zinc-500">{food.gram}g / 1회</p>
+                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal / 1회</p>
                     </div>
                     <Stepper
                       value={proteinCounts.get(food.label) ?? 0}
@@ -981,6 +1110,63 @@ export default function Home() {
                       step={1}
                     />
                   </div>
+                ))}
+              </div>
+            </Section>
+
+            <Section title={`🍚 탄수화물 · ${carbKcal}kcal / 목표 ${carbTarget}kcal`}>
+              <div className="space-y-2">
+                {CARB_FOODS.map((food) => (
+                  <div
+                    key={food.label}
+                    className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
+                  >
+                    <div>
+                      <p className="font-bold text-zinc-100">{food.label}</p>
+                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal / 1회</p>
+                    </div>
+                    <Stepper
+                      value={carbCounts.get(food.label) ?? 0}
+                      onChange={(v) => setCarbCount(food.label, v)}
+                      suffix="회"
+                      step={1}
+                    />
+                  </div>
+                ))}
+              </div>
+            </Section>
+
+            <Section title={`🥑 지방 · ${fatKcal}kcal / 목표 ${fatTarget}kcal`}>
+              <div className="space-y-2">
+                {FAT_FOODS.map((food) => (
+                  <div
+                    key={food.label}
+                    className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
+                  >
+                    <div>
+                      <p className="font-bold text-zinc-100">{food.label}</p>
+                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal / 1회</p>
+                    </div>
+                    <Stepper
+                      value={fatCounts.get(food.label) ?? 0}
+                      onChange={(v) => setFatCount(food.label, v)}
+                      suffix="회"
+                      step={1}
+                    />
+                  </div>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="🫐 보충음식">
+              <div className="flex flex-wrap gap-2">
+                {SUPPLEMENT_FOODS.map((food) => (
+                  <Chip
+                    key={food.label}
+                    label={`${food.label} ${food.unit}`}
+                    active={supplementItems.has(food.label)}
+                    onClick={() => toggleSupplement(food.label)}
+                  />
                 ))}
               </div>
             </Section>

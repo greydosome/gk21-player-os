@@ -30,7 +30,15 @@ def get_day_detail(record_date: date):
         ).scalar()
 
         if not day_record_id:
-            return {"workout_items": [], "protein_items": [], "mvp_text": None, "is_sick": False}
+            return {
+                "workout_items": [],
+                "protein_items": [],
+                "carb_items": [],
+                "fat_items": [],
+                "supplement_items": [],
+                "mvp_text": None,
+                "is_sick": False,
+            }
 
         workout_items = conn.execute(
             text("""
@@ -42,10 +50,14 @@ def get_day_detail(record_date: date):
             {"day_record_id": day_record_id}
         ).mappings().all()
 
-        protein_items = conn.execute(
-            text("SELECT protein_items FROM body_record WHERE day_record_id = :day_record_id"),
+        food_items = conn.execute(
+            text("""
+                SELECT protein_items, carb_items, fat_items, supplement_items
+                FROM body_record
+                WHERE day_record_id = :day_record_id
+            """),
             {"day_record_id": day_record_id}
-        ).scalar()
+        ).mappings().first()
 
         day_row = conn.execute(
             text("SELECT mvp_text, is_sick FROM day_record WHERE day_record_id = :day_record_id"),
@@ -54,7 +66,10 @@ def get_day_detail(record_date: date):
 
     return {
         "workout_items": [dict(row) for row in workout_items],
-        "protein_items": protein_items or [],
+        "protein_items": (food_items["protein_items"] if food_items else None) or [],
+        "carb_items": (food_items["carb_items"] if food_items else None) or [],
+        "fat_items": (food_items["fat_items"] if food_items else None) or [],
+        "supplement_items": (food_items["supplement_items"] if food_items else None) or [],
         "mvp_text": day_row["mvp_text"] if day_row else None,
         "is_sick": day_row["is_sick"] if day_row else False,
     }
@@ -62,7 +77,13 @@ def get_day_detail(record_date: date):
 
 def get_active_goal():
     sql = text("""
-        SELECT target_weight_kg, target_water_liter, target_protein_gram, target_calorie
+        SELECT
+            target_weight_kg,
+            target_water_liter,
+            target_protein_kcal,
+            target_carb_kcal,
+            target_fat_kcal,
+            target_calorie
         FROM user_goal
         WHERE goal_status = 'ACTIVE'
         ORDER BY started_at DESC

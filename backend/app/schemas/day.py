@@ -6,8 +6,13 @@ class BodyRecord(BaseModel):
     weight_kg: float | None = None
     waist_cm: float | None = None
     water_liter: float | None = None
-    protein_gram: int | None = None
+    protein_kcal: int | None = None
     protein_items: list[str] | None = None
+    carb_kcal: int | None = None
+    carb_items: list[str] | None = None
+    fat_kcal: int | None = None
+    fat_items: list[str] | None = None
+    supplement_items: list[str] | None = None
     binge_yn: bool | None = None
 
 

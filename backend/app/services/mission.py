@@ -33,8 +33,8 @@ def build_today_missions(dashboard: dict | None) -> list[dict]:
             "kind": "WATER"
         })
 
-    protein = int(dashboard.get("protein_gram") or 0)
-    if protein >= 160:
+    protein = int(dashboard.get("protein_kcal") or 0)
+    if protein >= 430:
         missions.append({
             "title": "단백질 목표 유지",
             "done": True,

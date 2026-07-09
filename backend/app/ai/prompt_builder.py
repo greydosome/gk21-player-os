@@ -46,6 +46,8 @@ def build_prompt(context, metrics):
         "sleep": [],
         "meal": [],
         "protein": [],
+        "carb": [],
+        "fat": [],
         "water": [],
         "workout_done": [],
         "workout_minutes": []
@@ -56,7 +58,9 @@ def build_prompt(context, metrics):
         trend["score"].append(row.get("score"))
         trend["sleep"].append(row.get("sleep_hours"))
         trend["meal"].append(row.get("meal_score"))
-        trend["protein"].append(row.get("protein_gram"))
+        trend["protein"].append(row.get("protein_kcal"))
+        trend["carb"].append(row.get("carb_kcal"))
+        trend["fat"].append(row.get("fat_kcal"))
         trend["water"].append(row.get("water_liter"))
         trend["workout_done"].append(row.get("workout_done_yn"))
         trend["workout_minutes"].append(row.get("bike_minutes"))

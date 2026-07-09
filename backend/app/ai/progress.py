@@ -75,7 +75,11 @@ def calculate_goal_progress(context):
 
             "workout_done_yn": today.get("workout_done_yn"),
 
-            "protein_gram": today.get("protein_gram"),
+            "protein_kcal": today.get("protein_kcal"),
+
+            "carb_kcal": today.get("carb_kcal"),
+
+            "fat_kcal": today.get("fat_kcal"),
 
             "water_liter": _to_float(today.get("water_liter")),
 
