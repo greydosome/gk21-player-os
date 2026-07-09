@@ -34,6 +34,12 @@ const WORKOUT_TYPES: WorkoutType[] = [
     subExercises: ["바벨컬", "덤벨컬", "트라이셉스 익스텐션", "케이블 푸시다운", "해머컬"],
   },
   {
+    label: "어깨운동",
+    kcalPerMin: 5,
+    defaultMinutes: 20,
+    subExercises: ["숄더프레스", "사이드 레터럴 레이즈", "프론트 레이즈", "페이스풀", "아놀드프레스"],
+  },
+  {
     label: "하체운동",
     kcalPerMin: 7,
     defaultMinutes: 30,
@@ -293,6 +299,7 @@ function snapshotFormState(state: {
   isSick: boolean;
   moodScore: number | null;
   mvpText: string;
+  workoutComment: string;
   selectedWorkouts: Map<string, SelectedWorkout>;
   proteinCounts: Map<string, number>;
   carbCounts: Map<string, number>;
@@ -308,6 +315,7 @@ function snapshotFormState(state: {
     isSick: state.isSick,
     moodScore: state.moodScore,
     mvpText: state.mvpText,
+    workoutComment: state.workoutComment,
     workouts: Array.from(state.selectedWorkouts.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([type, w]) => [type, w.minutes, Array.from(w.details).sort()]),
@@ -340,6 +348,7 @@ export default function Home() {
   const [morningMed, setMorningMed] = useState(false);
   const [eveningMed, setEveningMed] = useState(false);
   const [selectedWorkouts, setSelectedWorkouts] = useState<Map<string, SelectedWorkout>>(new Map());
+  const [workoutComment, setWorkoutComment] = useState("");
   const [proteinCounts, setProteinCounts] = useState<Map<string, number>>(new Map());
   const [proteinTarget, setProteinTarget] = useState(DEFAULT_PROTEIN_TARGET);
   const [carbCounts, setCarbCounts] = useState<Map<string, number>>(new Map());
@@ -536,7 +545,7 @@ export default function Home() {
       score: ready.score,
       grade: ready.level.label,
       mood_score: moodScore,
-      memo: null,
+      memo: workoutDone ? workoutComment || null : null,
       mvp_text: mvpText || null,
       is_sick: isSick,
       morning_med_taken: morningMed,
@@ -656,6 +665,7 @@ export default function Home() {
           isSick: detail?.is_sick ?? false,
           moodScore: d?.mood_score ?? null,
           mvpText: detail?.mvp_text ?? "",
+          workoutComment: d?.memo ?? "",
         };
 
         const workoutMap = new Map<string, SelectedWorkout>();
@@ -695,6 +705,7 @@ export default function Home() {
         setIsSick(loaded.isSick);
         setMoodScore(loaded.moodScore);
         setMvpText(loaded.mvpText);
+        setWorkoutComment(loaded.workoutComment);
         setSelectedWorkouts(workoutMap);
         setProteinCounts(proteinMap);
         setCarbCounts(carbMap);
@@ -736,6 +747,7 @@ export default function Home() {
       isSick,
       moodScore,
       mvpText,
+      workoutComment,
       selectedWorkouts,
       proteinCounts,
       carbCounts,
@@ -777,6 +789,7 @@ export default function Home() {
     isSick,
     moodScore,
     mvpText,
+    workoutComment,
   ]);
 
   async function requestCoaching() {
@@ -796,6 +809,7 @@ export default function Home() {
         isSick,
         moodScore,
         mvpText,
+        workoutComment,
         selectedWorkouts,
         proteinCounts,
         carbCounts,
@@ -1090,6 +1104,16 @@ export default function Home() {
                   })}
                 </div>
               )}
+
+              {workoutDone && (
+                <textarea
+                  value={workoutComment}
+                  onChange={(e) => setWorkoutComment(e.target.value)}
+                  placeholder="오늘 운동에 대한 코멘트를 남겨보세요"
+                  rows={2}
+                  className="mt-3 w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                />
+              )}
             </Section>
 
             <Section title={`🥩 단백질 · ${proteinKcal}kcal / 목표 ${proteinTarget}kcal`}>
@@ -1180,7 +1204,7 @@ export default function Home() {
               />
             </Section>
 
-            <Section title={`😴 수면 · ${sleepHours}시간`}>
+            <Section title={`😴 수면 · ${sleepHours}시간 / 목표 ${SLEEP_TARGET}시간`}>
               <ScaleRow
                 values={SLEEP_HOURS}
                 active={sleepHours}
