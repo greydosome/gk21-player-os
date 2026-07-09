@@ -12,9 +12,24 @@ type WorkoutType = {
 const WORKOUT_TYPES: WorkoutType[] = [
   { label: "풋살", kcalPerMin: 8, defaultMinutes: 90 },
   { label: "PT", kcalPerMin: 7, defaultMinutes: 60 },
-  { label: "GK Performance Day", kcalPerMin: 9, defaultMinutes: 60 },
-  { label: "Clubbell Mobility", kcalPerMin: 4, defaultMinutes: 15 },
-  { label: "하체모빌리티", kcalPerMin: 3, defaultMinutes: 15 },
+  {
+    label: "GK Performance Day",
+    kcalPerMin: 9,
+    defaultMinutes: 60,
+    subExercises: ["다이빙 세이브", "캐칭 훈련", "1대1 대응", "크로스 캐칭", "반응 훈련"],
+  },
+  {
+    label: "Clubbell Mobility",
+    kcalPerMin: 4,
+    defaultMinutes: 15,
+    subExercises: ["숄더 캐스트", "밀", "스위치", "프라이멀 스윙", "180 스윙"],
+  },
+  {
+    label: "하체모빌리티",
+    kcalPerMin: 3,
+    defaultMinutes: 15,
+    subExercises: ["힙 서클", "90/90 스트레치", "카프 스트레치", "월드 그레이티스트 스트레치", "폼롤러"],
+  },
   {
     label: "가슴운동",
     kcalPerMin: 6,
