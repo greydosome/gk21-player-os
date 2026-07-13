@@ -977,7 +977,7 @@ export default function Home() {
             <Section title="📋 데일리 체크">
               <div className="space-y-4">
                 <SubBlock title="⚡ 빠른 체크">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex gap-2 overflow-x-auto pb-1">
                     <Chip
                       label="☀️ 아침약"
                       active={morningMed}
@@ -1102,7 +1102,7 @@ export default function Home() {
                 </SubBlock>
 
                 <SubBlock title="🫐 보충음식">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex gap-2 overflow-x-auto pb-1">
                     {SUPPLEMENT_FOODS.map((food) => (
                       <Chip
                         key={food.label}
