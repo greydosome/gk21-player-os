@@ -4,70 +4,80 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type WorkoutType = {
   label: string;
+  category: "strength" | "cardio";
   kcalPerMin: number;
   defaultMinutes: number;
   subExercises?: string[];
 };
 
 const WORKOUT_TYPES: WorkoutType[] = [
-  { label: "풋살", kcalPerMin: 8, defaultMinutes: 90 },
-  { label: "PT", kcalPerMin: 7, defaultMinutes: 60 },
+  { label: "풋살", category: "cardio", kcalPerMin: 8, defaultMinutes: 90 },
+  { label: "PT", category: "strength", kcalPerMin: 7, defaultMinutes: 60 },
   {
     label: "GK Performance Day",
+    category: "cardio",
     kcalPerMin: 9,
     defaultMinutes: 60,
-    subExercises: ["다이빙 세이브", "캐칭 훈련", "1대1 대응", "크로스 캐칭", "반응 훈련", "슈팅 스톱", "풋워크 훈련"],
+    subExercises: ["다이빙 세이브", "캐칭 훈련", "1대1 대응", "크로스 캐칭", "반응 훈련", "슈팅 스톱"],
   },
   {
     label: "Clubbell Mobility",
+    category: "strength",
     kcalPerMin: 4,
     defaultMinutes: 15,
-    subExercises: ["숄더 캐스트", "밀", "스위치", "프라이멀 스윙", "180 스윙", "숄더 스윙", "패스 어라운드"],
+    subExercises: ["숄더 캐스트", "밀", "스위치", "프라이멀 스윙", "180 스윙", "숄더 스윙"],
   },
   {
     label: "하체모빌리티",
+    category: "strength",
     kcalPerMin: 3,
     defaultMinutes: 15,
     subExercises: ["힙 서클", "90/90 스트레치", "카프 스트레치", "월드 그레이티스트 스트레치", "폼롤러", "런지 스트레치", "발목 모빌리티"],
   },
   {
     label: "가슴운동",
+    category: "strength",
     kcalPerMin: 6,
     defaultMinutes: 30,
     subExercises: ["벤치프레스", "인클라인 벤치프레스", "덤벨 플라이", "딥스", "푸시업", "디클라인 벤치프레스", "케이블 크로스오버"],
   },
   {
     label: "등운동",
+    category: "strength",
     kcalPerMin: 6,
     defaultMinutes: 30,
     subExercises: ["랫풀다운", "티바로우", "데드리프트", "풀업", "시티드로우", "벤트오버 바벨로우", "원암 덤벨로우"],
   },
   {
     label: "팔운동",
+    category: "strength",
     kcalPerMin: 5,
     defaultMinutes: 20,
     subExercises: ["바벨컬", "덤벨컬", "트라이셉스 익스텐션", "케이블 푸시다운", "해머컬", "스컬크러셔", "컨센트레이션컬"],
   },
   {
     label: "어깨운동",
+    category: "strength",
     kcalPerMin: 5,
     defaultMinutes: 20,
     subExercises: ["숄더프레스", "사이드 레터럴 레이즈", "프론트 레이즈", "페이스풀", "아놀드프레스", "업라이트로우", "리버스 펙덱 플라이"],
   },
   {
     label: "하체운동",
+    category: "strength",
     kcalPerMin: 7,
     defaultMinutes: 30,
     subExercises: ["스쿼트", "레그프레스", "런지", "레그컬", "카프레이즈", "레그익스텐션", "힙쓰러스트"],
   },
   {
     label: "코어운동",
+    category: "strength",
     kcalPerMin: 5,
     defaultMinutes: 15,
     subExercises: ["플랭크", "크런치", "레그레이즈", "러시안트위스트", "사이드플랭크", "마운틴클라이머", "행잉레그레이즈"],
   },
-  { label: "자전거", kcalPerMin: 7, defaultMinutes: 30 },
-  { label: "계단 오르기", kcalPerMin: 10, defaultMinutes: 20 },
+  { label: "자전거", category: "cardio", kcalPerMin: 7, defaultMinutes: 30 },
+  { label: "계단 오르기", category: "cardio", kcalPerMin: 10, defaultMinutes: 20 },
 ];
 
 // 0=일 1=월 2=화 3=수 4=목 5=금 6=토 (Bible 주간 일정 기준)
@@ -136,15 +146,6 @@ const MOOD_OPTIONS = [
   { score: 3, icon: "🤔" },
   { score: 4, icon: "🤓" },
   { score: 5, icon: "😎" },
-];
-
-const FALLBACK_MVP_SUGGESTIONS = [
-  "오늘도 출석했다",
-  "오늘도 시즌을 이어갔다",
-  "작은 것 하나는 해냈다",
-  "완벽하지 않아도 이어갔다",
-  "오늘은 회복이 필요했다",
-  "다음을 위해 오늘을 버텼다",
 ];
 
 const READY_LEVELS = [
@@ -306,7 +307,6 @@ function snapshotFormState(state: {
   binge: boolean;
   isSick: boolean;
   moodScore: number | null;
-  mvpText: string;
   workoutComment: string;
   selectedWorkouts: Map<string, SelectedWorkout>;
   proteinCounts: Map<string, number>;
@@ -322,7 +322,6 @@ function snapshotFormState(state: {
     binge: state.binge,
     isSick: state.isSick,
     moodScore: state.moodScore,
-    mvpText: state.mvpText,
     workoutComment: state.workoutComment,
     workouts: Array.from(state.selectedWorkouts.entries())
       .sort(([a], [b]) => a.localeCompare(b))
@@ -370,9 +369,6 @@ export default function Home() {
   const [binge, setBinge] = useState(false);
   const [isSick, setIsSick] = useState(false);
   const [moodScore, setMoodScore] = useState<number | null>(null);
-  const [mvpText, setMvpText] = useState("");
-  const [mvpSuggestions, setMvpSuggestions] = useState<string[]>(FALLBACK_MVP_SUGGESTIONS);
-  const [mvpSuggestionsLoading, setMvpSuggestionsLoading] = useState(false);
   const [showLevelLegend, setShowLevelLegend] = useState(false);
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -420,10 +416,9 @@ export default function Home() {
       sleepHours > 0 ||
       binge ||
       moodScore !== null ||
-      mvpText.trim().length > 0 ||
       isSick
     );
-  }, [morningMed, eveningMed, selectedWorkouts, proteinCounts, carbCounts, fatCounts, supplementItems, waterLiter, sleepHours, binge, moodScore, mvpText, isSick]);
+  }, [morningMed, eveningMed, selectedWorkouts, proteinCounts, carbCounts, fatCounts, supplementItems, waterLiter, sleepHours, binge, moodScore, isSick]);
 
   const ready = useMemo(() => {
     if (isSick) return { score: 0, level: SICK_LEVEL };
@@ -552,7 +547,6 @@ export default function Home() {
       grade: ready.level.label,
       mood_score: moodScore,
       memo: workoutDone ? workoutComment || null : null,
-      mvp_text: mvpText || null,
       is_sick: isSick,
       morning_med_taken: morningMed,
       evening_med_taken: eveningMed,
@@ -620,33 +614,6 @@ export default function Home() {
     }
   }
 
-  // 날짜가 바뀌면 그 날짜의 "오늘의 한마디" 추천 문구를 OpenAI로부터 받아온다(해당 날짜 최초 요청시 생성 후 캐시).
-  useEffect(() => {
-    let cancelled = false;
-    setMvpSuggestionsLoading(true);
-
-    fetch(`/api/mvp-suggestions?record_date=${recordDate}`, { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (Array.isArray(data?.suggestions) && data.suggestions.length > 0) {
-          setMvpSuggestions(data.suggestions);
-        } else {
-          setMvpSuggestions(FALLBACK_MVP_SUGGESTIONS);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setMvpSuggestions(FALLBACK_MVP_SUGGESTIONS);
-      })
-      .finally(() => {
-        if (!cancelled) setMvpSuggestionsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [recordDate]);
-
   // 날짜가 바뀌면 그 날짜의 기존 기록을 불러와서 폼을 채운다 (없으면 기본값으로 초기화).
   useEffect(() => {
     let cancelled = false;
@@ -670,7 +637,6 @@ export default function Home() {
           binge: d?.binge_yn ?? false,
           isSick: detail?.is_sick ?? false,
           moodScore: d?.mood_score ?? null,
-          mvpText: detail?.mvp_text ?? "",
           workoutComment: d?.memo ?? "",
         };
 
@@ -710,7 +676,6 @@ export default function Home() {
         setBinge(loaded.binge);
         setIsSick(loaded.isSick);
         setMoodScore(loaded.moodScore);
-        setMvpText(loaded.mvpText);
         setWorkoutComment(loaded.workoutComment);
         setSelectedWorkouts(workoutMap);
         setProteinCounts(proteinMap);
@@ -752,7 +717,6 @@ export default function Home() {
       binge,
       isSick,
       moodScore,
-      mvpText,
       workoutComment,
       selectedWorkouts,
       proteinCounts,
@@ -794,7 +758,6 @@ export default function Home() {
     binge,
     isSick,
     moodScore,
-    mvpText,
     workoutComment,
   ]);
 
@@ -814,7 +777,6 @@ export default function Home() {
         binge,
         isSick,
         moodScore,
-        mvpText,
         workoutComment,
         selectedWorkouts,
         proteinCounts,
@@ -1012,104 +974,236 @@ export default function Home() {
           </section>
         ) : (
           <>
-            <Section title="⚡ 빠른 체크">
-              <div className="flex flex-wrap gap-2">
-                <Chip
-                  label="☀️ 아침약"
-                  active={morningMed}
-                  onClick={() => setMorningMed(!morningMed)}
-                />
-                <Chip
-                  label="🌙 저녁약"
-                  active={eveningMed}
-                  onClick={() => setEveningMed(!eveningMed)}
-                />
-                <Chip label="🍽 폭식함" active={binge} onClick={() => setBinge(!binge)} tone="warn" />
-                <Chip label="🤒 아픈 날" active={isSick} onClick={() => setIsSick(!isSick)} tone="warn" />
+            <Section title="📋 데일리 체크">
+              <div className="space-y-4">
+                <SubBlock title="⚡ 빠른 체크">
+                  <div className="flex flex-wrap gap-2">
+                    <Chip
+                      label="☀️ 아침약"
+                      active={morningMed}
+                      onClick={() => setMorningMed(!morningMed)}
+                    />
+                    <Chip
+                      label="🌙 저녁약"
+                      active={eveningMed}
+                      onClick={() => setEveningMed(!eveningMed)}
+                    />
+                    <Chip label="🍽 폭식함" active={binge} onClick={() => setBinge(!binge)} tone="warn" />
+                    <Chip label="🤒 아픈 날" active={isSick} onClick={() => setIsSick(!isSick)} tone="warn" />
+                  </div>
+                </SubBlock>
+
+                <SubBlock title={`💧 물 · ${waterLiter.toFixed(1)}L / 목표 ${waterTarget.toFixed(1)}L`}>
+                  <ScaleRow
+                    values={WATER_PRESETS}
+                    active={waterLiter}
+                    onSelect={setWaterLiter}
+                    format={(v) => `${v.toFixed(1)}L`}
+                  />
+                </SubBlock>
+
+                <SubBlock title={`😴 수면 · ${sleepHours}시간 / 목표 ${SLEEP_TARGET}시간`}>
+                  <ScaleRow
+                    values={SLEEP_HOURS}
+                    active={sleepHours}
+                    onSelect={setSleepHours}
+                    format={(v) => `${v}h`}
+                  />
+                </SubBlock>
+
+                <SubBlock title="🙂 컨디션">
+                  <div className="grid grid-cols-5 gap-2">
+                    {MOOD_OPTIONS.map((mood) => (
+                      <button
+                        key={mood.score}
+                        type="button"
+                        onClick={() => setMoodScore(moodScore === mood.score ? null : mood.score)}
+                        className={[
+                          "rounded-2xl border-2 py-3 text-3xl transition-colors",
+                          moodScore === mood.score
+                            ? "border-emerald-500 bg-zinc-800"
+                            : "border-zinc-700 bg-zinc-800",
+                        ].join(" ")}
+                      >
+                        {mood.icon}
+                      </button>
+                    ))}
+                  </div>
+                </SubBlock>
+              </div>
+            </Section>
+
+            <Section title="🍱 식단">
+              <div className="space-y-4">
+                <SubBlock title={`🥩 단백질 · ${proteinKcal}kcal / 목표 ${proteinTarget}kcal`}>
+                  <div className="space-y-2">
+                    {PROTEIN_FOODS.map((food) => (
+                      <div
+                        key={food.label}
+                        className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
+                      >
+                        <div>
+                          <p className="font-bold text-zinc-100">{food.label}</p>
+                          <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
+                        </div>
+                        <Stepper
+                          value={proteinCounts.get(food.label) ?? 0}
+                          onChange={(v) => setProteinCount(food.label, v)}
+                          suffix="회"
+                          step={1}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </SubBlock>
+
+                <SubBlock title={`🍚 탄수화물 · ${carbKcal}kcal / 목표 ${carbTarget}kcal`}>
+                  <div className="space-y-2">
+                    {CARB_FOODS.map((food) => (
+                      <div
+                        key={food.label}
+                        className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
+                      >
+                        <div>
+                          <p className="font-bold text-zinc-100">{food.label}</p>
+                          <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
+                        </div>
+                        <Stepper
+                          value={carbCounts.get(food.label) ?? 0}
+                          onChange={(v) => setCarbCount(food.label, v)}
+                          suffix="회"
+                          step={1}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </SubBlock>
+
+                <SubBlock title={`🥑 지방 · ${fatKcal}kcal / 목표 ${fatTarget}kcal`}>
+                  <div className="space-y-2">
+                    {FAT_FOODS.map((food) => (
+                      <div
+                        key={food.label}
+                        className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
+                      >
+                        <div>
+                          <p className="font-bold text-zinc-100">{food.label}</p>
+                          <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
+                        </div>
+                        <Stepper
+                          value={fatCounts.get(food.label) ?? 0}
+                          onChange={(v) => setFatCount(food.label, v)}
+                          suffix="회"
+                          step={1}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </SubBlock>
+
+                <SubBlock title="🫐 보충음식">
+                  <div className="flex flex-wrap gap-2">
+                    {SUPPLEMENT_FOODS.map((food) => (
+                      <Chip
+                        key={food.label}
+                        label={`${food.label} ${food.unit}`}
+                        active={supplementItems.has(food.label)}
+                        onClick={() => toggleSupplement(food.label)}
+                      />
+                    ))}
+                  </div>
+                </SubBlock>
               </div>
             </Section>
 
             <Section title="🏋 운동">
-              <div className="flex flex-wrap gap-2">
-                {WORKOUT_TYPES.map((w) => {
-                  const suggestion = todaySchedule.suggestions.find((s) => s.type === w.label);
-                  const isSelected = selectedWorkouts.has(w.label);
+              <div className="space-y-4">
+                {(
+                  [
+                    { key: "strength", title: "💪 근력" },
+                    { key: "cardio", title: "🏃 유산소" },
+                  ] as const
+                ).map((group) => (
+                  <SubBlock key={group.key} title={group.title}>
+                    <div className="space-y-2">
+                      {WORKOUT_TYPES.filter((w) => w.category === group.key).map((w) => {
+                        const suggestion = todaySchedule.suggestions.find((s) => s.type === w.label);
+                        const selected = selectedWorkouts.get(w.label);
+                        const isSelected = !!selected;
 
-                  return (
-                    <button
-                      key={w.label}
-                      type="button"
-                      onClick={() => toggleWorkout(w.label, suggestion?.minutes ?? w.defaultMinutes)}
-                      className={[
-                        "shrink-0 rounded-full border-2 px-3.5 py-2 text-sm font-bold transition-colors",
-                        isSelected
-                          ? "border-emerald-500 bg-emerald-500 text-zinc-950"
-                          : suggestion
-                            ? "border-amber-500 bg-zinc-900 text-amber-400"
-                            : "border-zinc-700 bg-zinc-800 text-zinc-200",
-                      ].join(" ")}
-                    >
-                      {isSelected ? "✓ " : suggestion ? "⭐ " : ""}
-                      {w.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {selectedWorkouts.size > 0 && (
-                <div className="mt-3 space-y-2">
-                  {Array.from(selectedWorkouts.entries()).map(([type, w]) => {
-                    const typeInfo = WORKOUT_TYPES.find((x) => x.label === type);
-                    return (
-                      <div key={type} className="rounded-2xl bg-zinc-800 p-2.5">
-                        <div className="flex items-center gap-2">
-                          <p className="min-w-0 flex-1 truncate text-sm font-bold text-zinc-100">{type}</p>
-
-                          <Stepper
-                            value={w.minutes}
-                            onChange={(v) => updateWorkoutMinutes(type, v)}
-                            suffix="분"
-                            step={5}
-                          />
-
-                          <span className="w-14 shrink-0 text-right text-xs font-bold text-zinc-500">
-                            {kcalFor(type, w.minutes)}kcal
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() => toggleWorkout(type, w.minutes)}
-                            className="h-8 w-8 shrink-0 rounded-full bg-emerald-500 text-sm font-black text-zinc-950"
-                          >
-                            ✕
-                          </button>
-                        </div>
-
-                        {typeInfo?.subExercises && (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {typeInfo.subExercises.map((exercise) => (
+                        return (
+                          <div key={w.label} className="rounded-2xl bg-zinc-800 p-3">
+                            <div className="flex items-center gap-2">
                               <button
-                                key={exercise}
                                 type="button"
-                                onClick={() => toggleWorkoutDetail(type, exercise)}
-                                className={[
-                                  "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors",
-                                  w.details.has(exercise)
-                                    ? "border-emerald-500 bg-emerald-500 text-zinc-950"
-                                    : "border-zinc-700 bg-zinc-900 text-zinc-400",
-                                ].join(" ")}
+                                onClick={() => toggleWorkout(w.label, suggestion?.minutes ?? w.defaultMinutes)}
+                                className="min-w-0 flex-1 text-left"
                               >
-                                {w.details.has(exercise) && "✓ "}
-                                {exercise}
+                                <p className="truncate font-bold text-zinc-100">
+                                  {isSelected ? "✓ " : suggestion ? "⭐ " : ""}
+                                  {w.label}
+                                </p>
+                                <p className="text-xs text-zinc-500">
+                                  {isSelected
+                                    ? `${selected.minutes}분 · ${kcalFor(w.label, selected.minutes)}kcal`
+                                    : `기본 ${w.defaultMinutes}분`}
+                                </p>
                               </button>
-                            ))}
+
+                              {isSelected ? (
+                                <>
+                                  <Stepper
+                                    value={selected.minutes}
+                                    onChange={(v) => updateWorkoutMinutes(w.label, v)}
+                                    suffix="분"
+                                    step={5}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleWorkout(w.label, selected.minutes)}
+                                    className="h-8 w-8 shrink-0 rounded-full bg-emerald-500 text-sm font-black text-zinc-950"
+                                  >
+                                    ✕
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleWorkout(w.label, suggestion?.minutes ?? w.defaultMinutes)}
+                                  className="shrink-0 rounded-full border-2 border-zinc-700 bg-zinc-900 px-3.5 py-2 text-sm font-bold text-zinc-300"
+                                >
+                                  선택
+                                </button>
+                              )}
+                            </div>
+
+                            {isSelected && w.subExercises && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {w.subExercises.map((exercise) => (
+                                  <button
+                                    key={exercise}
+                                    type="button"
+                                    onClick={() => toggleWorkoutDetail(w.label, exercise)}
+                                    className={[
+                                      "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors",
+                                      selected.details.has(exercise)
+                                        ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+                                        : "border-zinc-700 bg-zinc-900 text-zinc-400",
+                                    ].join(" ")}
+                                  >
+                                    {selected.details.has(exercise) && "✓ "}
+                                    {exercise}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                        );
+                      })}
+                    </div>
+                  </SubBlock>
+                ))}
+              </div>
 
               {workoutDone && (
                 <textarea
@@ -1117,142 +1211,8 @@ export default function Home() {
                   onChange={(e) => setWorkoutComment(e.target.value)}
                   placeholder="오늘 운동에 대한 코멘트를 남겨보세요"
                   rows={2}
-                  className="mt-3 w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                  className="mt-4 w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
                 />
-              )}
-            </Section>
-
-            <Section title={`🥩 단백질 · ${proteinKcal}kcal / 목표 ${proteinTarget}kcal`}>
-              <div className="space-y-2">
-                {PROTEIN_FOODS.map((food) => (
-                  <div
-                    key={food.label}
-                    className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
-                  >
-                    <div>
-                      <p className="font-bold text-zinc-100">{food.label}</p>
-                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
-                    </div>
-                    <Stepper
-                      value={proteinCounts.get(food.label) ?? 0}
-                      onChange={(v) => setProteinCount(food.label, v)}
-                      suffix="회"
-                      step={1}
-                    />
-                  </div>
-                ))}
-              </div>
-            </Section>
-
-            <Section title={`🍚 탄수화물 · ${carbKcal}kcal / 목표 ${carbTarget}kcal`}>
-              <div className="space-y-2">
-                {CARB_FOODS.map((food) => (
-                  <div
-                    key={food.label}
-                    className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
-                  >
-                    <div>
-                      <p className="font-bold text-zinc-100">{food.label}</p>
-                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
-                    </div>
-                    <Stepper
-                      value={carbCounts.get(food.label) ?? 0}
-                      onChange={(v) => setCarbCount(food.label, v)}
-                      suffix="회"
-                      step={1}
-                    />
-                  </div>
-                ))}
-              </div>
-            </Section>
-
-            <Section title={`🥑 지방 · ${fatKcal}kcal / 목표 ${fatTarget}kcal`}>
-              <div className="space-y-2">
-                {FAT_FOODS.map((food) => (
-                  <div
-                    key={food.label}
-                    className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
-                  >
-                    <div>
-                      <p className="font-bold text-zinc-100">{food.label}</p>
-                      <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
-                    </div>
-                    <Stepper
-                      value={fatCounts.get(food.label) ?? 0}
-                      onChange={(v) => setFatCount(food.label, v)}
-                      suffix="회"
-                      step={1}
-                    />
-                  </div>
-                ))}
-              </div>
-            </Section>
-
-            <Section title="🫐 보충음식">
-              <div className="flex flex-wrap gap-2">
-                {SUPPLEMENT_FOODS.map((food) => (
-                  <Chip
-                    key={food.label}
-                    label={`${food.label} ${food.unit}`}
-                    active={supplementItems.has(food.label)}
-                    onClick={() => toggleSupplement(food.label)}
-                  />
-                ))}
-              </div>
-            </Section>
-
-            <Section title={`💧 물 · ${waterLiter.toFixed(1)}L / 목표 ${waterTarget.toFixed(1)}L`}>
-              <ScaleRow
-                values={WATER_PRESETS}
-                active={waterLiter}
-                onSelect={setWaterLiter}
-                format={(v) => `${v.toFixed(1)}L`}
-              />
-            </Section>
-
-            <Section title={`😴 수면 · ${sleepHours}시간 / 목표 ${SLEEP_TARGET}시간`}>
-              <ScaleRow
-                values={SLEEP_HOURS}
-                active={sleepHours}
-                onSelect={setSleepHours}
-                format={(v) => `${v}h`}
-              />
-            </Section>
-
-            <Section title="🙂 컨디션">
-              <div className="grid grid-cols-5 gap-2">
-                {MOOD_OPTIONS.map((mood) => (
-                  <button
-                    key={mood.score}
-                    type="button"
-                    onClick={() => setMoodScore(moodScore === mood.score ? null : mood.score)}
-                    className={[
-                      "rounded-2xl border-2 py-3 text-3xl transition-colors",
-                      moodScore === mood.score
-                        ? "border-emerald-500 bg-zinc-800"
-                        : "border-zinc-700 bg-zinc-800",
-                    ].join(" ")}
-                  >
-                    {mood.icon}
-                  </button>
-                ))}
-              </div>
-            </Section>
-
-            <Section title="🏅 오늘의 한마디">
-              {mvpSuggestionsLoading ? (
-                <p className="text-sm font-bold text-zinc-500">AI가 오늘의 문구를 준비하고 있어요...</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {mvpSuggestions.map((phrase) => (
-                    <Chip
-                      key={phrase}
-                      label={phrase}
-                      active={mvpText === phrase}
-                      onClick={() => setMvpText(mvpText === phrase ? "" : phrase)}
-                    />
-                  ))}
-                </div>
               )}
             </Section>
 
@@ -1307,6 +1267,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </div>
       {children}
     </section>
+  );
+}
+
+function SubBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="border-t border-zinc-800 pt-4 first:border-t-0 first:pt-0">
+      <p className="mb-2 text-sm font-bold text-zinc-300">{title}</p>
+      {children}
+    </div>
   );
 }
 

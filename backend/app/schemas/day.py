@@ -61,7 +61,6 @@ class DayRecordRequest(BaseModel):
     grade: str = "GREEN"
     mood_score: int | None = None
     memo: str | None = None
-    mvp_text: str | None = None
     is_sick: bool = False
 
     morning_med_taken: bool | None = False
