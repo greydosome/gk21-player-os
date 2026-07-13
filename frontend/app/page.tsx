@@ -369,7 +369,6 @@ export default function Home() {
   const [binge, setBinge] = useState(false);
   const [isSick, setIsSick] = useState(false);
   const [moodScore, setMoodScore] = useState<number | null>(null);
-  const [showLevelLegend, setShowLevelLegend] = useState(false);
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [coachStatus, setCoachStatus] = useState<"idle" | "loading" | "ready">("idle");
@@ -447,15 +446,18 @@ export default function Home() {
     eveningMed,
   ]);
 
-  const factors = [
-    { icon: "😴", label: "수면", good: sleepHours >= SLEEP_TARGET - 1 },
-    { icon: "💧", label: "수분", good: waterLiter >= waterTarget * 0.75 },
-    { icon: "🥩", label: "단백질", good: proteinKcal >= proteinTarget * 0.75 },
-    { icon: "🏋", label: "운동", good: workoutDone },
-    { icon: "💊", label: "복약", good: morningMed && eveningMed },
-    { icon: "🙂", label: "컨디션", good: moodScore !== null && moodScore >= 4 },
+  const dietGood =
+    proteinKcal >= proteinTarget * 0.75 &&
+    carbKcal >= carbTarget * 0.75 &&
+    fatKcal >= fatTarget * 0.75;
+
+  const dayBadges = [
+    { key: "workout", icon: "🏋", label: "운동", good: workoutDone, activeClass: "border-blue-500 bg-blue-500 text-zinc-950" },
+    { key: "diet", icon: "🍱", label: "식단", good: dietGood, activeClass: "border-yellow-500 bg-yellow-500 text-zinc-950" },
+    { key: "water", icon: "💧", label: "물", good: waterLiter >= waterTarget, activeClass: "border-cyan-500 bg-cyan-500 text-zinc-950" },
+    { key: "sleep", icon: "😴", label: "수면", good: sleepHours >= SLEEP_TARGET, activeClass: "border-indigo-500 bg-indigo-500 text-zinc-950" },
+    { key: "med", icon: "💊", label: "복약", good: morningMed && eveningMed, activeClass: "border-emerald-500 bg-emerald-500 text-zinc-950" },
   ];
-  const missingFactors = factors.filter((f) => !f.good).map((f) => f.label);
 
   function toggleWorkout(type: string, defaultMinutes: number) {
     setSelectedWorkouts((prev) => {
@@ -832,63 +834,41 @@ export default function Home() {
 
         <section
           className={[
-            "mt-3 rounded-3xl p-6 text-white shadow-lg transition-colors duration-300",
-            ready.level.bg,
+            "mt-3 rounded-3xl p-6 shadow-lg transition-colors duration-300",
+            isSick || !hasAnyInput
+              ? ["text-white", ready.level.bg].join(" ")
+              : "border border-zinc-800 bg-zinc-900 text-zinc-100",
           ].join(" ")}
         >
-          <p className="text-sm font-black uppercase tracking-wide text-white/70">
-            {recordDate === today() ? "오늘 상태" : `${recordDate} 상태`}
-          </p>
-          <p className="mt-2 text-4xl font-black">
-            {ready.level.icon} {ready.level.label}
-          </p>
-          <p className="mt-2 font-bold text-white/90">{ready.level.text}</p>
-
-          {hasAnyInput && !isSick && (
-            <>
-              <p className="mt-2 text-sm font-bold text-white/80">
-                {missingFactors.length > 0
-                  ? `부족한 부분: ${missingFactors.join(", ")}`
-                  : "모든 항목이 좋은 상태입니다"}
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {factors.map((f) => (
-                  <span
-                    key={f.label}
-                    className={[
-                      "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors",
-                      f.good ? "bg-white text-zinc-900" : "bg-white/15 text-white/70",
-                    ].join(" ")}
-                  >
-                    {f.icon} {f.label}
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setShowLevelLegend((v) => !v)}
-            className="mt-3 text-xs font-bold text-white/70 underline"
+          <p
+            className={[
+              "text-sm font-black uppercase tracking-wide",
+              isSick || !hasAnyInput ? "text-white/70" : "text-zinc-500",
+            ].join(" ")}
           >
-            {showLevelLegend ? "등급 설명 닫기" : "등급 5단계 보기"}
-          </button>
+            {recordDate === today() ? "오늘 기록" : `${recordDate} 기록`}
+          </p>
 
-          {showLevelLegend && (
-            <div className="mt-2 space-y-1.5 rounded-2xl bg-black/20 p-3">
-              {READY_LEVELS.map((l) => (
-                <p key={l.label} className="text-xs font-bold text-white/90">
-                  {l.icon} {l.label} — {l.text}
-                </p>
+          {isSick || !hasAnyInput ? (
+            <>
+              <p className="mt-2 text-4xl font-black">
+                {ready.level.icon} {ready.level.label}
+              </p>
+              <p className="mt-2 font-bold text-white/90">{ready.level.text}</p>
+            </>
+          ) : (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {dayBadges.map((b) => (
+                <span
+                  key={b.key}
+                  className={[
+                    "inline-flex items-center gap-1.5 rounded-full border-2 px-3.5 py-2 text-sm font-bold transition-colors",
+                    b.good ? b.activeClass : "border-zinc-700 bg-zinc-800 text-zinc-400",
+                  ].join(" ")}
+                >
+                  {b.icon} {b.label}
+                </span>
               ))}
-              <p className="text-xs font-bold text-white/90">
-                {BLACK_LEVEL.icon} {BLACK_LEVEL.label} — {BLACK_LEVEL.text}
-              </p>
-              <p className="text-xs font-bold text-white/90">
-                {SICK_LEVEL.icon} {SICK_LEVEL.label} — {SICK_LEVEL.text}
-              </p>
             </div>
           )}
         </section>
