@@ -352,6 +352,7 @@ export default function Home() {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [recordDate, setRecordDate] = useState(today());
+  const [dataReady, setDataReady] = useState(false);
   const [morningMed, setMorningMed] = useState(false);
   const [eveningMed, setEveningMed] = useState(false);
   const [selectedWorkouts, setSelectedWorkouts] = useState<Map<string, SelectedWorkout>>(new Map());
@@ -619,6 +620,7 @@ export default function Home() {
   // 날짜가 바뀌면 그 날짜의 기존 기록을 불러와서 폼을 채운다 (없으면 기본값으로 초기화).
   useEffect(() => {
     let cancelled = false;
+    setDataReady(false);
     setCoachStatus("idle");
     setCoachText("");
     setAutoSaveStatus("idle");
@@ -699,6 +701,7 @@ export default function Home() {
         }
 
         loadedDateRef.current = recordDate;
+        setDataReady(true);
       });
 
     return () => {
@@ -835,21 +838,25 @@ export default function Home() {
         <section
           className={[
             "mt-3 rounded-3xl p-6 shadow-lg transition-colors duration-300",
-            isSick || !hasAnyInput
-              ? ["text-white", ready.level.bg].join(" ")
-              : "border border-zinc-800 bg-zinc-900 text-zinc-100",
+            !dataReady
+              ? "border border-zinc-800 bg-zinc-900 text-zinc-100"
+              : isSick || !hasAnyInput
+                ? ["text-white", ready.level.bg].join(" ")
+                : "border border-zinc-800 bg-zinc-900 text-zinc-100",
           ].join(" ")}
         >
           <p
             className={[
               "text-sm font-black uppercase tracking-wide",
-              isSick || !hasAnyInput ? "text-white/70" : "text-zinc-500",
+              dataReady && (isSick || !hasAnyInput) ? "text-white/70" : "text-zinc-500",
             ].join(" ")}
           >
             {recordDate === today() ? "오늘 기록" : `${recordDate} 기록`}
           </p>
 
-          {isSick || !hasAnyInput ? (
+          {!dataReady ? (
+            <p className="mt-2 text-lg font-bold text-zinc-500">불러오는 중...</p>
+          ) : isSick || !hasAnyInput ? (
             <>
               <p className="mt-2 text-4xl font-black">
                 {ready.level.icon} {ready.level.label}
