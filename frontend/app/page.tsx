@@ -866,6 +866,7 @@ export default function Home() {
                     b.good ? b.activeClass : "border-zinc-700 bg-zinc-800 text-zinc-400",
                   ].join(" ")}
                 >
+                  {b.good && "✓ "}
                   {b.icon} {b.label}
                 </span>
               ))}
@@ -1104,7 +1105,7 @@ export default function Home() {
                     { key: "cardio", title: "🏃 유산소" },
                   ] as const
                 ).map((group) => (
-                  <SubBlock key={group.key} title={group.title}>
+                  <CollapsibleBlock key={group.key} title={group.title}>
                     <div className="space-y-2">
                       {WORKOUT_TYPES.filter((w) => w.category === group.key).map((w) => {
                         const suggestion = todaySchedule.suggestions.find((s) => s.type === w.label);
@@ -1181,7 +1182,7 @@ export default function Home() {
                         );
                       })}
                     </div>
-                  </SubBlock>
+                  </CollapsibleBlock>
                 ))}
               </div>
 
@@ -1255,6 +1256,24 @@ function SubBlock({ title, children }: { title: string; children: React.ReactNod
     <div className="border-t border-zinc-800 pt-4 first:border-t-0 first:pt-0">
       <p className="mb-2 text-sm font-bold text-zinc-300">{title}</p>
       {children}
+    </div>
+  );
+}
+
+function CollapsibleBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border-t border-zinc-800 pt-4 first:border-t-0 first:pt-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <p className="text-sm font-bold text-zinc-300">{title}</p>
+        <span className="text-xs font-bold text-zinc-500">{open ? "▲ 접기" : "▼ 펼치기"}</span>
+      </button>
+      {open && <div className="mt-2">{children}</div>}
     </div>
   );
 }
