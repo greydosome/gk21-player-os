@@ -120,7 +120,7 @@ type FoodItem =
   | { label: string; mode: "gram"; kcalPer100g: number }
   | { label: string; mode: "piece"; unit: string; kcalPerPiece: number };
 
-const GRAM_STEPS = Array.from({ length: 31 }, (_, i) => i * 10);
+const GRAM_STEPS = Array.from({ length: 100 }, (_, i) => (i + 1) * 10);
 
 const PROTEIN_FOODS: FoodItem[] = [
   { label: "참치 마일드", mode: "gram", kcalPer100g: 126 },
@@ -1299,16 +1299,27 @@ function FoodSection({
                 <p className="font-bold text-zinc-100">{food.label}</p>
                 <p className="text-xs text-zinc-500">
                   {food.mode === "gram" ? `100g당 ${food.kcalPer100g}kcal` : `1개당 ${food.kcalPerPiece}kcal`}
-                  {amount > 0 && ` · 지금 ${amount}${unitLabel} / ${itemKcal}kcal`}
                 </p>
               </div>
+              {amount > 0 && (
+                <div className="mt-1 flex items-center justify-between">
+                  <p className="text-sm font-bold text-zinc-100">
+                    현재섭취 {amount}
+                    {unitLabel} / {itemKcal}kcal
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onChangeCount(food.label, 0)}
+                    className="text-xs font-bold text-zinc-500 underline"
+                  >
+                    초기화
+                  </button>
+                </div>
+              )}
               <div className="mt-2">
                 {food.mode === "gram" ? (
-                  <ScaleRow
-                    values={GRAM_STEPS}
-                    active={amount}
-                    onSelect={(v) => onChangeCount(food.label, v)}
-                    format={(v) => `${v}g`}
+                  <GramRoller
+                    onAdd={(v) => onChangeCount(food.label, amount + v)}
                     color={DIET_COLOR}
                   />
                 ) : (
@@ -1518,6 +1529,76 @@ function ScaleRow({
           {format(value)}
         </button>
       ))}
+    </div>
+  );
+}
+
+const GRAM_ROLLER_ITEM_HEIGHT = 36;
+
+function GramRoller({
+  onAdd,
+  color,
+  values = GRAM_STEPS,
+}: {
+  onAdd: (amount: number) => void;
+  color: BlockColor;
+  values?: number[];
+}) {
+  const [picked, setPicked] = useState(values[9] ?? values[0]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const idx = values.indexOf(picked);
+    if (containerRef.current && idx >= 0) {
+      containerRef.current.scrollTop = idx * GRAM_ROLLER_ITEM_HEIGHT;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleScroll() {
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      if (!containerRef.current) return;
+      const idx = Math.round(containerRef.current.scrollTop / GRAM_ROLLER_ITEM_HEIGHT);
+      const v = values[Math.min(Math.max(idx, 0), values.length - 1)];
+      if (v !== undefined) setPicked(v);
+    }, 80);
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative h-[108px] w-24 shrink-0 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900">
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="h-full snap-y snap-mandatory overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <div style={{ height: GRAM_ROLLER_ITEM_HEIGHT }} />
+          {values.map((v) => (
+            <div
+              key={v}
+              className="flex snap-center items-center justify-center text-sm font-bold text-zinc-300"
+              style={{ height: GRAM_ROLLER_ITEM_HEIGHT }}
+            >
+              {v}g
+            </div>
+          ))}
+          <div style={{ height: GRAM_ROLLER_ITEM_HEIGHT }} />
+        </div>
+        <div
+          className={["pointer-events-none absolute inset-x-0 top-1/2 h-9 -translate-y-1/2 border-y-2", color.border].join(
+            " "
+          )}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => onAdd(picked)}
+        className={[color.bg, "shrink-0 rounded-2xl px-4 py-2.5 text-sm font-black text-zinc-950"].join(" ")}
+      >
+        +{picked}g 담기
+      </button>
     </div>
   );
 }
