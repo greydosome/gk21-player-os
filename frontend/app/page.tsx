@@ -112,9 +112,10 @@ function scheduleFor(dateStr: string) {
 
 type BlockColor = { border: string; borderSoft: string; bg: string };
 
-const DAILY_COLOR: BlockColor = { border: "border-orange-500", borderSoft: "border-orange-500/40", bg: "bg-orange-500" };
-const DIET_COLOR: BlockColor = { border: "border-yellow-500", borderSoft: "border-yellow-500/40", bg: "bg-yellow-500" };
-const WORKOUT_COLOR: BlockColor = { border: "border-blue-500", borderSoft: "border-blue-500/40", bg: "bg-blue-500" };
+const MONO_COLOR: BlockColor = { border: "border-zinc-400", borderSoft: "border-zinc-700", bg: "bg-white" };
+const DAILY_COLOR: BlockColor = MONO_COLOR;
+const DIET_COLOR: BlockColor = MONO_COLOR;
+const WORKOUT_COLOR: BlockColor = MONO_COLOR;
 
 type FoodItem =
   | { label: string; mode: "gram"; kcalPer100g: number }
@@ -492,11 +493,11 @@ export default function Home() {
     fatKcal >= fatTarget * 0.75;
 
   const dayBadges = [
-    { key: "workout", icon: "🏋", label: "운동", good: workoutDone, activeClass: "border-blue-500 bg-blue-500 text-zinc-950" },
-    { key: "diet", icon: "🍱", label: "식단", good: dietGood, activeClass: "border-yellow-500 bg-yellow-500 text-zinc-950" },
-    { key: "water", icon: "💧", label: "물", good: waterLiter >= waterTarget, activeClass: "border-cyan-500 bg-cyan-500 text-zinc-950" },
-    { key: "sleep", icon: "😴", label: "수면", good: sleepHours >= SLEEP_TARGET, activeClass: "border-indigo-500 bg-indigo-500 text-zinc-950" },
-    { key: "med", icon: "💊", label: "복약", good: morningMed && eveningMed, activeClass: "border-emerald-500 bg-emerald-500 text-zinc-950" },
+    { key: "workout", icon: "🏋", label: "운동", good: workoutDone, activeClass: "border-white bg-white text-zinc-950" },
+    { key: "diet", icon: "🍱", label: "식단", good: dietGood, activeClass: "border-white bg-white text-zinc-950" },
+    { key: "water", icon: "💧", label: "물", good: waterLiter >= waterTarget, activeClass: "border-white bg-white text-zinc-950" },
+    { key: "sleep", icon: "😴", label: "수면", good: sleepHours >= SLEEP_TARGET, activeClass: "border-white bg-white text-zinc-950" },
+    { key: "med", icon: "💊", label: "복약", good: morningMed && eveningMed, activeClass: "border-white bg-white text-zinc-950" },
   ];
 
   function toggleWorkout(type: string, defaultMinutes: number) {
@@ -842,10 +843,13 @@ export default function Home() {
   }, [view, recordDate]);
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-32 text-zinc-100">
+    <main className="min-h-screen bg-zinc-950 pb-8 text-zinc-100">
       <div className="mx-auto max-w-xl p-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-black">🧤 GK21</h1>
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-3xl font-black">🧤 GK21</h1>
+            <span className="text-sm font-bold text-red-100">{todaySchedule.dayLabel}</span>
+          </div>
           <input
             type="date"
             value={recordDate}
@@ -853,11 +857,6 @@ export default function Home() {
             className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-bold text-zinc-100"
           />
         </div>
-
-        <p className="mt-2 text-sm font-bold text-zinc-500">
-          🗓️ {recordDate === today() ? "오늘은" : `${recordDate}은(는)`}{" "}
-          <span className="text-zinc-100">{todaySchedule.dayLabel}</span>입니다
-        </p>
 
         <section
           className={[
@@ -871,7 +870,7 @@ export default function Home() {
         >
           <p
             className={[
-              "text-sm font-black uppercase tracking-wide",
+              "text-center text-sm font-black uppercase tracking-wide",
               dataReady && (isSick || !hasAnyInput) ? "text-white/70" : "text-zinc-500",
             ].join(" ")}
           >
@@ -879,16 +878,16 @@ export default function Home() {
           </p>
 
           {!dataReady ? (
-            <p className="mt-2 text-lg font-bold text-zinc-500">불러오는 중...</p>
+            <p className="mt-2 text-center text-lg font-bold text-zinc-500">불러오는 중...</p>
           ) : isSick || !hasAnyInput ? (
-            <>
+            <div className="text-center">
               <p className="mt-2 text-4xl font-black">
                 {ready.level.icon} {ready.level.label}
               </p>
               <p className="mt-2 font-bold text-white/90">{ready.level.text}</p>
-            </>
+            </div>
           ) : (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
               {dayBadges.map((b) => (
                 <span
                   key={b.key}
@@ -920,7 +919,7 @@ export default function Home() {
               className={[
                 "rounded-2xl border-2 py-2.5 text-sm font-black transition-colors",
                 view === tab.key
-                  ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+                  ? "border-white bg-white text-zinc-950"
                   : "border-zinc-800 bg-zinc-900 text-zinc-400",
               ].join(" ")}
             >
@@ -1035,6 +1034,15 @@ export default function Home() {
                     ))}
                   </div>
                 </CollapsibleBlock>
+
+                <button
+                  type="button"
+                  onClick={requestCoaching}
+                  disabled={coachStatus === "loading"}
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-800 py-2 text-xs font-black text-zinc-100 disabled:opacity-50"
+                >
+                  {coachStatus === "loading" ? "코칭 받는 중..." : "🤖 AI 코칭 받기"}
+                </button>
               </div>
             </Section>
 
@@ -1195,8 +1203,8 @@ export default function Home() {
             </p>
 
             {coachStatus !== "idle" && (
-              <section className="mt-3 rounded-3xl border border-emerald-500/30 bg-zinc-900 p-6 shadow-lg">
-                <h2 className="text-lg font-black text-emerald-400">🤖 AI 코치</h2>
+              <section className="mt-3 rounded-3xl border border-zinc-700 bg-zinc-900 p-6 shadow-lg">
+                <h2 className="text-lg font-black text-zinc-100">🤖 AI 코치</h2>
                 <p className="mt-3 font-bold leading-relaxed text-zinc-100">
                   {coachStatus === "loading" && !coachText
                     ? "코치가 오늘 하루를 분석하고 있습니다..."
@@ -1207,21 +1215,6 @@ export default function Home() {
           </>
         )}
       </div>
-
-      {view === "today" && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 px-4 py-3 backdrop-blur">
-          <div className="mx-auto max-w-xl">
-            <button
-              type="button"
-              onClick={requestCoaching}
-              disabled={coachStatus === "loading"}
-              className="w-full rounded-2xl bg-emerald-500 py-4 text-lg font-black text-zinc-950 shadow-lg disabled:opacity-50"
-            >
-              {coachStatus === "loading" ? "코칭 받는 중..." : "🤖 AI 코칭 받기"}
-            </button>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
@@ -1357,7 +1350,7 @@ function StatTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-const CHART_ACCENT = "#10b981"; // emerald-500, app brand accent used as the sequential hue
+const CHART_ACCENT = "#e5e7eb"; // zinc-200, monotone chart accent
 
 function TrendChart({
   title,
@@ -1445,7 +1438,7 @@ function WorkoutDots({ data, dates }: { data: (boolean | null)[]; dates: string[
             title={dates[i]}
             className={[
               "h-6 flex-1 rounded-full",
-              done === true ? "bg-emerald-500" : done === false ? "bg-zinc-700" : "bg-zinc-900",
+              done === true ? "bg-white" : done === false ? "bg-zinc-700" : "bg-zinc-900",
             ].join(" ")}
           />
         ))}
