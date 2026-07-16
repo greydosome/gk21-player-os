@@ -123,8 +123,8 @@ type FoodItem =
 const GRAM_STEPS = Array.from({ length: 100 }, (_, i) => (i + 1) * 10);
 
 const PROTEIN_FOODS: FoodItem[] = [
-  { label: "참치 마일드", mode: "gram", kcalPer100g: 126 },
   { label: "달걀", mode: "piece", unit: "1개", kcalPerPiece: 100 },
+  { label: "참치 마일드", mode: "gram", kcalPer100g: 126 },
   { label: "닭가슴살", mode: "gram", kcalPer100g: 100 },
   { label: "닭가슴살스팸", mode: "gram", kcalPer100g: 170 },
 ];
