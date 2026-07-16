@@ -241,6 +241,17 @@ type HistoryRow = {
   binge_yn: boolean | null;
 };
 
+type NumericHistoryKey = "weight_kg" | "sleep_hours" | "water_liter" | "protein_kcal" | "carb_kcal" | "fat_kcal";
+
+const TREND_METRICS: { key: NumericHistoryKey; title: string; unit: string }[] = [
+  { key: "weight_kg", title: "⚖️ 체중", unit: "kg" },
+  { key: "sleep_hours", title: "😴 수면", unit: "h" },
+  { key: "water_liter", title: "💧 수분", unit: "L" },
+  { key: "protein_kcal", title: "🥩 단백질", unit: "kcal" },
+  { key: "carb_kcal", title: "🍚 탄수화물", unit: "kcal" },
+  { key: "fat_kcal", title: "🥑 지방", unit: "kcal" },
+];
+
 function today() {
   const now = new Date();
   const offset = now.getTimezoneOffset() * 60000;
@@ -250,6 +261,10 @@ function today() {
 function kcalFor(type: string, minutes: number) {
   const entry = WORKOUT_TYPES.find((w) => w.label === type);
   return Math.round((entry?.kcalPerMin ?? 6) * minutes);
+}
+
+function computeKcal(foods: FoodItem[], counts: Map<string, number>) {
+  return foods.reduce((sum, food) => sum + food.kcal * (counts.get(food.label) ?? 0), 0);
 }
 
 function round1(value: number | null) {
@@ -386,21 +401,9 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const proteinKcal = useMemo(
-    () =>
-      PROTEIN_FOODS.reduce((sum, food) => sum + food.kcal * (proteinCounts.get(food.label) ?? 0), 0),
-    [proteinCounts]
-  );
-
-  const carbKcal = useMemo(
-    () => CARB_FOODS.reduce((sum, food) => sum + food.kcal * (carbCounts.get(food.label) ?? 0), 0),
-    [carbCounts]
-  );
-
-  const fatKcal = useMemo(
-    () => FAT_FOODS.reduce((sum, food) => sum + food.kcal * (fatCounts.get(food.label) ?? 0), 0),
-    [fatCounts]
-  );
+  const proteinKcal = useMemo(() => computeKcal(PROTEIN_FOODS, proteinCounts), [proteinCounts]);
+  const carbKcal = useMemo(() => computeKcal(CARB_FOODS, carbCounts), [carbCounts]);
+  const fatKcal = useMemo(() => computeKcal(FAT_FOODS, fatCounts), [fatCounts]);
 
   const workoutDone = selectedWorkouts.size > 0;
   const todaySchedule = useMemo(() => scheduleFor(recordDate), [recordDate]);
@@ -498,24 +501,12 @@ export default function Home() {
     });
   }
 
-  function setProteinCount(label: string, count: number) {
-    setProteinCounts((prev) => {
-      const next = new Map(prev);
-      next.set(label, Math.max(0, count));
-      return next;
-    });
-  }
-
-  function setCarbCount(label: string, count: number) {
-    setCarbCounts((prev) => {
-      const next = new Map(prev);
-      next.set(label, Math.max(0, count));
-      return next;
-    });
-  }
-
-  function setFatCount(label: string, count: number) {
-    setFatCounts((prev) => {
+  function updateFoodCount(
+    setCounts: React.Dispatch<React.SetStateAction<Map<string, number>>>,
+    label: string,
+    count: number
+  ) {
+    setCounts((prev) => {
       const next = new Map(prev);
       next.set(label, Math.max(0, count));
       return next;
@@ -942,42 +933,15 @@ export default function Home() {
 
             {!statsLoading && history && (
               <>
-                <TrendChart
-                  title="⚖️ 체중"
-                  unit="kg"
-                  data={history.map((h) => h.weight_kg)}
-                  dates={history.map((h) => h.record_date)}
-                />
-                <TrendChart
-                  title="😴 수면"
-                  unit="h"
-                  data={history.map((h) => h.sleep_hours)}
-                  dates={history.map((h) => h.record_date)}
-                />
-                <TrendChart
-                  title="💧 수분"
-                  unit="L"
-                  data={history.map((h) => h.water_liter)}
-                  dates={history.map((h) => h.record_date)}
-                />
-                <TrendChart
-                  title="🥩 단백질"
-                  unit="kcal"
-                  data={history.map((h) => h.protein_kcal)}
-                  dates={history.map((h) => h.record_date)}
-                />
-                <TrendChart
-                  title="🍚 탄수화물"
-                  unit="kcal"
-                  data={history.map((h) => h.carb_kcal)}
-                  dates={history.map((h) => h.record_date)}
-                />
-                <TrendChart
-                  title="🥑 지방"
-                  unit="kcal"
-                  data={history.map((h) => h.fat_kcal)}
-                  dates={history.map((h) => h.record_date)}
-                />
+                {TREND_METRICS.map((m) => (
+                  <TrendChart
+                    key={m.key}
+                    title={m.title}
+                    unit={m.unit}
+                    data={history.map((h) => h[m.key])}
+                    dates={history.map((h) => h.record_date)}
+                  />
+                ))}
                 <WorkoutDots data={history.map((h) => h.workout_done_yn)} dates={history.map((h) => h.record_date)} />
               </>
             )}
@@ -1059,71 +1023,32 @@ export default function Home() {
 
             <Section title="🍱 식단">
               <div className="space-y-4">
-                <SubBlock title={`🥩 단백질 · ${proteinKcal}kcal / 목표 ${proteinTarget}kcal`}>
-                  <div className="space-y-2">
-                    {PROTEIN_FOODS.map((food) => (
-                      <div
-                        key={food.label}
-                        className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
-                      >
-                        <div>
-                          <p className="font-bold text-zinc-100">{food.label}</p>
-                          <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
-                        </div>
-                        <Stepper
-                          value={proteinCounts.get(food.label) ?? 0}
-                          onChange={(v) => setProteinCount(food.label, v)}
-                          suffix="회"
-                          step={1}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </SubBlock>
+                <FoodSection
+                  title="🥩 단백질"
+                  kcal={proteinKcal}
+                  target={proteinTarget}
+                  foods={PROTEIN_FOODS}
+                  counts={proteinCounts}
+                  onChangeCount={(label, v) => updateFoodCount(setProteinCounts, label, v)}
+                />
 
-                <SubBlock title={`🍚 탄수화물 · ${carbKcal}kcal / 목표 ${carbTarget}kcal`}>
-                  <div className="space-y-2">
-                    {CARB_FOODS.map((food) => (
-                      <div
-                        key={food.label}
-                        className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
-                      >
-                        <div>
-                          <p className="font-bold text-zinc-100">{food.label}</p>
-                          <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
-                        </div>
-                        <Stepper
-                          value={carbCounts.get(food.label) ?? 0}
-                          onChange={(v) => setCarbCount(food.label, v)}
-                          suffix="회"
-                          step={1}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </SubBlock>
+                <FoodSection
+                  title="🍚 탄수화물"
+                  kcal={carbKcal}
+                  target={carbTarget}
+                  foods={CARB_FOODS}
+                  counts={carbCounts}
+                  onChangeCount={(label, v) => updateFoodCount(setCarbCounts, label, v)}
+                />
 
-                <SubBlock title={`🥑 지방 · ${fatKcal}kcal / 목표 ${fatTarget}kcal`}>
-                  <div className="space-y-2">
-                    {FAT_FOODS.map((food) => (
-                      <div
-                        key={food.label}
-                        className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3"
-                      >
-                        <div>
-                          <p className="font-bold text-zinc-100">{food.label}</p>
-                          <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
-                        </div>
-                        <Stepper
-                          value={fatCounts.get(food.label) ?? 0}
-                          onChange={(v) => setFatCount(food.label, v)}
-                          suffix="회"
-                          step={1}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </SubBlock>
+                <FoodSection
+                  title="🥑 지방"
+                  kcal={fatKcal}
+                  target={fatTarget}
+                  foods={FAT_FOODS}
+                  counts={fatCounts}
+                  onChangeCount={(label, v) => updateFoodCount(setFatCounts, label, v)}
+                />
 
                 <SubBlock title="🫐 보충음식">
                   <div className="flex gap-2 overflow-x-auto pb-1">
@@ -1300,6 +1225,43 @@ function SubBlock({ title, children }: { title: string; children: React.ReactNod
       <p className="mb-2 text-sm font-bold text-zinc-300">{title}</p>
       {children}
     </div>
+  );
+}
+
+function FoodSection({
+  title,
+  kcal,
+  target,
+  foods,
+  counts,
+  onChangeCount,
+}: {
+  title: string;
+  kcal: number;
+  target: number;
+  foods: FoodItem[];
+  counts: Map<string, number>;
+  onChangeCount: (label: string, count: number) => void;
+}) {
+  return (
+    <SubBlock title={`${title} · ${kcal}kcal / 목표 ${target}kcal`}>
+      <div className="space-y-2">
+        {foods.map((food) => (
+          <div key={food.label} className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3">
+            <div>
+              <p className="font-bold text-zinc-100">{food.label}</p>
+              <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
+            </div>
+            <Stepper
+              value={counts.get(food.label) ?? 0}
+              onChange={(v) => onChangeCount(food.label, v)}
+              suffix="회"
+              step={1}
+            />
+          </div>
+        ))}
+      </div>
+    </SubBlock>
   );
 }
 
