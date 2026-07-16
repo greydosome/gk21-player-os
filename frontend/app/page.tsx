@@ -116,24 +116,28 @@ const DAILY_COLOR: BlockColor = { border: "border-cyan-500", borderSoft: "border
 const DIET_COLOR: BlockColor = { border: "border-yellow-500", borderSoft: "border-yellow-500/40", bg: "bg-yellow-500" };
 const WORKOUT_COLOR: BlockColor = { border: "border-blue-500", borderSoft: "border-blue-500/40", bg: "bg-blue-500" };
 
-type FoodItem = { label: string; unit: string; kcal: number };
+type FoodItem =
+  | { label: string; mode: "gram"; kcalPer100g: number }
+  | { label: string; mode: "piece"; unit: string; kcalPerPiece: number };
+
+const GRAM_STEPS = Array.from({ length: 31 }, (_, i) => i * 10);
 
 const PROTEIN_FOODS: FoodItem[] = [
-  { label: "참치 마일드", unit: "95g", kcal: 120 },
-  { label: "달걀", unit: "1개", kcal: 100 },
-  { label: "닭가슴살", unit: "100g", kcal: 100 },
-  { label: "닭가슴살스팸", unit: "100g", kcal: 170 },
+  { label: "참치 마일드", mode: "gram", kcalPer100g: 126 },
+  { label: "달걀", mode: "piece", unit: "1개", kcalPerPiece: 100 },
+  { label: "닭가슴살", mode: "gram", kcalPer100g: 100 },
+  { label: "닭가슴살스팸", mode: "gram", kcalPer100g: 170 },
 ];
 
 const CARB_FOODS: FoodItem[] = [
-  { label: "햇반", unit: "130g", kcal: 195 },
-  { label: "생고구마", unit: "100g", kcal: 120 },
-  { label: "감자", unit: "100g", kcal: 80 },
+  { label: "햇반", mode: "gram", kcalPer100g: 150 },
+  { label: "생고구마", mode: "gram", kcalPer100g: 120 },
+  { label: "감자", mode: "gram", kcalPer100g: 80 },
 ];
 
 const FAT_FOODS: FoodItem[] = [
-  { label: "아보카도", unit: "100g", kcal: 160 },
-  { label: "브로콜리", unit: "100g", kcal: 30 },
+  { label: "아보카도", mode: "gram", kcalPer100g: 160 },
+  { label: "브로콜리", mode: "gram", kcalPer100g: 30 },
 ];
 
 const SUPPLEMENT_FOODS: { label: string; unit: string }[] = [
@@ -269,8 +273,27 @@ function kcalFor(type: string, minutes: number) {
   return Math.round((entry?.kcalPerMin ?? 6) * minutes);
 }
 
+function foodKcal(food: FoodItem, amount: number) {
+  return food.mode === "gram" ? Math.round((amount / 100) * food.kcalPer100g) : amount * food.kcalPerPiece;
+}
+
 function computeKcal(foods: FoodItem[], counts: Map<string, number>) {
-  return foods.reduce((sum, food) => sum + food.kcal * (counts.get(food.label) ?? 0), 0);
+  return foods.reduce((sum, food) => sum + foodKcal(food, counts.get(food.label) ?? 0), 0);
+}
+
+function buildFoodItems(foods: FoodItem[], counts: Map<string, number>): string[] {
+  return foods
+    .filter((food) => (counts.get(food.label) ?? 0) > 0)
+    .map((food) => `${food.label} ${counts.get(food.label)}${food.mode === "gram" ? "g" : "개"}`);
+}
+
+function parseFoodItems(items: string[]) {
+  const map = new Map<string, number>();
+  items.forEach((item) => {
+    const match = item.match(/^(.*) (\d+)(?:g|개)$/);
+    if (match) map.set(match[1], parseInt(match[2], 10));
+  });
+  return map;
 }
 
 function round1(value: number | null) {
@@ -538,15 +561,9 @@ export default function Home() {
       })
       .join(", ");
 
-    const proteinItems = PROTEIN_FOODS.flatMap((food) =>
-      Array.from({ length: proteinCounts.get(food.label) ?? 0 }, () => food.label)
-    );
-    const carbItems = CARB_FOODS.flatMap((food) =>
-      Array.from({ length: carbCounts.get(food.label) ?? 0 }, () => food.label)
-    );
-    const fatItems = FAT_FOODS.flatMap((food) =>
-      Array.from({ length: fatCounts.get(food.label) ?? 0 }, () => food.label)
-    );
+    const proteinItems = buildFoodItems(PROTEIN_FOODS, proteinCounts);
+    const carbItems = buildFoodItems(CARB_FOODS, carbCounts);
+    const fatItems = buildFoodItems(FAT_FOODS, fatCounts);
 
     return {
       record_date: recordDate,
@@ -658,15 +675,9 @@ export default function Home() {
           });
         });
 
-        const countMapFrom = (labels: string[]) => {
-          const map = new Map<string, number>();
-          labels.forEach((label) => map.set(label, (map.get(label) ?? 0) + 1));
-          return map;
-        };
-
-        const proteinMap = countMapFrom(detail?.protein_items ?? []);
-        const carbMap = countMapFrom(detail?.carb_items ?? []);
-        const fatMap = countMapFrom(detail?.fat_items ?? []);
+        const proteinMap = parseFoodItems(detail?.protein_items ?? []);
+        const carbMap = parseFoodItems(detail?.carb_items ?? []);
+        const fatMap = parseFoodItems(detail?.fat_items ?? []);
         const supplementSet = new Set<string>(detail?.supplement_items ?? []);
 
         // 자동저장 effect가 "방금 불러온 값 그대로"인 경우 저장을 건너뛸 수 있도록 스냅샷을 먼저 기록해둔다.
@@ -1056,7 +1067,7 @@ export default function Home() {
                   onChangeCount={(label, v) => updateFoodCount(setFatCounts, label, v)}
                 />
 
-                <SubBlock title="🫐 보충음식">
+                <CollapsibleBlock title="🫐 보충음식">
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {SUPPLEMENT_FOODS.map((food) => (
                       <Chip
@@ -1068,7 +1079,7 @@ export default function Home() {
                       />
                     ))}
                   </div>
-                </SubBlock>
+                </CollapsibleBlock>
               </div>
             </Section>
 
@@ -1269,30 +1280,51 @@ function FoodSection({
   onChangeCount: (label: string, count: number) => void;
 }) {
   return (
-    <SubBlock title={`${title} · ${kcal}kcal / 목표 ${target}kcal`}>
-      <div className="space-y-2">
-        {foods.map((food) => (
-          <div
-            key={food.label}
-            className={[
-              "flex items-center justify-between rounded-2xl border-2 bg-zinc-800 p-3",
-              (counts.get(food.label) ?? 0) > 0 ? DIET_COLOR.border : "border-transparent",
-            ].join(" ")}
-          >
-            <div>
-              <p className="font-bold text-zinc-100">{food.label}</p>
-              <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
+    <CollapsibleBlock title={`${title} · ${kcal}kcal / 목표 ${target}kcal`}>
+      <div className="space-y-3">
+        {foods.map((food) => {
+          const amount = counts.get(food.label) ?? 0;
+          const itemKcal = foodKcal(food, amount);
+          const unitLabel = food.mode === "gram" ? "g" : "개";
+
+          return (
+            <div
+              key={food.label}
+              className={[
+                "rounded-2xl border-2 bg-zinc-800 p-3",
+                amount > 0 ? DIET_COLOR.border : "border-transparent",
+              ].join(" ")}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-bold text-zinc-100">{food.label}</p>
+                <p className="text-xs text-zinc-500">
+                  {food.mode === "gram" ? `100g당 ${food.kcalPer100g}kcal` : `1개당 ${food.kcalPerPiece}kcal`}
+                  {amount > 0 && ` · 지금 ${amount}${unitLabel} / ${itemKcal}kcal`}
+                </p>
+              </div>
+              <div className="mt-2">
+                {food.mode === "gram" ? (
+                  <ScaleRow
+                    values={GRAM_STEPS}
+                    active={amount}
+                    onSelect={(v) => onChangeCount(food.label, v)}
+                    format={(v) => `${v}g`}
+                    color={DIET_COLOR}
+                  />
+                ) : (
+                  <Stepper
+                    value={amount}
+                    onChange={(v) => onChangeCount(food.label, v)}
+                    suffix="개"
+                    step={1}
+                  />
+                )}
+              </div>
             </div>
-            <Stepper
-              value={counts.get(food.label) ?? 0}
-              onChange={(v) => onChangeCount(food.label, v)}
-              suffix="회"
-              step={1}
-            />
-          </div>
-        ))}
+          );
+        })}
       </div>
-    </SubBlock>
+    </CollapsibleBlock>
   );
 }
 
