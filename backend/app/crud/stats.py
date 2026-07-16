@@ -11,6 +11,7 @@ def get_period_stats(end_date, days):
     sql = text("""
         SELECT
             COUNT(*) AS days_logged,
+            AVG(weight_kg) AS avg_weight_kg,
             AVG(sleep_hours) AS avg_sleep_hours,
             AVG(water_liter) AS avg_water_liter,
             AVG(protein_kcal) AS avg_protein_kcal,
@@ -41,6 +42,7 @@ def get_period_history(end_date, days):
     sql = text("""
         SELECT
             gs.day::date AS record_date,
+            v.weight_kg,
             v.sleep_hours,
             v.water_liter,
             v.protein_kcal,

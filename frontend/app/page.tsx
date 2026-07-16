@@ -215,6 +215,7 @@ type SelectedWorkout = {
 
 type PeriodStats = {
   days_logged: number;
+  avg_weight_kg: number | null;
   avg_sleep_hours: number | null;
   avg_water_liter: number | null;
   avg_protein_kcal: number | null;
@@ -229,6 +230,7 @@ type PeriodStats = {
 
 type HistoryRow = {
   record_date: string;
+  weight_kg: number | null;
   sleep_hours: number | null;
   water_liter: number | null;
   protein_kcal: number | null;
@@ -302,6 +304,7 @@ function computeReady({
 function snapshotFormState(state: {
   morningMed: boolean;
   eveningMed: boolean;
+  weightKg: number | null;
   waterLiter: number;
   sleepHours: number;
   binge: boolean;
@@ -317,6 +320,7 @@ function snapshotFormState(state: {
   return JSON.stringify({
     morningMed: state.morningMed,
     eveningMed: state.eveningMed,
+    weightKg: state.weightKg,
     waterLiter: state.waterLiter,
     sleepHours: state.sleepHours,
     binge: state.binge,
@@ -364,6 +368,8 @@ export default function Home() {
   const [fatCounts, setFatCounts] = useState<Map<string, number>>(new Map());
   const [fatTarget, setFatTarget] = useState(DEFAULT_FAT_TARGET);
   const [supplementItems, setSupplementItems] = useState<Set<string>>(new Set());
+  const [weightKg, setWeightKg] = useState<number | null>(null);
+  const [weightTarget, setWeightTarget] = useState<number | null>(null);
   const [waterLiter, setWaterLiter] = useState(0);
   const [waterTarget, setWaterTarget] = useState(DEFAULT_WATER_TARGET);
   const [sleepHours, setSleepHours] = useState(0);
@@ -412,13 +418,14 @@ export default function Home() {
       hasCarb ||
       hasFat ||
       supplementItems.size > 0 ||
+      weightKg !== null ||
       waterLiter > 0 ||
       sleepHours > 0 ||
       binge ||
       moodScore !== null ||
       isSick
     );
-  }, [morningMed, eveningMed, selectedWorkouts, proteinCounts, carbCounts, fatCounts, supplementItems, waterLiter, sleepHours, binge, moodScore, isSick]);
+  }, [morningMed, eveningMed, selectedWorkouts, proteinCounts, carbCounts, fatCounts, supplementItems, weightKg, waterLiter, sleepHours, binge, moodScore, isSick]);
 
   const ready = useMemo(() => {
     if (isSick) return { score: 0, level: SICK_LEVEL };
@@ -555,6 +562,7 @@ export default function Home() {
       evening_med_taken: eveningMed,
       medication_note: buildMedicationNote(morningMed, eveningMed),
       body: {
+        weight_kg: weightKg,
         water_liter: waterLiter,
         protein_kcal: proteinKcal,
         protein_items: proteinItems,
@@ -636,6 +644,7 @@ export default function Home() {
         const loaded = {
           morningMed: d?.morning_med_taken ?? false,
           eveningMed: d?.evening_med_taken ?? false,
+          weightKg: d?.weight_kg ?? null,
           waterLiter: d?.water_liter ?? 0,
           sleepHours: d?.sleep_hours ?? 0,
           binge: d?.binge_yn ?? false,
@@ -675,6 +684,7 @@ export default function Home() {
 
         setMorningMed(loaded.morningMed);
         setEveningMed(loaded.eveningMed);
+        setWeightKg(loaded.weightKg);
         setWaterLiter(loaded.waterLiter);
         setSleepHours(loaded.sleepHours);
         setBinge(loaded.binge);
@@ -699,6 +709,9 @@ export default function Home() {
         if (data?.goal?.target_water_liter) {
           setWaterTarget(data.goal.target_water_liter);
         }
+        if (data?.goal?.target_weight_kg) {
+          setWeightTarget(data.goal.target_weight_kg);
+        }
 
         loadedDateRef.current = recordDate;
         setDataReady(true);
@@ -717,6 +730,7 @@ export default function Home() {
     const currentSnapshot = snapshotFormState({
       morningMed,
       eveningMed,
+      weightKg,
       waterLiter,
       sleepHours,
       binge,
@@ -758,6 +772,7 @@ export default function Home() {
     carbCounts,
     fatCounts,
     supplementItems,
+    weightKg,
     waterLiter,
     sleepHours,
     binge,
@@ -777,6 +792,7 @@ export default function Home() {
       lastLoadedSnapshotRef.current = snapshotFormState({
         morningMed,
         eveningMed,
+        weightKg,
         waterLiter,
         sleepHours,
         binge,
@@ -927,6 +943,12 @@ export default function Home() {
             {!statsLoading && history && (
               <>
                 <TrendChart
+                  title="⚖️ 체중"
+                  unit="kg"
+                  data={history.map((h) => h.weight_kg)}
+                  dates={history.map((h) => h.record_date)}
+                />
+                <TrendChart
                   title="😴 수면"
                   unit="h"
                   data={history.map((h) => h.sleep_hours)}
@@ -979,6 +1001,20 @@ export default function Home() {
                     <Chip label="🍽 폭식함" active={binge} onClick={() => setBinge(!binge)} tone="warn" />
                     <Chip label="🤒 아픈 날" active={isSick} onClick={() => setIsSick(!isSick)} tone="warn" />
                   </div>
+                </SubBlock>
+
+                <SubBlock
+                  title={`⚖️ 체중 · ${weightKg !== null ? `${weightKg}kg` : "-"}${weightTarget !== null ? ` / 목표 ${weightTarget}kg` : ""}`}
+                >
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step={0.1}
+                    value={weightKg ?? ""}
+                    onChange={(e) => setWeightKg(e.target.value === "" ? null : parseFloat(e.target.value))}
+                    placeholder="체중 입력 (kg)"
+                    className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-lg font-black text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                  />
                 </SubBlock>
 
                 <SubBlock title={`💧 물 · ${waterLiter.toFixed(1)}L / 목표 ${waterTarget.toFixed(1)}L`}>
