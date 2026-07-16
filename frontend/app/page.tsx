@@ -967,7 +967,7 @@ export default function Home() {
           <>
             <Section title="📋 데일리 체크" color={DAILY_COLOR}>
               <div className="space-y-4">
-                <SubBlock title="⚡ 빠른 체크">
+                <CollapsibleBlock title="⚡ 빠른 체크">
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     <Chip
                       label="☀️ 아침약"
@@ -982,9 +982,9 @@ export default function Home() {
                     <Chip label="🍽 폭식함" active={binge} onClick={() => setBinge(!binge)} tone="warn" />
                     <Chip label="🤒 아픈 날" active={isSick} onClick={() => setIsSick(!isSick)} tone="warn" />
                   </div>
-                </SubBlock>
+                </CollapsibleBlock>
 
-                <SubBlock
+                <CollapsibleBlock
                   title={`⚖️ 체중 · ${weightKg !== null ? `${weightKg}kg` : "-"}${weightTarget !== null ? ` / 목표 ${weightTarget}kg` : ""}`}
                 >
                   <input
@@ -996,27 +996,27 @@ export default function Home() {
                     placeholder="체중 입력 (kg)"
                     className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-lg font-black text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
                   />
-                </SubBlock>
+                </CollapsibleBlock>
 
-                <SubBlock title={`💧 물 · ${waterLiter.toFixed(1)}L / 목표 ${waterTarget.toFixed(1)}L`}>
+                <CollapsibleBlock title={`💧 물 · ${waterLiter.toFixed(1)}L / 목표 ${waterTarget.toFixed(1)}L`}>
                   <ScaleRow
                     values={WATER_PRESETS}
                     active={waterLiter}
                     onSelect={setWaterLiter}
                     format={(v) => `${v.toFixed(1)}L`}
                   />
-                </SubBlock>
+                </CollapsibleBlock>
 
-                <SubBlock title={`😴 수면 · ${sleepHours}시간 / 목표 ${SLEEP_TARGET}시간`}>
+                <CollapsibleBlock title={`😴 수면 · ${sleepHours}시간 / 목표 ${SLEEP_TARGET}시간`}>
                   <ScaleRow
                     values={SLEEP_HOURS}
                     active={sleepHours}
                     onSelect={setSleepHours}
                     format={(v) => `${v}h`}
                   />
-                </SubBlock>
+                </CollapsibleBlock>
 
-                <SubBlock title="🙂 컨디션">
+                <CollapsibleBlock title="🙂 컨디션">
                   <div className="grid grid-cols-5 gap-2">
                     {MOOD_OPTIONS.map((mood) => (
                       <button
@@ -1034,7 +1034,7 @@ export default function Home() {
                       </button>
                     ))}
                   </div>
-                </SubBlock>
+                </CollapsibleBlock>
               </div>
             </Section>
 
@@ -1252,15 +1252,6 @@ function Section({
       </div>
       {children}
     </section>
-  );
-}
-
-function SubBlock({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="border-t border-zinc-800 pt-4 first:border-t-0 first:pt-0">
-      <p className="mb-2 text-sm font-bold text-zinc-300">{title}</p>
-      {children}
-    </div>
   );
 }
 
