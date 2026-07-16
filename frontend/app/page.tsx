@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 type WorkoutType = {
   label: string;
@@ -139,6 +139,63 @@ const SUPPLEMENT_FOODS: { label: string; unit: string }[] = [
 const WATER_PRESETS = [0, 0.3, 0.5, 0.8, 1.0, 1.3, 1.5, 1.8, 2.0, 2.3, 2.5, 3.0];
 
 const SLEEP_HOURS = Array.from({ length: 25 }, (_, i) => i);
+
+type AccentKey = "emerald" | "blue" | "purple" | "pink" | "orange";
+
+const ACCENT_PRESETS: Record<
+  AccentKey,
+  { label: string; swatch: string; bg: string; border: string; text400: string; border30: string; hex: string }
+> = {
+  emerald: {
+    label: "에메랄드",
+    swatch: "bg-emerald-500",
+    bg: "bg-emerald-500",
+    border: "border-emerald-500",
+    text400: "text-emerald-400",
+    border30: "border-emerald-500/30",
+    hex: "#10b981",
+  },
+  blue: {
+    label: "블루",
+    swatch: "bg-blue-500",
+    bg: "bg-blue-500",
+    border: "border-blue-500",
+    text400: "text-blue-400",
+    border30: "border-blue-500/30",
+    hex: "#3b82f6",
+  },
+  purple: {
+    label: "퍼플",
+    swatch: "bg-purple-500",
+    bg: "bg-purple-500",
+    border: "border-purple-500",
+    text400: "text-purple-400",
+    border30: "border-purple-500/30",
+    hex: "#a855f7",
+  },
+  pink: {
+    label: "핑크",
+    swatch: "bg-pink-500",
+    bg: "bg-pink-500",
+    border: "border-pink-500",
+    text400: "text-pink-400",
+    border30: "border-pink-500/30",
+    hex: "#ec4899",
+  },
+  orange: {
+    label: "오렌지",
+    swatch: "bg-orange-500",
+    bg: "bg-orange-500",
+    border: "border-orange-500",
+    text400: "text-orange-400",
+    border30: "border-orange-500/30",
+    hex: "#f97316",
+  },
+};
+
+const ACCENT_STORAGE_KEY = "gk21-accent";
+
+const AccentContext = createContext(ACCENT_PRESETS.emerald);
 
 const MOOD_OPTIONS = [
   { score: 1, icon: "🤨" },
@@ -372,6 +429,18 @@ export default function Home() {
 
   const [recordDate, setRecordDate] = useState(today());
   const [dataReady, setDataReady] = useState(false);
+  const [accentKey, setAccentKey] = useState<AccentKey>("emerald");
+
+  useEffect(() => {
+    const saved = localStorage.getItem(ACCENT_STORAGE_KEY);
+    if (saved && saved in ACCENT_PRESETS) setAccentKey(saved as AccentKey);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(ACCENT_STORAGE_KEY, accentKey);
+  }, [accentKey]);
+
+  const accent = ACCENT_PRESETS[accentKey];
   const [morningMed, setMorningMed] = useState(false);
   const [eveningMed, setEveningMed] = useState(false);
   const [selectedWorkouts, setSelectedWorkouts] = useState<Map<string, SelectedWorkout>>(new Map());
@@ -825,6 +894,7 @@ export default function Home() {
   }, [view, recordDate]);
 
   return (
+    <AccentContext.Provider value={accent}>
     <main className="min-h-screen bg-zinc-950 pb-32 text-zinc-100">
       <div className="mx-auto max-w-xl p-4">
         <div className="flex items-center justify-between">
@@ -835,6 +905,22 @@ export default function Home() {
             onChange={(e) => setRecordDate(e.target.value)}
             className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-bold text-zinc-100"
           />
+        </div>
+
+        <div className="mt-2 flex items-center gap-1.5">
+          {(Object.keys(ACCENT_PRESETS) as AccentKey[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setAccentKey(key)}
+              aria-label={ACCENT_PRESETS[key].label}
+              className={[
+                "h-6 w-6 shrink-0 rounded-full transition-transform",
+                ACCENT_PRESETS[key].swatch,
+                accentKey === key ? "ring-2 ring-white ring-offset-2 ring-offset-zinc-950" : "opacity-50",
+              ].join(" ")}
+            />
+          ))}
         </div>
 
         <p className="mt-2 text-sm font-bold text-zinc-500">
@@ -903,7 +989,7 @@ export default function Home() {
               className={[
                 "rounded-2xl border-2 py-2.5 text-sm font-black transition-colors",
                 view === tab.key
-                  ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+                  ? [accent.border, accent.bg, "text-zinc-950"].join(" ")
                   : "border-zinc-800 bg-zinc-900 text-zinc-400",
               ].join(" ")}
             >
@@ -1009,7 +1095,7 @@ export default function Home() {
                         className={[
                           "rounded-2xl border-2 py-3 text-3xl transition-colors",
                           moodScore === mood.score
-                            ? "border-emerald-500 bg-zinc-800"
+                            ? [accent.border, "bg-zinc-800"].join(" ")
                             : "border-zinc-700 bg-zinc-800",
                         ].join(" ")}
                       >
@@ -1110,7 +1196,7 @@ export default function Home() {
                                   <button
                                     type="button"
                                     onClick={() => toggleWorkout(w.label, selected.minutes)}
-                                    className="h-8 w-8 shrink-0 rounded-full bg-emerald-500 text-sm font-black text-zinc-950"
+                                    className={[accent.bg, "h-8 w-8 shrink-0 rounded-full text-sm font-black text-zinc-950"].join(" ")}
                                   >
                                     ✕
                                   </button>
@@ -1136,7 +1222,7 @@ export default function Home() {
                                     className={[
                                       "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors",
                                       selected.details.has(exercise)
-                                        ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+                                        ? [accent.border, accent.bg, "text-zinc-950"].join(" ")
                                         : "border-zinc-700 bg-zinc-900 text-zinc-400",
                                     ].join(" ")}
                                   >
@@ -1171,8 +1257,8 @@ export default function Home() {
             </p>
 
             {coachStatus !== "idle" && (
-              <section className="mt-3 rounded-3xl border border-emerald-500/30 bg-zinc-900 p-6 shadow-lg">
-                <h2 className="text-lg font-black text-emerald-400">🤖 AI 코치</h2>
+              <section className={["mt-3 rounded-3xl border bg-zinc-900 p-6 shadow-lg", accent.border30].join(" ")}>
+                <h2 className={["text-lg font-black", accent.text400].join(" ")}>🤖 AI 코치</h2>
                 <p className="mt-3 font-bold leading-relaxed text-zinc-100">
                   {coachStatus === "loading" && !coachText
                     ? "코치가 오늘 하루를 분석하고 있습니다..."
@@ -1191,7 +1277,7 @@ export default function Home() {
               type="button"
               onClick={requestCoaching}
               disabled={coachStatus === "loading"}
-              className="w-full rounded-2xl bg-emerald-500 py-4 text-lg font-black text-zinc-950 shadow-lg disabled:opacity-50"
+              className={[accent.bg, "w-full rounded-2xl py-4 text-lg font-black text-zinc-950 shadow-lg disabled:opacity-50"].join(" ")}
             >
               {coachStatus === "loading" ? "코칭 받는 중..." : "🤖 AI 코칭 받기"}
             </button>
@@ -1199,6 +1285,7 @@ export default function Home() {
         </div>
       )}
     </main>
+    </AccentContext.Provider>
   );
 }
 
@@ -1292,8 +1379,6 @@ function StatTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-const CHART_ACCENT = "#10b981"; // emerald-500, app brand accent used as the sequential hue
-
 function TrendChart({
   title,
   unit,
@@ -1305,6 +1390,7 @@ function TrendChart({
   data: (number | null)[];
   dates: string[];
 }) {
+  const accent = useContext(AccentContext);
   const width = 300;
   const height = 70;
   const padding = 6;
@@ -1353,13 +1439,13 @@ function TrendChart({
           <path
             d={pathParts.join(" ")}
             fill="none"
-            stroke={CHART_ACCENT}
+            stroke={accent.hex}
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         )}
-        {lastPoint && <circle cx={lastPoint.x} cy={lastPoint.y} r="4" fill={CHART_ACCENT} stroke="#27272a" strokeWidth="2" />}
+        {lastPoint && <circle cx={lastPoint.x} cy={lastPoint.y} r="4" fill={accent.hex} stroke="#27272a" strokeWidth="2" />}
       </svg>
       <div className="flex justify-between text-xs font-bold text-zinc-600">
         <span>{dates[0]?.slice(5)}</span>
@@ -1370,6 +1456,7 @@ function TrendChart({
 }
 
 function WorkoutDots({ data, dates }: { data: (boolean | null)[]; dates: string[] }) {
+  const accent = useContext(AccentContext);
   return (
     <div className="rounded-2xl bg-zinc-800 p-3">
       <p className="text-xs font-bold text-zinc-400">🏋 운동일</p>
@@ -1380,7 +1467,7 @@ function WorkoutDots({ data, dates }: { data: (boolean | null)[]; dates: string[
             title={dates[i]}
             className={[
               "h-6 flex-1 rounded-full",
-              done === true ? "bg-emerald-500" : done === false ? "bg-zinc-700" : "bg-zinc-900",
+              done === true ? accent.bg : done === false ? "bg-zinc-700" : "bg-zinc-900",
             ].join(" ")}
           />
         ))}
@@ -1404,6 +1491,7 @@ function Chip({
   onClick: () => void;
   tone?: "default" | "warn";
 }) {
+  const accent = useContext(AccentContext);
   return (
     <button
       type="button"
@@ -1413,7 +1501,7 @@ function Chip({
         active
           ? tone === "warn"
             ? "border-red-600 bg-red-600 text-white"
-            : "border-emerald-500 bg-emerald-500 text-zinc-950"
+            : [accent.border, accent.bg, "text-zinc-950"].join(" ")
           : "border-zinc-700 bg-zinc-800 text-zinc-300",
       ].join(" ")}
     >
@@ -1434,6 +1522,7 @@ function ScaleRow({
   onSelect: (value: number) => void;
   format: (value: number) => string;
 }) {
+  const accent = useContext(AccentContext);
   return (
     <div className="flex gap-2 overflow-x-auto pb-1">
       {values.map((value) => (
@@ -1444,7 +1533,7 @@ function ScaleRow({
           className={[
             "shrink-0 rounded-2xl border-2 px-4 py-2.5 text-sm font-black transition-colors",
             active === value
-              ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+              ? [accent.border, accent.bg, "text-zinc-950"].join(" ")
               : "border-zinc-700 bg-zinc-800 text-zinc-300",
           ].join(" ")}
         >
