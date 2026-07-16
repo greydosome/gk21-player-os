@@ -274,6 +274,20 @@ function kcalFor(type: string, minutes: number) {
   return Math.round((entry?.kcalPerMin ?? 6) * minutes);
 }
 
+function workoutCategoryTotals(category: "strength" | "cardio", selectedWorkouts: Map<string, SelectedWorkout>) {
+  return WORKOUT_TYPES.filter((w) => w.category === category).reduce(
+    (totals, w) => {
+      const selected = selectedWorkouts.get(w.label);
+      if (!selected) return totals;
+      return {
+        minutes: totals.minutes + selected.minutes,
+        kcal: totals.kcal + kcalFor(w.label, selected.minutes),
+      };
+    },
+    { minutes: 0, kcal: 0 }
+  );
+}
+
 function foodKcal(food: FoodItem, amount: number) {
   return food.mode === "gram" ? Math.round((amount / 100) * food.kcalPer100g) : amount * food.kcalPerPiece;
 }
@@ -1098,8 +1112,10 @@ export default function Home() {
                     { key: "strength", title: "💪 근력" },
                     { key: "cardio", title: "🏃 유산소" },
                   ] as const
-                ).map((group) => (
-                  <CollapsibleBlock key={group.key} title={group.title}>
+                ).map((group) => {
+                  const totals = workoutCategoryTotals(group.key, selectedWorkouts);
+                  return (
+                  <CollapsibleBlock key={group.key} title={`${group.title} · ${totals.minutes}분 · ${totals.kcal}kcal`}>
                     <div className="space-y-2">
                       {WORKOUT_TYPES.filter((w) => w.category === group.key).map((w) => {
                         const suggestion = todaySchedule.suggestions.find((s) => s.type === w.label);
@@ -1183,7 +1199,8 @@ export default function Home() {
                       })}
                     </div>
                   </CollapsibleBlock>
-                ))}
+                  );
+                })}
               </div>
 
               {workoutDone && (
