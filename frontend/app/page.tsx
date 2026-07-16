@@ -110,6 +110,12 @@ function scheduleFor(dateStr: string) {
   return WEEKLY_SCHEDULE[dayOfWeek];
 }
 
+type BlockColor = { border: string; borderSoft: string; bg: string };
+
+const DAILY_COLOR: BlockColor = { border: "border-cyan-500", borderSoft: "border-cyan-500/40", bg: "bg-cyan-500" };
+const DIET_COLOR: BlockColor = { border: "border-yellow-500", borderSoft: "border-yellow-500/40", bg: "bg-yellow-500" };
+const WORKOUT_COLOR: BlockColor = { border: "border-blue-500", borderSoft: "border-blue-500/40", bg: "bg-blue-500" };
+
 type FoodItem = { label: string; unit: string; kcal: number };
 
 const PROTEIN_FOODS: FoodItem[] = [
@@ -948,7 +954,7 @@ export default function Home() {
           </section>
         ) : (
           <>
-            <Section title="📋 데일리 체크">
+            <Section title="📋 데일리 체크" color={DAILY_COLOR}>
               <div className="space-y-4">
                 <SubBlock title="⚡ 빠른 체크">
                   <div className="flex gap-2 overflow-x-auto pb-1">
@@ -1009,7 +1015,7 @@ export default function Home() {
                         className={[
                           "rounded-2xl border-2 py-3 text-3xl transition-colors",
                           moodScore === mood.score
-                            ? "border-emerald-500 bg-zinc-800"
+                            ? [DAILY_COLOR.border, "bg-zinc-800"].join(" ")
                             : "border-zinc-700 bg-zinc-800",
                         ].join(" ")}
                       >
@@ -1021,7 +1027,7 @@ export default function Home() {
               </div>
             </Section>
 
-            <Section title="🍱 식단">
+            <Section title="🍱 식단" color={DIET_COLOR}>
               <div className="space-y-4">
                 <FoodSection
                   title="🥩 단백질"
@@ -1058,6 +1064,7 @@ export default function Home() {
                         label={`${food.label} ${food.unit}`}
                         active={supplementItems.has(food.label)}
                         onClick={() => toggleSupplement(food.label)}
+                        color={DIET_COLOR}
                       />
                     ))}
                   </div>
@@ -1065,7 +1072,7 @@ export default function Home() {
               </div>
             </Section>
 
-            <Section title="🏋 운동">
+            <Section title="🏋 운동" color={WORKOUT_COLOR}>
               <div className="space-y-4">
                 {(
                   [
@@ -1081,7 +1088,13 @@ export default function Home() {
                         const isSelected = !!selected;
 
                         return (
-                          <div key={w.label} className="rounded-2xl bg-zinc-800 p-3">
+                          <div
+                            key={w.label}
+                            className={[
+                              "rounded-2xl border-2 bg-zinc-800 p-3",
+                              isSelected ? WORKOUT_COLOR.border : "border-transparent",
+                            ].join(" ")}
+                          >
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
@@ -1110,7 +1123,7 @@ export default function Home() {
                                   <button
                                     type="button"
                                     onClick={() => toggleWorkout(w.label, selected.minutes)}
-                                    className="h-8 w-8 shrink-0 rounded-full bg-emerald-500 text-sm font-black text-zinc-950"
+                                    className={[WORKOUT_COLOR.bg, "h-8 w-8 shrink-0 rounded-full text-sm font-black text-zinc-950"].join(" ")}
                                   >
                                     ✕
                                   </button>
@@ -1136,7 +1149,7 @@ export default function Home() {
                                     className={[
                                       "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors",
                                       selected.details.has(exercise)
-                                        ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+                                        ? [WORKOUT_COLOR.border, WORKOUT_COLOR.bg, "text-zinc-950"].join(" ")
                                         : "border-zinc-700 bg-zinc-900 text-zinc-400",
                                     ].join(" ")}
                                   >
@@ -1202,12 +1215,24 @@ export default function Home() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  color,
+  children,
+}: {
+  title: string;
+  color?: BlockColor;
+  children: React.ReactNode;
+}) {
   const [icon, ...rest] = title.split(" ");
   const label = rest.join(" ");
 
   return (
-    <section className="mt-3 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
+    <section
+      className={["mt-3 rounded-3xl border bg-zinc-900 p-4 shadow-sm", color ? color.borderSoft : "border-zinc-800"].join(
+        " "
+      )}
+    >
       <div className="mb-3 flex items-center gap-2">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-zinc-800 text-base">
           {icon}
@@ -1247,7 +1272,13 @@ function FoodSection({
     <SubBlock title={`${title} · ${kcal}kcal / 목표 ${target}kcal`}>
       <div className="space-y-2">
         {foods.map((food) => (
-          <div key={food.label} className="flex items-center justify-between rounded-2xl bg-zinc-800 p-3">
+          <div
+            key={food.label}
+            className={[
+              "flex items-center justify-between rounded-2xl border-2 bg-zinc-800 p-3",
+              (counts.get(food.label) ?? 0) > 0 ? DIET_COLOR.border : "border-transparent",
+            ].join(" ")}
+          >
             <div>
               <p className="font-bold text-zinc-100">{food.label}</p>
               <p className="text-xs text-zinc-500">{food.unit} · {food.kcal}kcal</p>
@@ -1398,11 +1429,13 @@ function Chip({
   active,
   onClick,
   tone = "default",
+  color = DAILY_COLOR,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
   tone?: "default" | "warn";
+  color?: BlockColor;
 }) {
   return (
     <button
@@ -1413,7 +1446,7 @@ function Chip({
         active
           ? tone === "warn"
             ? "border-red-600 bg-red-600 text-white"
-            : "border-emerald-500 bg-emerald-500 text-zinc-950"
+            : [color.border, color.bg, "text-zinc-950"].join(" ")
           : "border-zinc-700 bg-zinc-800 text-zinc-300",
       ].join(" ")}
     >
@@ -1428,11 +1461,13 @@ function ScaleRow({
   active,
   onSelect,
   format,
+  color = DAILY_COLOR,
 }: {
   values: number[];
   active: number;
   onSelect: (value: number) => void;
   format: (value: number) => string;
+  color?: BlockColor;
 }) {
   return (
     <div className="flex gap-2 overflow-x-auto pb-1">
@@ -1444,7 +1479,7 @@ function ScaleRow({
           className={[
             "shrink-0 rounded-2xl border-2 px-4 py-2.5 text-sm font-black transition-colors",
             active === value
-              ? "border-emerald-500 bg-emerald-500 text-zinc-950"
+              ? [color.border, color.bg, "text-zinc-950"].join(" ")
               : "border-zinc-700 bg-zinc-800 text-zinc-300",
           ].join(" ")}
         >
