@@ -112,7 +112,7 @@ function scheduleFor(dateStr: string) {
 
 type BlockColor = { border: string; borderSoft: string; bg: string };
 
-const DAILY_COLOR: BlockColor = { border: "border-cyan-500", borderSoft: "border-cyan-500/40", bg: "bg-cyan-500" };
+const DAILY_COLOR: BlockColor = { border: "border-orange-500", borderSoft: "border-orange-500/40", bg: "bg-orange-500" };
 const DIET_COLOR: BlockColor = { border: "border-yellow-500", borderSoft: "border-yellow-500/40", bg: "bg-yellow-500" };
 const WORKOUT_COLOR: BlockColor = { border: "border-blue-500", borderSoft: "border-blue-500/40", bg: "bg-blue-500" };
 
