@@ -123,9 +123,9 @@ type FoodItem =
 
 const GRAM_STEPS = Array.from({ length: 100 }, (_, i) => (i + 1) * 10);
 
-// 카탈로그에 없는 음식을 이름+g또는개수(선택)+총칼로리로 직접 기록하는 항목.
+// 매크로 분류 없이(일반식) 이름+g또는개수(선택)+총칼로리로 직접 기록하는 항목.
 // 100g당kcal은 총칼로리로부터 역산한 값(그램 단위일 때만 계산 가능)이며, 문자열로 인코딩해
-// 기존 protein_items/carb_items/fat_items(list[str]) 컬럼에 그대로 얹어 저장한다 (백엔드/DB 변경 없음).
+// body_record.general_food_items(list[str]) 컬럼에 저장한다.
 type CustomFoodEntry = {
   name: string;
   unit: "g" | "count";
@@ -343,32 +343,27 @@ function foodKcal(food: FoodItem, amount: number) {
   return food.mode === "gram" ? Math.round((amount / 100) * food.kcalPer100g) : amount * food.kcalPerPiece;
 }
 
-function computeKcal(foods: FoodItem[], counts: Map<string, number>, customItems: CustomFoodEntry[] = []) {
-  const catalogKcal = foods.reduce((sum, food) => sum + foodKcal(food, counts.get(food.label) ?? 0), 0);
-  const customKcal = customItems.reduce((sum, item) => sum + item.totalCalorie, 0);
-  return catalogKcal + customKcal;
+function computeKcal(foods: FoodItem[], counts: Map<string, number>) {
+  return foods.reduce((sum, food) => sum + foodKcal(food, counts.get(food.label) ?? 0), 0);
 }
 
-function buildFoodItems(foods: FoodItem[], counts: Map<string, number>, customItems: CustomFoodEntry[]): string[] {
-  const catalogItems = foods
+function buildFoodItems(foods: FoodItem[], counts: Map<string, number>): string[] {
+  return foods
     .filter((food) => (counts.get(food.label) ?? 0) > 0)
     .map((food) => `${food.label} ${counts.get(food.label)}${food.mode === "gram" ? "g" : "개"}`);
-  return [...catalogItems, ...customItems.map(encodeCustomFoodItem)];
 }
 
 function parseFoodItems(items: string[]) {
-  const counts = new Map<string, number>();
-  const custom: CustomFoodEntry[] = [];
+  const map = new Map<string, number>();
   items.forEach((item) => {
-    if (item.startsWith(CUSTOM_FOOD_PREFIX)) {
-      const decoded = decodeCustomFoodItem(item);
-      if (decoded) custom.push(decoded);
-      return;
-    }
     const match = item.match(/^(.*) (\d+)(?:g|개)$/);
-    if (match) counts.set(match[1], parseInt(match[2], 10));
+    if (match) map.set(match[1], parseInt(match[2], 10));
   });
-  return { counts, custom };
+  return map;
+}
+
+function parseGeneralFoodItems(items: string[]): CustomFoodEntry[] {
+  return items.map(decodeCustomFoodItem).filter((item): item is CustomFoodEntry => item !== null);
 }
 
 function round1(value: number | null) {
@@ -435,9 +430,7 @@ function snapshotFormState(state: {
   proteinCounts: Map<string, number>;
   carbCounts: Map<string, number>;
   fatCounts: Map<string, number>;
-  customProteinItems: CustomFoodEntry[];
-  customCarbItems: CustomFoodEntry[];
-  customFatItems: CustomFoodEntry[];
+  customMealItems: CustomFoodEntry[];
   supplementItems: Set<string>;
 }) {
   return JSON.stringify({
@@ -463,9 +456,7 @@ function snapshotFormState(state: {
     fat: Array.from(state.fatCounts.entries())
       .filter(([, count]) => count > 0)
       .sort(([a], [b]) => a.localeCompare(b)),
-    customProtein: state.customProteinItems.map(encodeCustomFoodItem),
-    customCarb: state.customCarbItems.map(encodeCustomFoodItem),
-    customFat: state.customFatItems.map(encodeCustomFoodItem),
+    generalFood: state.customMealItems.map(encodeCustomFoodItem),
     supplement: Array.from(state.supplementItems).sort(),
   });
 }
@@ -491,14 +482,12 @@ export default function Home() {
   const [workoutComment, setWorkoutComment] = useState("");
   const [proteinCounts, setProteinCounts] = useState<Map<string, number>>(new Map());
   const [proteinTarget, setProteinTarget] = useState(DEFAULT_PROTEIN_TARGET);
-  const [customProteinItems, setCustomProteinItems] = useState<CustomFoodEntry[]>([]);
   const [carbCounts, setCarbCounts] = useState<Map<string, number>>(new Map());
   const [carbTarget, setCarbTarget] = useState(DEFAULT_CARB_TARGET);
-  const [customCarbItems, setCustomCarbItems] = useState<CustomFoodEntry[]>([]);
   const [fatCounts, setFatCounts] = useState<Map<string, number>>(new Map());
   const [fatTarget, setFatTarget] = useState(DEFAULT_FAT_TARGET);
-  const [customFatItems, setCustomFatItems] = useState<CustomFoodEntry[]>([]);
   const [supplementItems, setSupplementItems] = useState<Set<string>>(new Set());
+  const [customMealItems, setCustomMealItems] = useState<CustomFoodEntry[]>([]);
   const [weightKg, setWeightKg] = useState<number | null>(null);
   const [weightTarget, setWeightTarget] = useState<number | null>(null);
   const [waterLiter, setWaterLiter] = useState(0);
@@ -517,17 +506,12 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const proteinKcal = useMemo(
-    () => computeKcal(PROTEIN_FOODS, proteinCounts, customProteinItems),
-    [proteinCounts, customProteinItems]
-  );
-  const carbKcal = useMemo(
-    () => computeKcal(CARB_FOODS, carbCounts, customCarbItems),
-    [carbCounts, customCarbItems]
-  );
-  const fatKcal = useMemo(
-    () => computeKcal(FAT_FOODS, fatCounts, customFatItems),
-    [fatCounts, customFatItems]
+  const proteinKcal = useMemo(() => computeKcal(PROTEIN_FOODS, proteinCounts), [proteinCounts]);
+  const carbKcal = useMemo(() => computeKcal(CARB_FOODS, carbCounts), [carbCounts]);
+  const fatKcal = useMemo(() => computeKcal(FAT_FOODS, fatCounts), [fatCounts]);
+  const generalFoodKcal = useMemo(
+    () => customMealItems.reduce((sum, item) => sum + item.totalCalorie, 0),
+    [customMealItems]
   );
 
   const workoutDone = selectedWorkouts.size > 0 || customCardioWorkouts.length > 0;
@@ -538,8 +522,6 @@ export default function Home() {
     const hasProtein = Array.from(proteinCounts.values()).some((count) => count > 0);
     const hasCarb = Array.from(carbCounts.values()).some((count) => count > 0);
     const hasFat = Array.from(fatCounts.values()).some((count) => count > 0);
-    const hasCustomFood =
-      customProteinItems.length > 0 || customCarbItems.length > 0 || customFatItems.length > 0;
     return (
       morningMed ||
       eveningMed ||
@@ -548,7 +530,7 @@ export default function Home() {
       hasProtein ||
       hasCarb ||
       hasFat ||
-      hasCustomFood ||
+      customMealItems.length > 0 ||
       supplementItems.size > 0 ||
       weightKg !== null ||
       waterLiter > 0 ||
@@ -565,9 +547,7 @@ export default function Home() {
     proteinCounts,
     carbCounts,
     fatCounts,
-    customProteinItems,
-    customCarbItems,
-    customFatItems,
+    customMealItems,
     supplementItems,
     weightKg,
     waterLiter,
@@ -677,18 +657,12 @@ export default function Home() {
     });
   }
 
-  function addCustomFood(
-    setCustomItems: React.Dispatch<React.SetStateAction<CustomFoodEntry[]>>,
-    entry: CustomFoodEntry
-  ) {
-    setCustomItems((prev) => [...prev, entry]);
+  function addCustomMealItem(entry: CustomFoodEntry) {
+    setCustomMealItems((prev) => [...prev, entry]);
   }
 
-  function removeCustomFood(
-    setCustomItems: React.Dispatch<React.SetStateAction<CustomFoodEntry[]>>,
-    index: number
-  ) {
-    setCustomItems((prev) => prev.filter((_, i) => i !== index));
+  function removeCustomMealItem(index: number) {
+    setCustomMealItems((prev) => prev.filter((_, i) => i !== index));
   }
 
   function buildPayload() {
@@ -702,9 +676,10 @@ export default function Home() {
       ...customCardioWorkouts.map((w) => `${w.name} ${w.minutes}분`),
     ].join(", ");
 
-    const proteinItems = buildFoodItems(PROTEIN_FOODS, proteinCounts, customProteinItems);
-    const carbItems = buildFoodItems(CARB_FOODS, carbCounts, customCarbItems);
-    const fatItems = buildFoodItems(FAT_FOODS, fatCounts, customFatItems);
+    const proteinItems = buildFoodItems(PROTEIN_FOODS, proteinCounts);
+    const carbItems = buildFoodItems(CARB_FOODS, carbCounts);
+    const fatItems = buildFoodItems(FAT_FOODS, fatCounts);
+    const generalFoodItems = customMealItems.map(encodeCustomFoodItem);
 
     return {
       record_date: recordDate,
@@ -726,6 +701,7 @@ export default function Home() {
         fat_kcal: fatKcal,
         fat_items: fatItems,
         supplement_items: Array.from(supplementItems),
+        general_food_items: generalFoodItems,
         binge_yn: binge,
       },
       workout: {
@@ -836,9 +812,10 @@ export default function Home() {
           }
         );
 
-        const protein = parseFoodItems(detail?.protein_items ?? []);
-        const carb = parseFoodItems(detail?.carb_items ?? []);
-        const fat = parseFoodItems(detail?.fat_items ?? []);
+        const proteinMap = parseFoodItems(detail?.protein_items ?? []);
+        const carbMap = parseFoodItems(detail?.carb_items ?? []);
+        const fatMap = parseFoodItems(detail?.fat_items ?? []);
+        const generalFoodList = parseGeneralFoodItems(detail?.general_food_items ?? []);
         const supplementSet = new Set<string>(detail?.supplement_items ?? []);
 
         // 자동저장 effect가 "방금 불러온 값 그대로"인 경우 저장을 건너뛸 수 있도록 스냅샷을 먼저 기록해둔다.
@@ -846,12 +823,10 @@ export default function Home() {
           ...loaded,
           selectedWorkouts: workoutMap,
           customCardioWorkouts: customCardioList,
-          proteinCounts: protein.counts,
-          carbCounts: carb.counts,
-          fatCounts: fat.counts,
-          customProteinItems: protein.custom,
-          customCarbItems: carb.custom,
-          customFatItems: fat.custom,
+          proteinCounts: proteinMap,
+          carbCounts: carbMap,
+          fatCounts: fatMap,
+          customMealItems: generalFoodList,
           supplementItems: supplementSet,
         });
 
@@ -866,12 +841,10 @@ export default function Home() {
         setWorkoutComment(loaded.workoutComment);
         setSelectedWorkouts(workoutMap);
         setCustomCardioWorkouts(customCardioList);
-        setProteinCounts(protein.counts);
-        setCarbCounts(carb.counts);
-        setFatCounts(fat.counts);
-        setCustomProteinItems(protein.custom);
-        setCustomCarbItems(carb.custom);
-        setCustomFatItems(fat.custom);
+        setProteinCounts(proteinMap);
+        setCarbCounts(carbMap);
+        setFatCounts(fatMap);
+        setCustomMealItems(generalFoodList);
         setSupplementItems(supplementSet);
 
         if (data?.goal?.target_protein_kcal) {
@@ -919,9 +892,7 @@ export default function Home() {
       proteinCounts,
       carbCounts,
       fatCounts,
-      customProteinItems,
-      customCarbItems,
-      customFatItems,
+      customMealItems,
       supplementItems,
     });
 
@@ -953,9 +924,7 @@ export default function Home() {
     proteinCounts,
     carbCounts,
     fatCounts,
-    customProteinItems,
-    customCarbItems,
-    customFatItems,
+    customMealItems,
     supplementItems,
     weightKg,
     waterLiter,
@@ -989,9 +958,7 @@ export default function Home() {
         proteinCounts,
         carbCounts,
         fatCounts,
-        customProteinItems,
-        customCarbItems,
-        customFatItems,
+        customMealItems,
         supplementItems,
       });
       setAutoSaveStatus("saved");
@@ -1235,9 +1202,6 @@ export default function Home() {
                   foods={PROTEIN_FOODS}
                   counts={proteinCounts}
                   onChangeCount={(label, v) => updateFoodCount(setProteinCounts, label, v)}
-                  customItems={customProteinItems}
-                  onAddCustom={(entry) => addCustomFood(setCustomProteinItems, entry)}
-                  onRemoveCustom={(i) => removeCustomFood(setCustomProteinItems, i)}
                 />
 
                 <FoodSection
@@ -1247,9 +1211,6 @@ export default function Home() {
                   foods={CARB_FOODS}
                   counts={carbCounts}
                   onChangeCount={(label, v) => updateFoodCount(setCarbCounts, label, v)}
-                  customItems={customCarbItems}
-                  onAddCustom={(entry) => addCustomFood(setCustomCarbItems, entry)}
-                  onRemoveCustom={(i) => removeCustomFood(setCustomCarbItems, i)}
                 />
 
                 <FoodSection
@@ -1259,9 +1220,6 @@ export default function Home() {
                   foods={FAT_FOODS}
                   counts={fatCounts}
                   onChangeCount={(label, v) => updateFoodCount(setFatCounts, label, v)}
-                  customItems={customFatItems}
-                  onAddCustom={(entry) => addCustomFood(setCustomFatItems, entry)}
-                  onRemoveCustom={(i) => removeCustomFood(setCustomFatItems, i)}
                 />
 
                 <CollapsibleBlock title="🫐 보충음식">
@@ -1275,6 +1233,35 @@ export default function Home() {
                         color={DIET_COLOR}
                       />
                     ))}
+                  </div>
+                </CollapsibleBlock>
+
+                <CollapsibleBlock title={`🍽 일반식 · ${generalFoodKcal}kcal`}>
+                  <div className="space-y-3">
+                    {customMealItems.map((item, index) => (
+                      <div
+                        key={`${item.name}-${index}`}
+                        className={["rounded-2xl border-2 bg-zinc-800 p-3", DIET_COLOR.border].join(" ")}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-bold text-zinc-100">{item.name}</p>
+                          <button
+                            type="button"
+                            onClick={() => removeCustomMealItem(index)}
+                            className="text-xs font-bold text-zinc-500 underline"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                        <p className="mt-1 text-sm font-bold text-zinc-100">
+                          {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} / ` : ""}
+                          {item.totalCalorie}kcal
+                          {item.kcalPer100g !== null ? ` · 100g당 ${item.kcalPer100g}kcal` : ""}
+                        </p>
+                      </div>
+                    ))}
+
+                    <CustomFoodForm onAdd={addCustomMealItem} />
                   </div>
                 </CollapsibleBlock>
               </div>
@@ -1480,9 +1467,6 @@ function FoodSection({
   foods,
   counts,
   onChangeCount,
-  customItems,
-  onAddCustom,
-  onRemoveCustom,
 }: {
   title: string;
   kcal: number;
@@ -1490,9 +1474,6 @@ function FoodSection({
   foods: FoodItem[];
   counts: Map<string, number>;
   onChangeCount: (label: string, count: number) => void;
-  customItems: CustomFoodEntry[];
-  onAddCustom: (entry: CustomFoodEntry) => void;
-  onRemoveCustom: (index: number) => void;
 }) {
   return (
     <CollapsibleBlock title={`${title} · ${kcal}kcal / 목표 ${target}kcal`}>
@@ -1549,28 +1530,6 @@ function FoodSection({
             </div>
           );
         })}
-
-        {customItems.map((item, index) => (
-          <div key={`${item.name}-${index}`} className={["rounded-2xl border-2 bg-zinc-800 p-3", DIET_COLOR.border].join(" ")}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-bold text-zinc-100">{item.name}</p>
-              <button
-                type="button"
-                onClick={() => onRemoveCustom(index)}
-                className="text-xs font-bold text-zinc-500 underline"
-              >
-                삭제
-              </button>
-            </div>
-            <p className="mt-1 text-sm font-bold text-zinc-100">
-              {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} / ` : ""}
-              {item.totalCalorie}kcal
-              {item.kcalPer100g !== null ? ` · 100g당 ${item.kcalPer100g}kcal` : ""}
-            </p>
-          </div>
-        ))}
-
-        <CustomFoodForm onAdd={onAddCustom} />
       </div>
     </CollapsibleBlock>
   );

@@ -36,12 +36,13 @@ def get_day_detail(record_date: date):
                 "carb_items": [],
                 "fat_items": [],
                 "supplement_items": [],
+                "general_food_items": [],
                 "is_sick": False,
             }
 
         workout_items = conn.execute(
             text("""
-                SELECT workout_type, minutes, detail
+                SELECT workout_type, minutes, calorie_estimate, detail
                 FROM workout_item
                 WHERE day_record_id = :day_record_id
                 ORDER BY workout_item_id
@@ -51,7 +52,7 @@ def get_day_detail(record_date: date):
 
         food_items = conn.execute(
             text("""
-                SELECT protein_items, carb_items, fat_items, supplement_items
+                SELECT protein_items, carb_items, fat_items, supplement_items, general_food_items
                 FROM body_record
                 WHERE day_record_id = :day_record_id
             """),
@@ -69,6 +70,7 @@ def get_day_detail(record_date: date):
         "carb_items": (food_items["carb_items"] if food_items else None) or [],
         "fat_items": (food_items["fat_items"] if food_items else None) or [],
         "supplement_items": (food_items["supplement_items"] if food_items else None) or [],
+        "general_food_items": (food_items["general_food_items"] if food_items else None) or [],
         "is_sick": day_row["is_sick"] if day_row else False,
     }
 

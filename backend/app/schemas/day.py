@@ -13,6 +13,7 @@ class BodyRecord(BaseModel):
     fat_kcal: int | None = None
     fat_items: list[str] | None = None
     supplement_items: list[str] | None = None
+    general_food_items: list[str] | None = None
     binge_yn: bool | None = None
 
 

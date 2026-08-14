@@ -53,6 +53,8 @@ def save_body(conn, day_record_id, body):
 
         "supplement_items": json.dumps(body.supplement_items or [], ensure_ascii=False),
 
+        "general_food_items": json.dumps(body.general_food_items or [], ensure_ascii=False),
+
         "binge_yn": body.binge_yn,
 
     }
@@ -88,6 +90,8 @@ def save_body(conn, day_record_id, body):
                     fat_items = CAST(:fat_items AS jsonb),
 
                     supplement_items = CAST(:supplement_items AS jsonb),
+
+                    general_food_items = CAST(:general_food_items AS jsonb),
 
                     binge_yn = :binge_yn,
 
@@ -133,6 +137,8 @@ def save_body(conn, day_record_id, body):
 
                     supplement_items,
 
+                    general_food_items,
+
                     binge_yn
 
                 )
@@ -162,6 +168,8 @@ def save_body(conn, day_record_id, body):
                     CAST(:fat_items AS jsonb),
 
                     CAST(:supplement_items AS jsonb),
+
+                    CAST(:general_food_items AS jsonb),
 
                     :binge_yn
 
