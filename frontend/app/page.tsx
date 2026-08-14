@@ -258,6 +258,14 @@ type SelectedWorkout = {
   details: Set<string>;
 };
 
+// 카탈로그(WORKOUT_TYPES)에 없는 유산소 운동을 이름+분+소모칼로리로 직접 기록하는 항목.
+// workout_item 테이블은 workout_type이 자유 문자열이라 별도 인코딩 없이 그대로 workout_items에 실어 보낸다.
+type CustomWorkoutEntry = {
+  name: string;
+  minutes: number;
+  calorieEstimate: number;
+};
+
 type PeriodStats = {
   days_logged: number;
   avg_weight_kg: number | null;
@@ -308,8 +316,12 @@ function kcalFor(type: string, minutes: number) {
   return Math.round((entry?.kcalPerMin ?? 6) * minutes);
 }
 
-function workoutCategoryTotals(category: "strength" | "cardio", selectedWorkouts: Map<string, SelectedWorkout>) {
-  return WORKOUT_TYPES.filter((w) => w.category === category).reduce(
+function workoutCategoryTotals(
+  category: "strength" | "cardio",
+  selectedWorkouts: Map<string, SelectedWorkout>,
+  customWorkouts: CustomWorkoutEntry[] = []
+) {
+  const catalogTotals = WORKOUT_TYPES.filter((w) => w.category === category).reduce(
     (totals, w) => {
       const selected = selectedWorkouts.get(w.label);
       if (!selected) return totals;
@@ -319,6 +331,11 @@ function workoutCategoryTotals(category: "strength" | "cardio", selectedWorkouts
       };
     },
     { minutes: 0, kcal: 0 }
+  );
+
+  return customWorkouts.reduce(
+    (totals, w) => ({ minutes: totals.minutes + w.minutes, kcal: totals.kcal + w.calorieEstimate }),
+    catalogTotals
   );
 }
 
@@ -414,6 +431,7 @@ function snapshotFormState(state: {
   moodScore: number | null;
   workoutComment: string;
   selectedWorkouts: Map<string, SelectedWorkout>;
+  customCardioWorkouts: CustomWorkoutEntry[];
   proteinCounts: Map<string, number>;
   carbCounts: Map<string, number>;
   fatCounts: Map<string, number>;
@@ -435,6 +453,7 @@ function snapshotFormState(state: {
     workouts: Array.from(state.selectedWorkouts.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([type, w]) => [type, w.minutes, Array.from(w.details).sort()]),
+    customCardio: state.customCardioWorkouts.map((w) => [w.name, w.minutes, w.calorieEstimate]),
     protein: Array.from(state.proteinCounts.entries())
       .filter(([, count]) => count > 0)
       .sort(([a], [b]) => a.localeCompare(b)),
@@ -468,6 +487,7 @@ export default function Home() {
   const [morningMed, setMorningMed] = useState(false);
   const [eveningMed, setEveningMed] = useState(false);
   const [selectedWorkouts, setSelectedWorkouts] = useState<Map<string, SelectedWorkout>>(new Map());
+  const [customCardioWorkouts, setCustomCardioWorkouts] = useState<CustomWorkoutEntry[]>([]);
   const [workoutComment, setWorkoutComment] = useState("");
   const [proteinCounts, setProteinCounts] = useState<Map<string, number>>(new Map());
   const [proteinTarget, setProteinTarget] = useState(DEFAULT_PROTEIN_TARGET);
@@ -510,7 +530,7 @@ export default function Home() {
     [fatCounts, customFatItems]
   );
 
-  const workoutDone = selectedWorkouts.size > 0;
+  const workoutDone = selectedWorkouts.size > 0 || customCardioWorkouts.length > 0;
   const todaySchedule = useMemo(() => scheduleFor(recordDate), [recordDate]);
 
   // DB에 기록 행이 존재하는지가 아니라, 실제로 뭔가 하나라도 체크했는지로 BREAK 여부를 판단한다.
@@ -524,6 +544,7 @@ export default function Home() {
       morningMed ||
       eveningMed ||
       selectedWorkouts.size > 0 ||
+      customCardioWorkouts.length > 0 ||
       hasProtein ||
       hasCarb ||
       hasFat ||
@@ -540,6 +561,7 @@ export default function Home() {
     morningMed,
     eveningMed,
     selectedWorkouts,
+    customCardioWorkouts,
     proteinCounts,
     carbCounts,
     fatCounts,
@@ -626,6 +648,14 @@ export default function Home() {
     });
   }
 
+  function addCustomCardioWorkout(entry: CustomWorkoutEntry) {
+    setCustomCardioWorkouts((prev) => [...prev, entry]);
+  }
+
+  function removeCustomCardioWorkout(index: number) {
+    setCustomCardioWorkouts((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function updateFoodCount(
     setCounts: React.Dispatch<React.SetStateAction<Map<string, number>>>,
     label: string,
@@ -664,12 +694,13 @@ export default function Home() {
   function buildPayload() {
     const bikeMinutes = selectedWorkouts.get("자전거")?.minutes ?? 0;
 
-    const completedWorkout = Array.from(selectedWorkouts.entries())
-      .map(([type, w]) => {
+    const completedWorkout = [
+      ...Array.from(selectedWorkouts.entries()).map(([type, w]) => {
         const detailText = w.details.size > 0 ? ` (${Array.from(w.details).join(", ")})` : "";
         return `${type} ${w.minutes}분${detailText}`;
-      })
-      .join(", ");
+      }),
+      ...customCardioWorkouts.map((w) => `${w.name} ${w.minutes}분`),
+    ].join(", ");
 
     const proteinItems = buildFoodItems(PROTEIN_FOODS, proteinCounts, customProteinItems);
     const carbItems = buildFoodItems(CARB_FOODS, carbCounts, customCarbItems);
@@ -703,12 +734,20 @@ export default function Home() {
         bike_minutes: bikeMinutes,
         workout_done_yn: workoutDone,
       },
-      workout_items: Array.from(selectedWorkouts.entries()).map(([type, w]) => ({
-        workout_type: type,
-        minutes: w.minutes,
-        calorie_estimate: kcalFor(type, w.minutes),
-        detail: w.details.size > 0 ? Array.from(w.details).join(", ") : null,
-      })),
+      workout_items: [
+        ...Array.from(selectedWorkouts.entries()).map(([type, w]) => ({
+          workout_type: type,
+          minutes: w.minutes,
+          calorie_estimate: kcalFor(type, w.minutes),
+          detail: w.details.size > 0 ? Array.from(w.details).join(", ") : null,
+        })),
+        ...customCardioWorkouts.map((w) => ({
+          workout_type: w.name,
+          minutes: w.minutes,
+          calorie_estimate: w.calorieEstimate,
+          detail: null,
+        })),
+      ],
       meal: null,
       sleep: {
         sleep_hours: sleepHours,
@@ -778,12 +817,24 @@ export default function Home() {
         };
 
         const workoutMap = new Map<string, SelectedWorkout>();
-        (detail?.workout_items ?? []).forEach((item: { workout_type: string; minutes: number; detail: string | null }) => {
-          workoutMap.set(item.workout_type, {
-            minutes: item.minutes,
-            details: new Set(item.detail ? item.detail.split(", ") : []),
-          });
-        });
+        const customCardioList: CustomWorkoutEntry[] = [];
+        (detail?.workout_items ?? []).forEach(
+          (item: { workout_type: string; minutes: number; calorie_estimate: number | null; detail: string | null }) => {
+            const isKnownType = WORKOUT_TYPES.some((w) => w.label === item.workout_type);
+            if (isKnownType) {
+              workoutMap.set(item.workout_type, {
+                minutes: item.minutes,
+                details: new Set(item.detail ? item.detail.split(", ") : []),
+              });
+            } else {
+              customCardioList.push({
+                name: item.workout_type,
+                minutes: item.minutes,
+                calorieEstimate: item.calorie_estimate ?? 0,
+              });
+            }
+          }
+        );
 
         const protein = parseFoodItems(detail?.protein_items ?? []);
         const carb = parseFoodItems(detail?.carb_items ?? []);
@@ -794,6 +845,7 @@ export default function Home() {
         lastLoadedSnapshotRef.current = snapshotFormState({
           ...loaded,
           selectedWorkouts: workoutMap,
+          customCardioWorkouts: customCardioList,
           proteinCounts: protein.counts,
           carbCounts: carb.counts,
           fatCounts: fat.counts,
@@ -813,6 +865,7 @@ export default function Home() {
         setMoodScore(loaded.moodScore);
         setWorkoutComment(loaded.workoutComment);
         setSelectedWorkouts(workoutMap);
+        setCustomCardioWorkouts(customCardioList);
         setProteinCounts(protein.counts);
         setCarbCounts(carb.counts);
         setFatCounts(fat.counts);
@@ -862,6 +915,7 @@ export default function Home() {
       moodScore,
       workoutComment,
       selectedWorkouts,
+      customCardioWorkouts,
       proteinCounts,
       carbCounts,
       fatCounts,
@@ -895,6 +949,7 @@ export default function Home() {
     morningMed,
     eveningMed,
     selectedWorkouts,
+    customCardioWorkouts,
     proteinCounts,
     carbCounts,
     fatCounts,
@@ -930,6 +985,7 @@ export default function Home() {
         moodScore,
         workoutComment,
         selectedWorkouts,
+        customCardioWorkouts,
         proteinCounts,
         carbCounts,
         fatCounts,
@@ -1232,7 +1288,11 @@ export default function Home() {
                     { key: "cardio", title: "🏃 유산소" },
                   ] as const
                 ).map((group) => {
-                  const totals = workoutCategoryTotals(group.key, selectedWorkouts);
+                  const totals = workoutCategoryTotals(
+                    group.key,
+                    selectedWorkouts,
+                    group.key === "cardio" ? customCardioWorkouts : []
+                  );
                   return (
                   <CollapsibleBlock key={group.key} title={`${group.title} · ${totals.minutes}분 · ${totals.kcal}kcal`}>
                     <div className="space-y-2">
@@ -1316,6 +1376,35 @@ export default function Home() {
                           </div>
                         );
                       })}
+
+                      {group.key === "cardio" && (
+                        <>
+                          {customCardioWorkouts.map((w, index) => (
+                            <div
+                              key={`${w.name}-${index}`}
+                              className={["rounded-2xl border-2 bg-zinc-800 p-3", WORKOUT_COLOR.border].join(" ")}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div>
+                                  <p className="font-bold text-zinc-100">{w.name}</p>
+                                  <p className="text-xs text-zinc-500">
+                                    {w.minutes}분 · {w.calorieEstimate}kcal
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeCustomCardioWorkout(index)}
+                                  className="text-xs font-bold text-zinc-500 underline"
+                                >
+                                  삭제
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+
+                          <CustomWorkoutForm onAdd={addCustomCardioWorkout} />
+                        </>
+                      )}
                     </div>
                   </CollapsibleBlock>
                   );
@@ -1571,6 +1660,72 @@ function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) 
           onClick={handleAdd}
           disabled={!canAdd}
           className={[DIET_COLOR.bg, "w-full rounded-xl py-2 text-sm font-black text-zinc-950 disabled:opacity-40"].join(" ")}
+        >
+          + 추가하기
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CustomWorkoutForm({ onAdd }: { onAdd: (entry: CustomWorkoutEntry) => void }) {
+  const [name, setName] = useState("");
+  const [minutesInput, setMinutesInput] = useState("");
+  const [calorieInput, setCalorieInput] = useState("");
+
+  const minutes = minutesInput.trim() === "" ? null : Number(minutesInput);
+  const calorieEstimate = calorieInput.trim() === "" ? null : Number(calorieInput);
+
+  const minutesValid = minutes !== null && !Number.isNaN(minutes) && minutes > 0;
+  const calorieValid = calorieEstimate !== null && !Number.isNaN(calorieEstimate) && calorieEstimate >= 0;
+  const canAdd = name.trim() !== "" && minutesValid && calorieValid;
+
+  function handleAdd() {
+    if (!canAdd || minutes === null || calorieEstimate === null) return;
+    onAdd({ name: name.trim(), minutes, calorieEstimate });
+    setName("");
+    setMinutesInput("");
+    setCalorieInput("");
+  }
+
+  return (
+    <div className="rounded-2xl border border-dashed border-zinc-700 bg-zinc-900 p-3">
+      <p className="text-xs font-bold text-zinc-400">직접입력 (목록에 없는 운동)</p>
+
+      <div className="mt-2 space-y-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="운동 이름 (예: 수영, 조깅)"
+          className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        />
+
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={minutesInput}
+            onChange={(e) => setMinutesInput(e.target.value)}
+            placeholder="시간 (분)"
+            className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          />
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={calorieInput}
+            onChange={(e) => setCalorieInput(e.target.value)}
+            placeholder="소모 칼로리(kcal)"
+            className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!canAdd}
+          className={[WORKOUT_COLOR.bg, "w-full rounded-xl py-2 text-sm font-black text-zinc-950 disabled:opacity-40"].join(" ")}
         >
           + 추가하기
         </button>
