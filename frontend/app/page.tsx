@@ -632,6 +632,10 @@ export default function Home() {
     setCustomCardioWorkouts((prev) => [...prev, entry]);
   }
 
+  function updateCustomCardioWorkout(index: number, entry: CustomWorkoutEntry) {
+    setCustomCardioWorkouts((prev) => prev.map((item, i) => (i === index ? entry : item)));
+  }
+
   function removeCustomCardioWorkout(index: number) {
     setCustomCardioWorkouts((prev) => prev.filter((_, i) => i !== index));
   }
@@ -659,6 +663,10 @@ export default function Home() {
 
   function addCustomMealItem(entry: CustomFoodEntry) {
     setCustomMealItems((prev) => [...prev, entry]);
+  }
+
+  function updateCustomMealItem(index: number, entry: CustomFoodEntry) {
+    setCustomMealItems((prev) => prev.map((item, i) => (i === index ? entry : item)));
   }
 
   function removeCustomMealItem(index: number) {
@@ -1239,26 +1247,13 @@ export default function Home() {
                 <CollapsibleBlock title={`🍽 일반식 · ${generalFoodKcal}kcal`}>
                   <div className="space-y-3">
                     {customMealItems.map((item, index) => (
-                      <div
+                      <CustomFoodRow
                         key={`${item.name}-${index}`}
-                        className={["rounded-2xl border-2 bg-zinc-800 p-3", DIET_COLOR.border].join(" ")}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-bold text-zinc-100">{item.name}</p>
-                          <button
-                            type="button"
-                            onClick={() => removeCustomMealItem(index)}
-                            className="text-xs font-bold text-zinc-500 underline"
-                          >
-                            삭제
-                          </button>
-                        </div>
-                        <p className="mt-1 text-sm font-bold text-zinc-100">
-                          {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} / ` : ""}
-                          {item.totalCalorie}kcal
-                          {item.kcalPer100g !== null ? ` · 100g당 ${item.kcalPer100g}kcal` : ""}
-                        </p>
-                      </div>
+                        item={item}
+                        color={DIET_COLOR}
+                        onSave={(entry) => updateCustomMealItem(index, entry)}
+                        onRemove={() => removeCustomMealItem(index)}
+                      />
                     ))}
 
                     <CustomFoodForm onAdd={addCustomMealItem} />
@@ -1367,26 +1362,13 @@ export default function Home() {
                       {group.key === "cardio" && (
                         <>
                           {customCardioWorkouts.map((w, index) => (
-                            <div
+                            <CustomWorkoutRow
                               key={`${w.name}-${index}`}
-                              className={["rounded-2xl border-2 bg-zinc-800 p-3", WORKOUT_COLOR.border].join(" ")}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div>
-                                  <p className="font-bold text-zinc-100">{w.name}</p>
-                                  <p className="text-xs text-zinc-500">
-                                    {w.minutes}분 · {w.calorieEstimate}kcal
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => removeCustomCardioWorkout(index)}
-                                  className="text-xs font-bold text-zinc-500 underline"
-                                >
-                                  삭제
-                                </button>
-                              </div>
-                            </div>
+                              item={w}
+                              color={WORKOUT_COLOR}
+                              onSave={(entry) => updateCustomCardioWorkout(index, entry)}
+                              onRemove={() => removeCustomCardioWorkout(index)}
+                            />
                           ))}
 
                           <CustomWorkoutForm onAdd={addCustomCardioWorkout} />
@@ -1535,11 +1517,92 @@ function FoodSection({
   );
 }
 
-function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) {
-  const [name, setName] = useState("");
-  const [unit, setUnit] = useState<"g" | "count">("g");
-  const [quantityInput, setQuantityInput] = useState(""); // 비워두면 null(미입력) 처리
-  const [calorieInput, setCalorieInput] = useState("");
+// CustomFoodForm(추가)과 CustomFoodRow(수정)가 공유하는 입력 필드 UI.
+function CustomFoodFields({
+  name,
+  setName,
+  unit,
+  setUnit,
+  quantityInput,
+  setQuantityInput,
+  calorieInput,
+  setCalorieInput,
+  kcalPer100g,
+  color,
+}: {
+  name: string;
+  setName: (v: string) => void;
+  unit: "g" | "count";
+  setUnit: (v: "g" | "count") => void;
+  quantityInput: string;
+  setQuantityInput: (v: string) => void;
+  calorieInput: string;
+  setCalorieInput: (v: string) => void;
+  kcalPer100g: number | null;
+  color: BlockColor;
+}) {
+  return (
+    <>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="음식 이름"
+        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+      />
+
+      <div className="flex gap-2">
+        <div className="flex flex-1 rounded-xl border border-zinc-700 bg-zinc-800 p-1">
+          <button
+            type="button"
+            onClick={() => setUnit("g")}
+            className={["flex-1 rounded-lg py-1.5 text-xs font-black transition-colors", unit === "g" ? [color.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
+          >
+            그램(g)
+          </button>
+          <button
+            type="button"
+            onClick={() => setUnit("count")}
+            className={["flex-1 rounded-lg py-1.5 text-xs font-black transition-colors", unit === "count" ? [color.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
+          >
+            개수(개)
+          </button>
+        </div>
+
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          value={quantityInput}
+          onChange={(e) => setQuantityInput(e.target.value)}
+          placeholder={unit === "g" ? "g (선택)" : "개수 (선택)"}
+          className="w-24 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          value={calorieInput}
+          onChange={(e) => setCalorieInput(e.target.value)}
+          placeholder="총 칼로리 (kcal)"
+          className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        />
+        <div className="shrink-0 rounded-xl bg-zinc-800 px-3 py-2 text-right">
+          <p className="text-[10px] font-bold text-zinc-500">100g당</p>
+          <p className="text-sm font-black text-zinc-100">{kcalPer100g !== null ? `${kcalPer100g}kcal` : "-"}</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function useCustomFoodFormState(initial?: CustomFoodEntry) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [unit, setUnit] = useState<"g" | "count">(initial?.unit ?? "g");
+  const [quantityInput, setQuantityInput] = useState(initial?.quantity != null ? String(initial.quantity) : "");
+  const [calorieInput, setCalorieInput] = useState(initial ? String(initial.totalCalorie) : "");
 
   const quantity = quantityInput.trim() === "" ? null : Number(quantityInput);
   const totalCalorie = calorieInput.trim() === "" ? null : Number(calorieInput);
@@ -1547,14 +1610,28 @@ function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) 
 
   const quantityValid = quantity === null || !Number.isNaN(quantity);
   const calorieValid = totalCalorie !== null && !Number.isNaN(totalCalorie);
-  const canAdd = name.trim() !== "" && calorieValid && quantityValid;
+  const canSubmit = name.trim() !== "" && calorieValid && quantityValid;
+
+  function reset(entry?: CustomFoodEntry) {
+    setName(entry?.name ?? "");
+    setUnit(entry?.unit ?? "g");
+    setQuantityInput(entry?.quantity != null ? String(entry.quantity) : "");
+    setCalorieInput(entry ? String(entry.totalCalorie) : "");
+  }
+
+  return {
+    name, setName, unit, setUnit, quantityInput, setQuantityInput, calorieInput, setCalorieInput,
+    quantity, totalCalorie, kcalPer100g, canSubmit, reset,
+  };
+}
+
+function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) {
+  const f = useCustomFoodFormState();
 
   function handleAdd() {
-    if (!canAdd || totalCalorie === null) return;
-    onAdd({ name: name.trim(), unit, quantity, totalCalorie, kcalPer100g });
-    setName("");
-    setQuantityInput("");
-    setCalorieInput("");
+    if (!f.canSubmit || f.totalCalorie === null) return;
+    onAdd({ name: f.name.trim(), unit: f.unit, quantity: f.quantity, totalCalorie: f.totalCalorie, kcalPer100g: f.kcalPer100g });
+    f.reset();
   }
 
   return (
@@ -1562,62 +1639,19 @@ function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) 
       <p className="text-xs font-bold text-zinc-400">직접입력 (카탈로그에 없는 음식)</p>
 
       <div className="mt-2 space-y-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="음식 이름"
-          className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        <CustomFoodFields
+          name={f.name} setName={f.setName}
+          unit={f.unit} setUnit={f.setUnit}
+          quantityInput={f.quantityInput} setQuantityInput={f.setQuantityInput}
+          calorieInput={f.calorieInput} setCalorieInput={f.setCalorieInput}
+          kcalPer100g={f.kcalPer100g}
+          color={DIET_COLOR}
         />
-
-        <div className="flex gap-2">
-          <div className="flex flex-1 rounded-xl border border-zinc-700 bg-zinc-800 p-1">
-            <button
-              type="button"
-              onClick={() => setUnit("g")}
-              className={["flex-1 rounded-lg py-1.5 text-xs font-black transition-colors", unit === "g" ? [DIET_COLOR.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
-            >
-              그램(g)
-            </button>
-            <button
-              type="button"
-              onClick={() => setUnit("count")}
-              className={["flex-1 rounded-lg py-1.5 text-xs font-black transition-colors", unit === "count" ? [DIET_COLOR.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
-            >
-              개수(개)
-            </button>
-          </div>
-
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            value={quantityInput}
-            onChange={(e) => setQuantityInput(e.target.value)}
-            placeholder={unit === "g" ? "g (선택)" : "개수 (선택)"}
-            className="w-24 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            value={calorieInput}
-            onChange={(e) => setCalorieInput(e.target.value)}
-            placeholder="총 칼로리 (kcal)"
-            className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
-          />
-          <div className="shrink-0 rounded-xl bg-zinc-800 px-3 py-2 text-right">
-            <p className="text-[10px] font-bold text-zinc-500">100g당</p>
-            <p className="text-sm font-black text-zinc-100">{kcalPer100g !== null ? `${kcalPer100g}kcal` : "-"}</p>
-          </div>
-        </div>
 
         <button
           type="button"
           onClick={handleAdd}
-          disabled={!canAdd}
+          disabled={!f.canSubmit}
           className={[DIET_COLOR.bg, "w-full rounded-xl py-2 text-sm font-black text-zinc-950 disabled:opacity-40"].join(" ")}
         >
           + 추가하기
@@ -1627,24 +1661,165 @@ function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) 
   );
 }
 
-function CustomWorkoutForm({ onAdd }: { onAdd: (entry: CustomWorkoutEntry) => void }) {
-  const [name, setName] = useState("");
-  const [minutesInput, setMinutesInput] = useState("");
-  const [calorieInput, setCalorieInput] = useState("");
+function CustomFoodRow({
+  item,
+  color,
+  onSave,
+  onRemove,
+}: {
+  item: CustomFoodEntry;
+  color: BlockColor;
+  onSave: (entry: CustomFoodEntry) => void;
+  onRemove: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const f = useCustomFoodFormState(item);
+
+  function startEdit() {
+    f.reset(item);
+    setEditing(true);
+  }
+
+  function handleSave() {
+    if (!f.canSubmit || f.totalCalorie === null) return;
+    onSave({ name: f.name.trim(), unit: f.unit, quantity: f.quantity, totalCalorie: f.totalCalorie, kcalPer100g: f.kcalPer100g });
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return (
+      <div className={["rounded-2xl border-2 bg-zinc-800 p-3", color.border].join(" ")}>
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-bold text-zinc-100">{item.name}</p>
+          <div className="flex shrink-0 gap-3">
+            <button type="button" onClick={startEdit} className="text-xs font-bold text-zinc-400 underline">
+              수정
+            </button>
+            <button type="button" onClick={onRemove} className="text-xs font-bold text-zinc-500 underline">
+              삭제
+            </button>
+          </div>
+        </div>
+        <p className="mt-1 text-sm font-bold text-zinc-100">
+          {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} / ` : ""}
+          {item.totalCalorie}kcal
+          {item.kcalPer100g !== null ? ` · 100g당 ${item.kcalPer100g}kcal` : ""}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={["rounded-2xl border-2 bg-zinc-900 p-3", color.border].join(" ")}>
+      <div className="space-y-2">
+        <CustomFoodFields
+          name={f.name} setName={f.setName}
+          unit={f.unit} setUnit={f.setUnit}
+          quantityInput={f.quantityInput} setQuantityInput={f.setQuantityInput}
+          calorieInput={f.calorieInput} setCalorieInput={f.setCalorieInput}
+          kcalPer100g={f.kcalPer100g}
+          color={color}
+        />
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="flex-1 rounded-xl border border-zinc-700 py-2 text-sm font-black text-zinc-300"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!f.canSubmit}
+            className={[color.bg, "flex-1 rounded-xl py-2 text-sm font-black text-zinc-950 disabled:opacity-40"].join(" ")}
+          >
+            저장
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// CustomWorkoutForm(추가)과 CustomWorkoutRow(수정)가 공유하는 입력 필드 UI.
+function CustomWorkoutFields({
+  name,
+  setName,
+  minutesInput,
+  setMinutesInput,
+  calorieInput,
+  setCalorieInput,
+}: {
+  name: string;
+  setName: (v: string) => void;
+  minutesInput: string;
+  setMinutesInput: (v: string) => void;
+  calorieInput: string;
+  setCalorieInput: (v: string) => void;
+}) {
+  return (
+    <>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="운동 이름 (예: 수영, 조깅)"
+        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+      />
+
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          value={minutesInput}
+          onChange={(e) => setMinutesInput(e.target.value)}
+          placeholder="시간 (분)"
+          className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        />
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          value={calorieInput}
+          onChange={(e) => setCalorieInput(e.target.value)}
+          placeholder="소모 칼로리(kcal)"
+          className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        />
+      </div>
+    </>
+  );
+}
+
+function useCustomWorkoutFormState(initial?: CustomWorkoutEntry) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [minutesInput, setMinutesInput] = useState(initial ? String(initial.minutes) : "");
+  const [calorieInput, setCalorieInput] = useState(initial ? String(initial.calorieEstimate) : "");
 
   const minutes = minutesInput.trim() === "" ? null : Number(minutesInput);
   const calorieEstimate = calorieInput.trim() === "" ? null : Number(calorieInput);
 
   const minutesValid = minutes !== null && !Number.isNaN(minutes) && minutes > 0;
   const calorieValid = calorieEstimate !== null && !Number.isNaN(calorieEstimate) && calorieEstimate >= 0;
-  const canAdd = name.trim() !== "" && minutesValid && calorieValid;
+  const canSubmit = name.trim() !== "" && minutesValid && calorieValid;
+
+  function reset(entry?: CustomWorkoutEntry) {
+    setName(entry?.name ?? "");
+    setMinutesInput(entry ? String(entry.minutes) : "");
+    setCalorieInput(entry ? String(entry.calorieEstimate) : "");
+  }
+
+  return { name, setName, minutesInput, setMinutesInput, calorieInput, setCalorieInput, minutes, calorieEstimate, canSubmit, reset };
+}
+
+function CustomWorkoutForm({ onAdd }: { onAdd: (entry: CustomWorkoutEntry) => void }) {
+  const f = useCustomWorkoutFormState();
 
   function handleAdd() {
-    if (!canAdd || minutes === null || calorieEstimate === null) return;
-    onAdd({ name: name.trim(), minutes, calorieEstimate });
-    setName("");
-    setMinutesInput("");
-    setCalorieInput("");
+    if (!f.canSubmit || f.minutes === null || f.calorieEstimate === null) return;
+    onAdd({ name: f.name.trim(), minutes: f.minutes, calorieEstimate: f.calorieEstimate });
+    f.reset();
   }
 
   return (
@@ -1652,42 +1827,99 @@ function CustomWorkoutForm({ onAdd }: { onAdd: (entry: CustomWorkoutEntry) => vo
       <p className="text-xs font-bold text-zinc-400">직접입력 (목록에 없는 운동)</p>
 
       <div className="mt-2 space-y-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="운동 이름 (예: 수영, 조깅)"
-          className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        <CustomWorkoutFields
+          name={f.name} setName={f.setName}
+          minutesInput={f.minutesInput} setMinutesInput={f.setMinutesInput}
+          calorieInput={f.calorieInput} setCalorieInput={f.setCalorieInput}
         />
-
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            value={minutesInput}
-            onChange={(e) => setMinutesInput(e.target.value)}
-            placeholder="시간 (분)"
-            className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
-          />
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            value={calorieInput}
-            onChange={(e) => setCalorieInput(e.target.value)}
-            placeholder="소모 칼로리(kcal)"
-            className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
-          />
-        </div>
 
         <button
           type="button"
           onClick={handleAdd}
-          disabled={!canAdd}
+          disabled={!f.canSubmit}
           className={[WORKOUT_COLOR.bg, "w-full rounded-xl py-2 text-sm font-black text-zinc-950 disabled:opacity-40"].join(" ")}
         >
           + 추가하기
         </button>
+      </div>
+    </div>
+  );
+}
+
+function CustomWorkoutRow({
+  item,
+  color,
+  onSave,
+  onRemove,
+}: {
+  item: CustomWorkoutEntry;
+  color: BlockColor;
+  onSave: (entry: CustomWorkoutEntry) => void;
+  onRemove: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const f = useCustomWorkoutFormState(item);
+
+  function startEdit() {
+    f.reset(item);
+    setEditing(true);
+  }
+
+  function handleSave() {
+    if (!f.canSubmit || f.minutes === null || f.calorieEstimate === null) return;
+    onSave({ name: f.name.trim(), minutes: f.minutes, calorieEstimate: f.calorieEstimate });
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return (
+      <div className={["rounded-2xl border-2 bg-zinc-800 p-3", color.border].join(" ")}>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="font-bold text-zinc-100">{item.name}</p>
+            <p className="text-xs text-zinc-500">
+              {item.minutes}분 · {item.calorieEstimate}kcal
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-3">
+            <button type="button" onClick={startEdit} className="text-xs font-bold text-zinc-400 underline">
+              수정
+            </button>
+            <button type="button" onClick={onRemove} className="text-xs font-bold text-zinc-500 underline">
+              삭제
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={["rounded-2xl border-2 bg-zinc-900 p-3", color.border].join(" ")}>
+      <div className="space-y-2">
+        <CustomWorkoutFields
+          name={f.name} setName={f.setName}
+          minutesInput={f.minutesInput} setMinutesInput={f.setMinutesInput}
+          calorieInput={f.calorieInput} setCalorieInput={f.setCalorieInput}
+        />
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="flex-1 rounded-xl border border-zinc-700 py-2 text-sm font-black text-zinc-300"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!f.canSubmit}
+            className={[color.bg, "flex-1 rounded-xl py-2 text-sm font-black text-zinc-950 disabled:opacity-40"].join(" ")}
+          >
+            저장
+          </button>
+        </div>
       </div>
     </div>
   );
