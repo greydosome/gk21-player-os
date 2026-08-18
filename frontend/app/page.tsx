@@ -1304,24 +1304,26 @@ export default function Home() {
                           placeholder="음식 이름 검색"
                           className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
                         />
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {filteredFoodHistory.length === 0 ? (
-                            <p className="text-xs font-bold text-zinc-600">검색 결과가 없어요.</p>
-                          ) : (
-                            filteredFoodHistory.map((item) => (
+                        {filteredFoodHistory.length === 0 ? (
+                          <p className="mt-2 text-xs font-bold text-zinc-600">검색 결과가 없어요.</p>
+                        ) : (
+                          <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                            {filteredFoodHistory.map((item) => (
                               <button
                                 key={item.name}
                                 type="button"
                                 onClick={() => addCustomMealItem(item)}
-                                className="shrink-0 rounded-full border-2 border-zinc-700 bg-zinc-800 px-3.5 py-2 text-xs font-bold text-zinc-300"
+                                className="flex w-full items-center justify-between rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-left"
                               >
-                                {item.name} ·{" "}
-                                {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} · ` : ""}
-                                {item.totalCalorie}kcal
+                                <span className="text-sm font-bold text-zinc-200">{item.name}</span>
+                                <span className="shrink-0 text-xs font-bold text-zinc-500">
+                                  {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} · ` : ""}
+                                  {item.totalCalorie}kcal
+                                </span>
                               </button>
-                            ))
-                          )}
-                        </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
