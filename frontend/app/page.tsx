@@ -123,18 +123,30 @@ type FoodItem =
 
 const GRAM_STEPS = Array.from({ length: 100 }, (_, i) => (i + 1) * 10);
 
-// 매크로 분류 없이(일반식) 이름+g또는개수(선택)+총칼로리로 직접 기록하는 항목.
+// 카탈로그 밖에서 이름+g또는개수(선택)+총칼로리로 직접 기록하는 항목. 단백질/탄수화물/지방/보충음식
+// 중 하나로 분류하거나(그 매크로의 kcal에 합산되고 해당 섹션에 표시됨), 미분류(일반식)로 남길 수 있다.
 // 100g당kcal은 총칼로리로부터 역산한 값(그램 단위일 때만 계산 가능)이며, 문자열로 인코딩해
-// body_record.general_food_items(list[str]) 컬럼에 저장한다.
+// body_record.general_food_items(list[str]) 컬럼에 카테고리 상관없이 전부 저장한다.
+type FoodCategory = "general" | "protein" | "carb" | "fat" | "supplement";
+
 type CustomFoodEntry = {
   name: string;
   unit: "g" | "count";
   quantity: number | null;
   totalCalorie: number;
   kcalPer100g: number | null;
+  category: FoodCategory;
 };
 
 const CUSTOM_FOOD_PREFIX = "CUSTOM|";
+
+const FOOD_CATEGORY_OPTIONS: { value: FoodCategory; label: string }[] = [
+  { value: "general", label: "일반식" },
+  { value: "protein", label: "단백질" },
+  { value: "carb", label: "탄수화물" },
+  { value: "fat", label: "지방" },
+  { value: "supplement", label: "보충음식" },
+];
 
 function caloriesPer100g(unit: "g" | "count", quantity: number | null, totalCalorie: number | null) {
   if (unit !== "g" || quantity === null || quantity <= 0) return null;
@@ -143,18 +155,36 @@ function caloriesPer100g(unit: "g" | "count", quantity: number | null, totalCalo
 }
 
 function encodeCustomFoodItem(entry: CustomFoodEntry) {
-  return [CUSTOM_FOOD_PREFIX.slice(0, -1), entry.name.replaceAll("|", ""), entry.quantity ?? "", entry.unit, entry.totalCalorie].join("|");
+  return [
+    CUSTOM_FOOD_PREFIX.slice(0, -1),
+    entry.name.replaceAll("|", ""),
+    entry.quantity ?? "",
+    entry.unit,
+    entry.totalCalorie,
+    entry.category,
+  ].join("|");
 }
 
 function decodeCustomFoodItem(raw: string): CustomFoodEntry | null {
   const parts = raw.split("|");
-  if (parts.length !== 5) return null;
-  const [, name, quantityRaw, unitRaw, totalCalorieRaw] = parts;
+  if (parts.length !== 5 && parts.length !== 6) return null;
+  const [, name, quantityRaw, unitRaw, totalCalorieRaw, categoryRaw] = parts;
   const unit: "g" | "count" = unitRaw === "count" ? "count" : "g";
   const quantity = quantityRaw === "" ? null : Number(quantityRaw);
   const totalCalorie = Number(totalCalorieRaw);
+  // 5-part(레거시) 항목은 카테고리가 없었으므로 일반식으로 취급한다.
+  const category: FoodCategory = FOOD_CATEGORY_OPTIONS.some((o) => o.value === categoryRaw)
+    ? (categoryRaw as FoodCategory)
+    : "general";
   if (!name || Number.isNaN(totalCalorie)) return null;
-  return { name, unit, quantity: quantity === null || Number.isNaN(quantity) ? null : quantity, totalCalorie, kcalPer100g: caloriesPer100g(unit, quantity ?? null, totalCalorie) };
+  return {
+    name,
+    unit,
+    quantity: quantity === null || Number.isNaN(quantity) ? null : quantity,
+    totalCalorie,
+    kcalPer100g: caloriesPer100g(unit, quantity ?? null, totalCalorie),
+    category,
+  };
 }
 
 const PROTEIN_FOODS: FoodItem[] = [
@@ -366,6 +396,17 @@ function parseGeneralFoodItems(items: string[]): CustomFoodEntry[] {
   return items.map(decodeCustomFoodItem).filter((item): item is CustomFoodEntry => item !== null);
 }
 
+function sumCustomKcal(items: CustomFoodEntry[], category: FoodCategory) {
+  return items.filter((item) => item.category === category).reduce((sum, item) => sum + item.totalCalorie, 0);
+}
+
+// 특정 카테고리에 속한 항목만, 원본 배열에서의 index와 함께 뽑아낸다 (수정/삭제 시 원본 index가 필요).
+function customEntriesByCategory(items: CustomFoodEntry[], category: FoodCategory) {
+  return items
+    .map((item, index) => ({ item, index }))
+    .filter((entry) => entry.item.category === category);
+}
+
 // 이름이 같은 항목이 여러 날짜에 걸쳐 반복될 수 있으므로, 가장 최근 값(먼저 나오는 항목)만 남긴다.
 function dedupeFoodHistoryByName(items: CustomFoodEntry[]): CustomFoodEntry[] {
   const seen = new Set<string>();
@@ -520,13 +561,21 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const proteinKcal = useMemo(() => computeKcal(PROTEIN_FOODS, proteinCounts), [proteinCounts]);
-  const carbKcal = useMemo(() => computeKcal(CARB_FOODS, carbCounts), [carbCounts]);
-  const fatKcal = useMemo(() => computeKcal(FAT_FOODS, fatCounts), [fatCounts]);
-  const generalFoodKcal = useMemo(
-    () => customMealItems.reduce((sum, item) => sum + item.totalCalorie, 0),
-    [customMealItems]
+  const proteinKcal = useMemo(
+    () => computeKcal(PROTEIN_FOODS, proteinCounts) + sumCustomKcal(customMealItems, "protein"),
+    [proteinCounts, customMealItems]
   );
+  const carbKcal = useMemo(
+    () => computeKcal(CARB_FOODS, carbCounts) + sumCustomKcal(customMealItems, "carb"),
+    [carbCounts, customMealItems]
+  );
+  const fatKcal = useMemo(
+    () => computeKcal(FAT_FOODS, fatCounts) + sumCustomKcal(customMealItems, "fat"),
+    [fatCounts, customMealItems]
+  );
+  const generalFoodKcal = useMemo(() => sumCustomKcal(customMealItems, "general"), [customMealItems]);
+  const supplementCustomKcal = useMemo(() => sumCustomKcal(customMealItems, "supplement"), [customMealItems]);
+  const totalDietKcal = proteinKcal + carbKcal + fatKcal + generalFoodKcal + supplementCustomKcal;
   const filteredFoodHistory = useMemo(() => {
     const query = foodHistoryQuery.trim();
     if (!query) return foodHistory;
@@ -534,6 +583,12 @@ export default function Home() {
   }, [foodHistory, foodHistoryQuery]);
 
   const workoutDone = selectedWorkouts.size > 0 || customCardioWorkouts.length > 0;
+  const totalWorkoutKcal = useMemo(
+    () =>
+      workoutCategoryTotals("strength", selectedWorkouts).kcal +
+      workoutCategoryTotals("cardio", selectedWorkouts, customCardioWorkouts).kcal,
+    [selectedWorkouts, customCardioWorkouts]
+  );
   const todaySchedule = useMemo(() => scheduleFor(recordDate), [recordDate]);
 
   // DB에 기록 행이 존재하는지가 아니라, 실제로 뭔가 하나라도 체크했는지로 BREAK 여부를 판단한다.
@@ -1240,7 +1295,7 @@ export default function Home() {
               </div>
             </Section>
 
-            <Section title="🍱 식단" color={DIET_COLOR}>
+            <Section title="🍱 식단" color={DIET_COLOR} subtitle={`${totalDietKcal}kcal`}>
               <div className="space-y-4">
                 <FoodSection
                   title="🥩 단백질"
@@ -1249,6 +1304,10 @@ export default function Home() {
                   foods={PROTEIN_FOODS}
                   counts={proteinCounts}
                   onChangeCount={(label, v) => updateFoodCount(setProteinCounts, label, v)}
+                  category="protein"
+                  customItems={customMealItems}
+                  onSaveCustom={updateCustomMealItem}
+                  onRemoveCustom={removeCustomMealItem}
                 />
 
                 <FoodSection
@@ -1258,6 +1317,10 @@ export default function Home() {
                   foods={CARB_FOODS}
                   counts={carbCounts}
                   onChangeCount={(label, v) => updateFoodCount(setCarbCounts, label, v)}
+                  category="carb"
+                  customItems={customMealItems}
+                  onSaveCustom={updateCustomMealItem}
+                  onRemoveCustom={removeCustomMealItem}
                 />
 
                 <FoodSection
@@ -1267,17 +1330,35 @@ export default function Home() {
                   foods={FAT_FOODS}
                   counts={fatCounts}
                   onChangeCount={(label, v) => updateFoodCount(setFatCounts, label, v)}
+                  category="fat"
+                  customItems={customMealItems}
+                  onSaveCustom={updateCustomMealItem}
+                  onRemoveCustom={removeCustomMealItem}
                 />
 
-                <CollapsibleBlock title="🫐 보충음식">
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {SUPPLEMENT_FOODS.map((food) => (
-                      <Chip
-                        key={food.label}
-                        label={`${food.label} ${food.unit}`}
-                        active={supplementItems.has(food.label)}
-                        onClick={() => toggleSupplement(food.label)}
+                <CollapsibleBlock
+                  title={supplementCustomKcal > 0 ? `🫐 보충음식 · ${supplementCustomKcal}kcal` : "🫐 보충음식"}
+                >
+                  <div className="space-y-3">
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {SUPPLEMENT_FOODS.map((food) => (
+                        <Chip
+                          key={food.label}
+                          label={`${food.label} ${food.unit}`}
+                          active={supplementItems.has(food.label)}
+                          onClick={() => toggleSupplement(food.label)}
+                          color={DIET_COLOR}
+                        />
+                      ))}
+                    </div>
+
+                    {customEntriesByCategory(customMealItems, "supplement").map(({ item, index }) => (
+                      <CustomFoodRow
+                        key={`${item.name}-${index}`}
+                        item={item}
                         color={DIET_COLOR}
+                        onSave={(entry) => updateCustomMealItem(index, entry)}
+                        onRemove={() => removeCustomMealItem(index)}
                       />
                     ))}
                   </div>
@@ -1285,7 +1366,7 @@ export default function Home() {
 
                 <CollapsibleBlock title={`🍽 일반식 · ${generalFoodKcal}kcal`}>
                   <div className="space-y-3">
-                    {customMealItems.map((item, index) => (
+                    {customEntriesByCategory(customMealItems, "general").map(({ item, index }) => (
                       <CustomFoodRow
                         key={`${item.name}-${index}`}
                         item={item}
@@ -1333,7 +1414,7 @@ export default function Home() {
               </div>
             </Section>
 
-            <Section title="🏋 운동" color={WORKOUT_COLOR}>
+            <Section title="🏋 운동" color={WORKOUT_COLOR} subtitle={`${totalWorkoutKcal}kcal`}>
               <div className="space-y-4">
                 {(
                   [
@@ -1487,10 +1568,12 @@ export default function Home() {
 function Section({
   title,
   color,
+  subtitle,
   children,
 }: {
   title: string;
   color?: BlockColor;
+  subtitle?: string;
   children: React.ReactNode;
 }) {
   const [icon, ...rest] = title.split(" ");
@@ -1502,11 +1585,14 @@ function Section({
         " "
       )}
     >
-      <div className="mb-3 flex items-center gap-2">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-zinc-800 text-base">
-          {icon}
-        </span>
-        <h2 className="text-base font-black text-zinc-100">{label}</h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-zinc-800 text-base">
+            {icon}
+          </span>
+          <h2 className="text-base font-black text-zinc-100">{label}</h2>
+        </div>
+        {subtitle && <span className="text-sm font-bold text-zinc-400">{subtitle}</span>}
       </div>
       {children}
     </section>
@@ -1520,6 +1606,10 @@ function FoodSection({
   foods,
   counts,
   onChangeCount,
+  category,
+  customItems,
+  onSaveCustom,
+  onRemoveCustom,
 }: {
   title: string;
   kcal: number;
@@ -1527,6 +1617,10 @@ function FoodSection({
   foods: FoodItem[];
   counts: Map<string, number>;
   onChangeCount: (label: string, count: number) => void;
+  category: FoodCategory;
+  customItems: CustomFoodEntry[];
+  onSaveCustom: (index: number, entry: CustomFoodEntry) => void;
+  onRemoveCustom: (index: number) => void;
 }) {
   return (
     <CollapsibleBlock title={`${title} · ${kcal}kcal / 목표 ${target}kcal`}>
@@ -1583,6 +1677,16 @@ function FoodSection({
             </div>
           );
         })}
+
+        {customEntriesByCategory(customItems, category).map(({ item, index }) => (
+          <CustomFoodRow
+            key={`${item.name}-${index}`}
+            item={item}
+            color={DIET_COLOR}
+            onSave={(entry) => onSaveCustom(index, entry)}
+            onRemove={() => onRemoveCustom(index)}
+          />
+        ))}
       </div>
     </CollapsibleBlock>
   );
@@ -1592,6 +1696,8 @@ function FoodSection({
 function CustomFoodFields({
   name,
   setName,
+  category,
+  setCategory,
   unit,
   setUnit,
   quantityInput,
@@ -1603,6 +1709,8 @@ function CustomFoodFields({
 }: {
   name: string;
   setName: (v: string) => void;
+  category: FoodCategory;
+  setCategory: (v: FoodCategory) => void;
   unit: "g" | "count";
   setUnit: (v: "g" | "count") => void;
   quantityInput: string;
@@ -1620,6 +1728,24 @@ function CustomFoodFields({
         placeholder="음식 이름"
         className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
       />
+
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+        {FOOD_CATEGORY_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => setCategory(opt.value)}
+            className={[
+              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold transition-colors",
+              category === opt.value
+                ? [color.border, color.bg, "text-zinc-950"].join(" ")
+                : "border-zinc-700 bg-zinc-800 text-zinc-400",
+            ].join(" ")}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
 
       <div className="flex gap-2">
         <div className="flex flex-1 rounded-xl border border-zinc-700 bg-zinc-800 p-1">
@@ -1671,6 +1797,7 @@ function CustomFoodFields({
 
 function useCustomFoodFormState(initial?: CustomFoodEntry) {
   const [name, setName] = useState(initial?.name ?? "");
+  const [category, setCategory] = useState<FoodCategory>(initial?.category ?? "general");
   const [unit, setUnit] = useState<"g" | "count">(initial?.unit ?? "g");
   const [quantityInput, setQuantityInput] = useState(initial?.quantity != null ? String(initial.quantity) : "");
   const [calorieInput, setCalorieInput] = useState(initial ? String(initial.totalCalorie) : "");
@@ -1685,13 +1812,14 @@ function useCustomFoodFormState(initial?: CustomFoodEntry) {
 
   function reset(entry?: CustomFoodEntry) {
     setName(entry?.name ?? "");
+    setCategory(entry?.category ?? "general");
     setUnit(entry?.unit ?? "g");
     setQuantityInput(entry?.quantity != null ? String(entry.quantity) : "");
     setCalorieInput(entry ? String(entry.totalCalorie) : "");
   }
 
   return {
-    name, setName, unit, setUnit, quantityInput, setQuantityInput, calorieInput, setCalorieInput,
+    name, setName, category, setCategory, unit, setUnit, quantityInput, setQuantityInput, calorieInput, setCalorieInput,
     quantity, totalCalorie, kcalPer100g, canSubmit, reset,
   };
 }
@@ -1701,7 +1829,7 @@ function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) 
 
   function handleAdd() {
     if (!f.canSubmit || f.totalCalorie === null) return;
-    onAdd({ name: f.name.trim(), unit: f.unit, quantity: f.quantity, totalCalorie: f.totalCalorie, kcalPer100g: f.kcalPer100g });
+    onAdd({ name: f.name.trim(), unit: f.unit, quantity: f.quantity, totalCalorie: f.totalCalorie, kcalPer100g: f.kcalPer100g, category: f.category });
     f.reset();
   }
 
@@ -1712,6 +1840,7 @@ function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) 
       <div className="mt-2 space-y-2">
         <CustomFoodFields
           name={f.name} setName={f.setName}
+          category={f.category} setCategory={f.setCategory}
           unit={f.unit} setUnit={f.setUnit}
           quantityInput={f.quantityInput} setQuantityInput={f.setQuantityInput}
           calorieInput={f.calorieInput} setCalorieInput={f.setCalorieInput}
@@ -1753,7 +1882,7 @@ function CustomFoodRow({
 
   function handleSave() {
     if (!f.canSubmit || f.totalCalorie === null) return;
-    onSave({ name: f.name.trim(), unit: f.unit, quantity: f.quantity, totalCalorie: f.totalCalorie, kcalPer100g: f.kcalPer100g });
+    onSave({ name: f.name.trim(), unit: f.unit, quantity: f.quantity, totalCalorie: f.totalCalorie, kcalPer100g: f.kcalPer100g, category: f.category });
     setEditing(false);
   }
 
@@ -1785,6 +1914,7 @@ function CustomFoodRow({
       <div className="space-y-2">
         <CustomFoodFields
           name={f.name} setName={f.setName}
+          category={f.category} setCategory={f.setCategory}
           unit={f.unit} setUnit={f.setUnit}
           quantityInput={f.quantityInput} setQuantityInput={f.setQuantityInput}
           calorieInput={f.calorieInput} setCalorieInput={f.setCalorieInput}
