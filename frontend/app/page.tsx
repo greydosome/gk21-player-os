@@ -366,6 +366,18 @@ function parseGeneralFoodItems(items: string[]): CustomFoodEntry[] {
   return items.map(decodeCustomFoodItem).filter((item): item is CustomFoodEntry => item !== null);
 }
 
+// 이름이 같은 항목이 여러 날짜에 걸쳐 반복될 수 있으므로, 가장 최근 값(먼저 나오는 항목)만 남긴다.
+function dedupeFoodHistoryByName(items: CustomFoodEntry[]): CustomFoodEntry[] {
+  const seen = new Set<string>();
+  const deduped: CustomFoodEntry[] = [];
+  items.forEach((item) => {
+    if (seen.has(item.name)) return;
+    seen.add(item.name);
+    deduped.push(item);
+  });
+  return deduped;
+}
+
 function round1(value: number | null) {
   return value === null || value === undefined ? "-" : Math.round(value * 10) / 10;
 }
@@ -488,6 +500,8 @@ export default function Home() {
   const [fatTarget, setFatTarget] = useState(DEFAULT_FAT_TARGET);
   const [supplementItems, setSupplementItems] = useState<Set<string>>(new Set());
   const [customMealItems, setCustomMealItems] = useState<CustomFoodEntry[]>([]);
+  const [foodHistory, setFoodHistory] = useState<CustomFoodEntry[]>([]);
+  const [foodHistoryQuery, setFoodHistoryQuery] = useState("");
   const [weightKg, setWeightKg] = useState<number | null>(null);
   const [weightTarget, setWeightTarget] = useState<number | null>(null);
   const [waterLiter, setWaterLiter] = useState(0);
@@ -513,6 +527,11 @@ export default function Home() {
     () => customMealItems.reduce((sum, item) => sum + item.totalCalorie, 0),
     [customMealItems]
   );
+  const filteredFoodHistory = useMemo(() => {
+    const query = foodHistoryQuery.trim();
+    if (!query) return foodHistory;
+    return foodHistory.filter((item) => item.name.includes(query));
+  }, [foodHistory, foodHistoryQuery]);
 
   const workoutDone = selectedWorkouts.size > 0 || customCardioWorkouts.length > 0;
   const todaySchedule = useMemo(() => scheduleFor(recordDate), [recordDate]);
@@ -771,6 +790,26 @@ export default function Home() {
       setCoachStatus("ready");
     }
   }
+
+  // 일반식 직접입력 히스토리는 날짜와 무관하게 한 번만 불러온다 (조회해서 선택하기용).
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/food-history", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        const decoded = parseGeneralFoodItems(data?.items ?? []);
+        setFoodHistory(dedupeFoodHistoryByName(decoded));
+      })
+      .catch(() => {
+        if (!cancelled) setFoodHistory([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // 날짜가 바뀌면 그 날짜의 기존 기록을 불러와서 폼을 채운다 (없으면 기본값으로 초기화).
   useEffect(() => {
@@ -1255,6 +1294,36 @@ export default function Home() {
                         onRemove={() => removeCustomMealItem(index)}
                       />
                     ))}
+
+                    {foodHistory.length > 0 && (
+                      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+                        <p className="text-xs font-bold text-zinc-400">이전에 입력한 음식에서 선택</p>
+                        <input
+                          value={foodHistoryQuery}
+                          onChange={(e) => setFoodHistoryQuery(e.target.value)}
+                          placeholder="음식 이름 검색"
+                          className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                        />
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {filteredFoodHistory.length === 0 ? (
+                            <p className="text-xs font-bold text-zinc-600">검색 결과가 없어요.</p>
+                          ) : (
+                            filteredFoodHistory.map((item) => (
+                              <button
+                                key={item.name}
+                                type="button"
+                                onClick={() => addCustomMealItem(item)}
+                                className="shrink-0 rounded-full border-2 border-zinc-700 bg-zinc-800 px-3.5 py-2 text-xs font-bold text-zinc-300"
+                              >
+                                {item.name} ·{" "}
+                                {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} · ` : ""}
+                                {item.totalCalorie}kcal
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     <CustomFoodForm onAdd={addCustomMealItem} />
                   </div>

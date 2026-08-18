@@ -4,6 +4,7 @@ from app.api import ai_analysis
 from app.api import dashboard
 from app.api import day
 from app.api import db
+from app.api import food_history
 from app.api import health
 from app.api import stats
 
@@ -18,3 +19,4 @@ app.include_router(day.router)
 app.include_router(ai_analysis.router)
 app.include_router(dashboard.router)
 app.include_router(stats.router)
+app.include_router(food_history.router)
