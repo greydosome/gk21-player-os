@@ -110,12 +110,12 @@ function scheduleFor(dateStr: string) {
   return WEEKLY_SCHEDULE[dayOfWeek];
 }
 
-type BlockColor = { border: string; borderSoft: string; bg: string };
+type BlockColor = { border: string; borderSoft: string; bg: string; text: string };
 
-const MONO_COLOR: BlockColor = { border: "border-zinc-400", borderSoft: "border-zinc-700", bg: "bg-white" };
-const DAILY_COLOR: BlockColor = MONO_COLOR;
-const DIET_COLOR: BlockColor = MONO_COLOR;
-const WORKOUT_COLOR: BlockColor = MONO_COLOR;
+// 세 섹션(데일리체크/식단/운동)을 한눈에 구분할 수 있도록 각자 고유 색을 준다.
+const DAILY_COLOR: BlockColor = { border: "border-cyan-500", borderSoft: "border-cyan-500/40", bg: "bg-cyan-500", text: "text-cyan-400" };
+const DIET_COLOR: BlockColor = { border: "border-yellow-500", borderSoft: "border-yellow-500/40", bg: "bg-yellow-500", text: "text-yellow-400" };
+const WORKOUT_COLOR: BlockColor = { border: "border-blue-500", borderSoft: "border-blue-500/40", bg: "bg-blue-500", text: "text-blue-400" };
 
 type FoodItem =
   | { label: string; mode: "gram"; kcalPer100g: number }
@@ -1096,7 +1096,7 @@ export default function Home() {
       <div className="mx-auto max-w-xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-2">
-            <h1 className="text-3xl font-black">🧤 GK21</h1>
+            <h1 className="text-2xl font-black">🧤 GK21</h1>
             <span className="text-sm font-bold text-red-100">{todaySchedule.dayLabel}</span>
           </div>
           <input
@@ -1592,7 +1592,9 @@ function Section({
           </span>
           <h2 className="text-base font-black text-zinc-100">{label}</h2>
         </div>
-        {subtitle && <span className="text-sm font-bold text-zinc-400">{subtitle}</span>}
+        {subtitle && (
+          <span className={[color ? color.text : "text-zinc-300", "text-lg font-black"].join(" ")}>{subtitle}</span>
+        )}
       </div>
       {children}
     </section>
