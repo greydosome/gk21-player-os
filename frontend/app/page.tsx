@@ -116,6 +116,11 @@ type BlockColor = { border: string; borderSoft: string; bg: string; text: string
 const DAILY_COLOR: BlockColor = { border: "border-cyan-500", borderSoft: "border-cyan-500/40", bg: "bg-cyan-500", text: "text-cyan-400" };
 const DIET_COLOR: BlockColor = { border: "border-yellow-500", borderSoft: "border-yellow-500/40", bg: "bg-yellow-500", text: "text-yellow-400" };
 const WORKOUT_COLOR: BlockColor = { border: "border-blue-500", borderSoft: "border-blue-500/40", bg: "bg-blue-500", text: "text-blue-400" };
+const CALORIE_COLOR: BlockColor = { border: "border-emerald-500", borderSoft: "border-emerald-500/40", bg: "bg-emerald-500", text: "text-emerald-400" };
+const OVER_BUDGET_COLOR: BlockColor = { border: "border-red-500", borderSoft: "border-red-500/40", bg: "bg-red-500", text: "text-red-400" };
+
+// 하루 섭취 가능 칼로리 상한. 식단 섹션에서 계산되는 총 섭취 칼로리와 비교해 잔여 칼로리를 보여준다.
+const DAILY_CALORIE_BUDGET = 1200;
 
 type FoodItem =
   | { label: string; mode: "gram"; kcalPer100g: number }
@@ -576,6 +581,7 @@ export default function Home() {
   const generalFoodKcal = useMemo(() => sumCustomKcal(customMealItems, "general"), [customMealItems]);
   const supplementCustomKcal = useMemo(() => sumCustomKcal(customMealItems, "supplement"), [customMealItems]);
   const totalDietKcal = proteinKcal + carbKcal + fatKcal + generalFoodKcal + supplementCustomKcal;
+  const remainingKcal = DAILY_CALORIE_BUDGET - totalDietKcal;
   const filteredFoodHistory = useMemo(() => {
     const query = foodHistoryQuery.trim();
     if (!query) return foodHistory;
@@ -1292,6 +1298,39 @@ export default function Home() {
                 >
                   {coachStatus === "loading" ? "코칭 받는 중..." : "🤖 AI 코칭 받기"}
                 </button>
+              </div>
+            </Section>
+
+            <Section
+              title="🔥 칼로리"
+              color={remainingKcal < 0 ? OVER_BUDGET_COLOR : CALORIE_COLOR}
+              subtitle={`${remainingKcal >= 0 ? remainingKcal : `-${Math.abs(remainingKcal)}`}kcal 남음`}
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-2xl bg-zinc-800 p-3">
+                  <p className="text-xs font-bold text-zinc-500">섭취 칼로리</p>
+                  <p className="mt-1 text-lg font-black text-zinc-100">{totalDietKcal}kcal</p>
+                </div>
+                <div className="rounded-2xl bg-zinc-800 p-3">
+                  <p className="text-xs font-bold text-zinc-500">잔여 칼로리 / 목표 {DAILY_CALORIE_BUDGET}kcal</p>
+                  <p
+                    className={[
+                      "mt-1 text-lg font-black",
+                      remainingKcal < 0 ? OVER_BUDGET_COLOR.text : "text-zinc-100",
+                    ].join(" ")}
+                  >
+                    {remainingKcal}kcal
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className={[
+                    "h-full rounded-full transition-all",
+                    remainingKcal < 0 ? OVER_BUDGET_COLOR.bg : CALORIE_COLOR.bg,
+                  ].join(" ")}
+                  style={{ width: `${Math.min(100, Math.round((totalDietKcal / DAILY_CALORIE_BUDGET) * 100))}%` }}
+                />
               </div>
             </Section>
 
