@@ -1246,7 +1246,7 @@ export default function Home() {
           </section>
         ) : (
           <>
-            <Section title="📋 데일리 체크" color={DAILY_COLOR} collapsible>
+            <Section title="📋 데일리 체크" color={DAILY_COLOR} collapsible defaultOpen={false}>
               <div className="space-y-4">
                 <CollapsibleBlock title="⚡ 빠른 체크">
                   <div className="flex gap-2 overflow-x-auto pb-1">
