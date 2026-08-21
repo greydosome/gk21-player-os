@@ -151,6 +151,41 @@ def get_ai_context(target_date: date):
 
         ).mappings().first()
 
+        # 최근 30일간 실제로 수행한 운동을 종류별로 집계한다. workout_comment에서
+        # "어떤 운동이 부족한지"를 구체적으로 짚어주려면 done/not-done 여부만으로는
+        # 부족하고, 부위/종목별 빈도가 필요하다.
+        workout_type_history = conn.execute(
+
+            text("""
+
+                SELECT
+
+                    wi.workout_type,
+
+                    SUM(wi.minutes) AS total_minutes,
+
+                    COUNT(*) AS sessions,
+
+                    MAX(dr.record_date) AS last_done
+
+                FROM workout_item wi
+
+                JOIN day_record dr ON dr.day_record_id = wi.day_record_id
+
+                WHERE dr.record_date <= :record_date
+
+                  AND dr.record_date > :record_date - INTERVAL '30 days'
+
+                GROUP BY wi.workout_type
+
+                ORDER BY total_minutes DESC
+
+            """),
+
+            {"record_date": target_date}
+
+        ).mappings().all()
+
     context = {
 
         "target_date": str(target_date),
@@ -158,6 +193,8 @@ def get_ai_context(target_date: date):
         "today": dict(today) if today else {},
 
         "history": [dict(row) for row in history],
+
+        "workout_type_history": [dict(row) for row in workout_type_history],
 
         "profile": dict(profile) if profile else {},
 

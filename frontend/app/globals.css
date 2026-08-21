@@ -24,3 +24,34 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+ * 라이트 테마: zinc 팔레트를 그대로 반전(950 <-> 50, 900 <-> 100, ...)시켜서
+ * 앱 전체에 흩어진 zinc 계열 배경/글자/테두리 유틸리티가 코드 수정 없이
+ * 자동으로 밝은 톤으로 바뀌도록 한다. 다크 모드는 Tailwind 기본값을 그대로 쓴다.
+ *
+ * --pop-bg / --pop-fg는 "현재 배경과 가장 대비되는 강조색"(선택된 뱃지/탭 등)으로,
+ * 다크에서는 흰 배경+검정 글씨, 라이트에서는 검정 배경+흰 글씨가 되어야 하므로
+ * zinc 스케일과 별도로 관리한다.
+ */
+:root {
+  --pop-bg: #ffffff;
+  --pop-fg: oklch(14.1% 0.005 285.823);
+}
+
+[data-theme="light"] {
+  --color-zinc-50: oklch(14.1% 0.005 285.823);
+  --color-zinc-100: oklch(21% 0.006 285.885);
+  --color-zinc-200: oklch(27.4% 0.006 286.033);
+  --color-zinc-300: oklch(37% 0.013 285.805);
+  --color-zinc-400: oklch(44.2% 0.017 285.786);
+  --color-zinc-500: oklch(55.2% 0.016 285.938);
+  --color-zinc-600: oklch(70.5% 0.015 286.067);
+  --color-zinc-700: oklch(87.1% 0.006 286.286);
+  --color-zinc-800: oklch(92% 0.004 286.32);
+  --color-zinc-900: oklch(96.7% 0.001 286.375);
+  --color-zinc-950: oklch(98.5% 0 0);
+
+  --pop-bg: oklch(14.1% 0.005 285.823);
+  --pop-fg: oklch(98.5% 0 0);
+}

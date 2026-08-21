@@ -113,7 +113,7 @@ function scheduleFor(dateStr: string) {
 type BlockColor = { border: string; borderSoft: string; bg: string; text: string };
 
 // 세 섹션(데일리체크/식단/운동)을 한눈에 구분할 수 있도록 각자 고유 색을 준다.
-const DAILY_COLOR: BlockColor = { border: "border-cyan-500", borderSoft: "border-cyan-500/40", bg: "bg-cyan-500", text: "text-cyan-400" };
+const DAILY_COLOR: BlockColor = { border: "border-zinc-500", borderSoft: "border-zinc-600/40", bg: "bg-zinc-500", text: "text-zinc-400" };
 const DIET_COLOR: BlockColor = { border: "border-yellow-500", borderSoft: "border-yellow-500/40", bg: "bg-yellow-500", text: "text-yellow-400" };
 const WORKOUT_COLOR: BlockColor = { border: "border-blue-500", borderSoft: "border-blue-500/40", bg: "bg-blue-500", text: "text-blue-400" };
 const CALORIE_COLOR: BlockColor = { border: "border-emerald-500", borderSoft: "border-emerald-500/40", bg: "bg-emerald-500", text: "text-emerald-400" };
@@ -121,6 +121,10 @@ const OVER_BUDGET_COLOR: BlockColor = { border: "border-red-500", borderSoft: "b
 
 // 하루 섭취 가능 칼로리 상한. 식단 섹션에서 계산되는 총 섭취 칼로리와 비교해 잔여 칼로리를 보여준다.
 const DAILY_CALORIE_BUDGET = 1200;
+
+// 다크/라이트 두 테마 모두에서 "가장 눈에 띄는 강조색"이 되도록 테마에 따라 반전되는 색.
+// (다크: 흰 배경 + 검정 글씨, 라이트: 검정 배경 + 흰 글씨) — globals.css의 --pop-bg/--pop-fg 참고.
+const DAY_BADGE_ACTIVE_CLASS = "border-[var(--pop-bg)] bg-[var(--pop-bg)] text-[var(--pop-fg)]";
 
 type FoodItem =
   | { label: string; mode: "gram"; kcalPer100g: number }
@@ -531,6 +535,18 @@ export default function Home() {
   const loadedDateRef = useRef<string | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 테마: 기본은 검은색(dark), localStorage에 저장해 다음 방문에도 유지한다.
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("gk21-theme");
+    if (saved === "light" || saved === "dark") setTheme(saved);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("gk21-theme", theme);
+  }, [theme]);
+
   const [recordDate, setRecordDate] = useState(today());
   const [dataReady, setDataReady] = useState(false);
   const [morningMed, setMorningMed] = useState(false);
@@ -560,6 +576,8 @@ export default function Home() {
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [coachStatus, setCoachStatus] = useState<"idle" | "loading" | "ready">("idle");
   const [coachText, setCoachText] = useState("");
+  const [coachWorkoutText, setCoachWorkoutText] = useState("");
+  const [coachMealText, setCoachMealText] = useState("");
 
   const [view, setView] = useState<"today" | "week" | "month">("today");
   const [stats, setStats] = useState<PeriodStats | null>(null);
@@ -664,17 +682,15 @@ export default function Home() {
     eveningMed,
   ]);
 
-  const dietGood =
-    proteinKcal >= proteinTarget * 0.75 &&
-    carbKcal >= carbTarget * 0.75 &&
-    fatKcal >= fatTarget * 0.75;
+  // 목표치 달성이 아니라 "하나라도 체크/기록했는지"를 기준으로 성공 여부를 판단한다.
+  const dietGood = totalDietKcal > 0;
 
   const dayBadges = [
-    { key: "workout", icon: "🏋", label: "운동", good: workoutDone, activeClass: "border-white bg-white text-zinc-950" },
-    { key: "diet", icon: "🍱", label: "식단", good: dietGood, activeClass: "border-white bg-white text-zinc-950" },
-    { key: "water", icon: "💧", label: "물", good: waterLiter >= waterTarget, activeClass: "border-white bg-white text-zinc-950" },
-    { key: "sleep", icon: "😴", label: "수면", good: sleepHours >= SLEEP_TARGET, activeClass: "border-white bg-white text-zinc-950" },
-    { key: "med", icon: "💊", label: "복약", good: morningMed && eveningMed, activeClass: "border-white bg-white text-zinc-950" },
+    { key: "workout", icon: "🏋", label: "운동", good: workoutDone, activeClass: DAY_BADGE_ACTIVE_CLASS },
+    { key: "diet", icon: "🍱", label: "식단", good: dietGood, activeClass: DAY_BADGE_ACTIVE_CLASS },
+    { key: "water", icon: "💧", label: "물", good: waterLiter > 0, activeClass: DAY_BADGE_ACTIVE_CLASS },
+    { key: "sleep", icon: "😴", label: "수면", good: sleepHours > 0, activeClass: DAY_BADGE_ACTIVE_CLASS },
+    { key: "med", icon: "💊", label: "복약", good: morningMed || eveningMed, activeClass: DAY_BADGE_ACTIVE_CLASS },
   ];
 
   function toggleWorkout(type: string, defaultMinutes: number) {
@@ -840,6 +856,8 @@ export default function Home() {
       const text = ai?.cards?.coach ?? ai?.summary;
 
       if (text) setCoachText(text);
+      if (ai?.comments?.workout) setCoachWorkoutText(ai.comments.workout);
+      if (ai?.comments?.meal) setCoachMealText(ai.comments.meal);
 
       if (ai?.overview?.status === "COMPLETED" || attemptsLeft <= 0) {
         setCoachStatus("ready");
@@ -1046,6 +1064,8 @@ export default function Home() {
   async function requestCoaching() {
     setCoachStatus("loading");
     setCoachText("");
+    setCoachWorkoutText("");
+    setCoachMealText("");
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
     try {
@@ -1098,19 +1118,29 @@ export default function Home() {
   }, [view, recordDate]);
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-8 text-zinc-100">
+    <main data-theme={theme} className="min-h-screen bg-zinc-950 pb-8 text-zinc-100 transition-colors duration-300">
       <div className="mx-auto max-w-xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-2">
             <h1 className="text-2xl font-black">🧤 GK21</h1>
-            <span className="text-sm font-bold text-red-100">{todaySchedule.dayLabel}</span>
+            <span className="text-sm font-bold text-red-400">{todaySchedule.dayLabel}</span>
           </div>
-          <input
-            type="date"
-            value={recordDate}
-            onChange={(e) => setRecordDate(e.target.value)}
-            className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-bold text-zinc-100"
-          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-zinc-700 bg-zinc-900 text-base"
+              aria-label={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
+            >
+              {theme === "dark" ? "🌙" : "☀️"}
+            </button>
+            <input
+              type="date"
+              value={recordDate}
+              onChange={(e) => setRecordDate(e.target.value)}
+              className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-bold text-zinc-100"
+            />
+          </div>
         </div>
 
         <section
@@ -1173,9 +1203,7 @@ export default function Home() {
               onClick={() => setView(tab.key)}
               className={[
                 "rounded-2xl border-2 py-2.5 text-sm font-black transition-colors",
-                view === tab.key
-                  ? "border-white bg-white text-zinc-950"
-                  : "border-zinc-800 bg-zinc-900 text-zinc-400",
+                view === tab.key ? DAY_BADGE_ACTIVE_CLASS : "border-zinc-800 bg-zinc-900 text-zinc-400",
               ].join(" ")}
             >
               {tab.label}
@@ -1219,7 +1247,7 @@ export default function Home() {
           </section>
         ) : (
           <>
-            <Section title="📋 데일리 체크" color={DAILY_COLOR}>
+            <Section title="📋 데일리 체크" color={DAILY_COLOR} collapsible>
               <div className="space-y-4">
                 <CollapsibleBlock title="⚡ 빠른 체크">
                   <div className="flex gap-2 overflow-x-auto pb-1">
@@ -1592,9 +1620,26 @@ export default function Home() {
                 <h2 className="text-lg font-black text-zinc-100">🤖 AI 코치</h2>
                 <p className="mt-3 font-bold leading-relaxed text-zinc-100">
                   {coachStatus === "loading" && !coachText
-                    ? "코치가 오늘 하루를 분석하고 있습니다..."
+                    ? "코치가 오늘 운동/식단을 분석하고 있습니다..."
                     : coachText}
                 </p>
+
+                {(coachWorkoutText || coachMealText) && (
+                  <div className="mt-4 space-y-3 border-t border-zinc-800 pt-4">
+                    {coachWorkoutText && (
+                      <div>
+                        <p className="text-xs font-black text-blue-400">🏋 운동</p>
+                        <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">{coachWorkoutText}</p>
+                      </div>
+                    )}
+                    {coachMealText && (
+                      <div>
+                        <p className="text-xs font-black text-yellow-400">🍱 식단</p>
+                        <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">{coachMealText}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </section>
             )}
           </>
@@ -1608,15 +1653,28 @@ function Section({
   title,
   color,
   subtitle,
+  collapsible = false,
+  defaultOpen = true,
   children,
 }: {
   title: string;
   color?: BlockColor;
   subtitle?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
   const [icon, ...rest] = title.split(" ");
   const label = rest.join(" ");
+  const [open, setOpen] = useState(defaultOpen);
+  const showBody = !collapsible || open;
+
+  const header = (
+    <div className="flex items-center gap-2">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-zinc-800 text-base">{icon}</span>
+      <h2 className="text-base font-black text-zinc-100">{label}</h2>
+    </div>
+  );
 
   return (
     <section
@@ -1624,18 +1682,31 @@ function Section({
         " "
       )}
     >
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-zinc-800 text-base">
-            {icon}
-          </span>
-          <h2 className="text-base font-black text-zinc-100">{label}</h2>
-        </div>
-        {subtitle && (
-          <span className={[color ? color.text : "text-zinc-300", "text-lg font-black"].join(" ")}>{subtitle}</span>
+      <div className={["flex items-center justify-between gap-2", showBody ? "mb-3" : ""].join(" ")}>
+        {collapsible ? (
+          <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 text-left">
+            {header}
+          </button>
+        ) : (
+          header
         )}
+        <div className="flex items-center gap-2">
+          {subtitle && (
+            <span className={[color ? color.text : "text-zinc-300", "text-lg font-black"].join(" ")}>{subtitle}</span>
+          )}
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-zinc-800 text-xs font-bold text-zinc-400"
+              aria-label={open ? "접기" : "펼치기"}
+            >
+              {open ? "▲" : "▼"}
+            </button>
+          )}
+        </div>
       </div>
-      {children}
+      {showBody && children}
     </section>
   );
 }
@@ -2282,7 +2353,7 @@ function WorkoutDots({ data, dates }: { data: (boolean | null)[]; dates: string[
             title={dates[i]}
             className={[
               "h-6 flex-1 rounded-full",
-              done === true ? "bg-white" : done === false ? "bg-zinc-700" : "bg-zinc-900",
+              done === true ? "bg-[var(--pop-bg)]" : done === false ? "bg-zinc-700" : "bg-zinc-900",
             ].join(" ")}
           />
         ))}
