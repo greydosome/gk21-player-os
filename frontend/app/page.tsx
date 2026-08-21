@@ -118,6 +118,7 @@ const DIET_COLOR: BlockColor = { border: "border-yellow-500", borderSoft: "borde
 const WORKOUT_COLOR: BlockColor = { border: "border-blue-500", borderSoft: "border-blue-500/40", bg: "bg-blue-500", text: "text-blue-400" };
 const CALORIE_COLOR: BlockColor = { border: "border-emerald-500", borderSoft: "border-emerald-500/40", bg: "bg-emerald-500", text: "text-emerald-400" };
 const OVER_BUDGET_COLOR: BlockColor = { border: "border-red-500", borderSoft: "border-red-500/40", bg: "bg-red-500", text: "text-red-400" };
+const AI_COLOR: BlockColor = { border: "border-violet-500", borderSoft: "border-violet-500/40", bg: "bg-violet-500", text: "text-violet-400" };
 
 // 하루 섭취 가능 칼로리 상한. 식단 섹션에서 계산되는 총 섭취 칼로리와 비교해 잔여 칼로리를 보여준다.
 const DAILY_CALORIE_BUDGET = 1200;
@@ -1120,12 +1121,9 @@ export default function Home() {
   return (
     <main data-theme={theme} className="min-h-screen bg-zinc-950 pb-8 text-zinc-100 transition-colors duration-300">
       <div className="mx-auto max-w-xl p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-baseline gap-2">
-            <h1 className="text-2xl font-black">🧤 GK21</h1>
-            <span className="text-sm font-bold text-red-400">{todaySchedule.dayLabel}</span>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="shrink-0 text-2xl font-black">🧤 GK21</h1>
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
@@ -1142,6 +1140,7 @@ export default function Home() {
             />
           </div>
         </div>
+        <p className="mt-1 truncate text-sm font-bold text-red-400">{todaySchedule.dayLabel}</p>
 
         <section
           className={[
@@ -1317,15 +1316,6 @@ export default function Home() {
                     ))}
                   </div>
                 </CollapsibleBlock>
-
-                <button
-                  type="button"
-                  onClick={requestCoaching}
-                  disabled={coachStatus === "loading"}
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-800 py-2 text-xs font-black text-zinc-100 disabled:opacity-50"
-                >
-                  {coachStatus === "loading" ? "코칭 받는 중..." : "🤖 AI 코칭 받기"}
-                </button>
               </div>
             </Section>
 
@@ -1615,33 +1605,43 @@ export default function Home() {
               {autoSaveStatus === "saved" && "✓ 자동 저장됨"}
             </p>
 
-            {coachStatus !== "idle" && (
-              <section className="mt-3 rounded-3xl border border-zinc-700 bg-zinc-900 p-6 shadow-lg">
-                <h2 className="text-lg font-black text-zinc-100">🤖 AI 코치</h2>
-                <p className="mt-3 font-bold leading-relaxed text-zinc-100">
-                  {coachStatus === "loading" && !coachText
-                    ? "코치가 오늘 운동/식단을 분석하고 있습니다..."
-                    : coachText}
-                </p>
+            <Section title="🤖 AI 코치" color={AI_COLOR}>
+              <button
+                type="button"
+                onClick={requestCoaching}
+                disabled={coachStatus === "loading"}
+                className="w-full rounded-xl border border-zinc-700 bg-zinc-800 py-2 text-xs font-black text-zinc-100 disabled:opacity-50"
+              >
+                {coachStatus === "loading" ? "코칭 받는 중..." : "🤖 AI 코칭 받기"}
+              </button>
 
-                {(coachWorkoutText || coachMealText) && (
-                  <div className="mt-4 space-y-3 border-t border-zinc-800 pt-4">
-                    {coachWorkoutText && (
-                      <div>
-                        <p className="text-xs font-black text-blue-400">🏋 운동</p>
-                        <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">{coachWorkoutText}</p>
-                      </div>
-                    )}
-                    {coachMealText && (
-                      <div>
-                        <p className="text-xs font-black text-yellow-400">🍱 식단</p>
-                        <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">{coachMealText}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </section>
-            )}
+              {coachStatus !== "idle" && (
+                <div className="mt-4 border-t border-zinc-800 pt-4">
+                  <p className="font-bold leading-relaxed text-zinc-100">
+                    {coachStatus === "loading" && !coachText
+                      ? "코치가 오늘 운동/식단을 분석하고 있습니다..."
+                      : coachText}
+                  </p>
+
+                  {(coachWorkoutText || coachMealText) && (
+                    <div className="mt-4 space-y-3 border-t border-zinc-800 pt-4">
+                      {coachWorkoutText && (
+                        <div>
+                          <p className="text-xs font-black text-blue-400">🏋 운동</p>
+                          <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">{coachWorkoutText}</p>
+                        </div>
+                      )}
+                      {coachMealText && (
+                        <div>
+                          <p className="text-xs font-black text-yellow-400">🍱 식단</p>
+                          <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">{coachMealText}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </Section>
           </>
         )}
       </div>
