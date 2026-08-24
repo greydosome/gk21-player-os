@@ -124,22 +124,35 @@ type BlockColor = { border: string; borderSoft: string; bg: string; text: string
 
 // 세 섹션(데일리체크/식단/운동)을 한눈에 구분할 수 있도록 각자 고유 색을 준다.
 const DAILY_COLOR: BlockColor = { border: "border-zinc-500", borderSoft: "border-zinc-600/40", bg: "bg-zinc-500", text: "text-zinc-400" };
+// 식단(amber)은 5개 팔레트 전부 동일한 값이라 팔레트 대응 없이 고정 Tailwind 클래스를 쓴다.
 const DIET_COLOR: BlockColor = { border: "border-yellow-500", borderSoft: "border-yellow-500/40", bg: "bg-yellow-500", text: "text-yellow-400" };
-// 운동/AI 코치는 팔레트의 시그니처 강조색(--accent-secondary/--accent-primary)을 쓴다.
-// 칼로리(emerald)/식단(amber)은 기능색이라 팔레트가 바뀌어도 고정한다.
+// 운동은 팔레트의 Secondary 색을 쓴다.
 const WORKOUT_COLOR: BlockColor = {
   border: "border-[var(--accent-secondary)]",
   borderSoft: "border-[var(--accent-secondary)]/40",
   bg: "bg-[var(--accent-secondary)]",
   text: "text-[var(--accent-secondary)]",
 };
-const CALORIE_COLOR: BlockColor = { border: "border-emerald-500", borderSoft: "border-emerald-500/40", bg: "bg-emerald-500", text: "text-emerald-400" };
-const OVER_BUDGET_COLOR: BlockColor = { border: "border-red-500", borderSoft: "border-red-500/40", bg: "bg-red-500", text: "text-red-400" };
+// 칼로리는 팔레트의 Primary 색을 쓴다("기본" 팔레트에서는 기존 emerald 그대로).
+const CALORIE_COLOR: BlockColor = {
+  border: "border-[var(--accent-calorie)]",
+  borderSoft: "border-[var(--accent-calorie)]/40",
+  bg: "bg-[var(--accent-calorie)]",
+  text: "text-[var(--accent-calorie)]",
+};
+// 잔여 칼로리 초과 등 위험 상태는 팔레트의 Danger 색을 쓴다.
+const OVER_BUDGET_COLOR: BlockColor = {
+  border: "border-[var(--accent-danger)]",
+  borderSoft: "border-[var(--accent-danger)]/40",
+  bg: "bg-[var(--accent-danger)]",
+  text: "text-[var(--accent-danger)]",
+};
+// AI 코치는 팔레트의 Success 색을 쓴다("기본" 팔레트에서는 기존 violet 그대로).
 const AI_COLOR: BlockColor = {
-  border: "border-[var(--accent-primary)]",
-  borderSoft: "border-[var(--accent-primary)]/40",
-  bg: "bg-[var(--accent-primary)]",
-  text: "text-[var(--accent-primary)]",
+  border: "border-[var(--accent-ai)]",
+  borderSoft: "border-[var(--accent-ai)]/40",
+  bg: "bg-[var(--accent-ai)]",
+  text: "text-[var(--accent-ai)]",
 };
 
 // 하루 섭취 가능 칼로리 상한. 식단 섹션에서 계산되는 총 섭취 칼로리와 비교해 잔여 칼로리를 보여준다.
