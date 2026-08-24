@@ -1164,7 +1164,10 @@ export default function Home() {
     <main data-theme={theme} className="min-h-screen bg-zinc-950 pb-8 text-zinc-100 transition-colors duration-300">
       <div className="mx-auto max-w-xl p-4">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="shrink-0 text-2xl font-black">🧤 GK21</h1>
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h1 className="shrink-0 text-2xl font-black">🧤 GK21</h1>
+            <span className="truncate text-sm font-bold text-zinc-400">{todaySchedule.dayLabel}</span>
+          </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
@@ -1182,7 +1185,6 @@ export default function Home() {
             />
           </div>
         </div>
-        <p className="mt-1 truncate text-sm font-bold text-red-400">{todaySchedule.dayLabel}</p>
 
         <section
           className={[
@@ -1472,6 +1474,7 @@ export default function Home() {
                           item={item}
                           color={DIET_COLOR}
                           compact
+                          small
                           onSave={(entry) => updateCustomMealItem(index, entry)}
                           onRemove={() => removeCustomMealItem(index)}
                         />
@@ -2024,12 +2027,14 @@ function CustomFoodRow({
   onSave,
   onRemove,
   compact = false,
+  small = false,
 }: {
   item: CustomFoodEntry;
   color: BlockColor;
   onSave: (entry: CustomFoodEntry) => void;
   onRemove: () => void;
   compact?: boolean;
+  small?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const f = useCustomFoodFormState(item);
@@ -2051,7 +2056,11 @@ function CustomFoodRow({
       <button
         type="button"
         onClick={startEdit}
-        className={["inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 bg-zinc-800 px-4 py-2.5 text-sm font-bold text-zinc-100", color.border].join(" ")}
+        className={[
+          "inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 bg-zinc-800 font-bold text-zinc-100",
+          small ? "px-3 py-1.5 text-xs" : "px-4 py-2.5 text-sm",
+          color.border,
+        ].join(" ")}
       >
         <span>
           {item.name} · {item.totalCalorie}kcal
