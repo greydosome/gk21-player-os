@@ -1397,7 +1397,7 @@ export default function Home() {
                   title={supplementCustomKcal > 0 ? `🫐 보충음식 · ${supplementCustomKcal}kcal` : "🫐 보충음식"}
                 >
                   <div className="space-y-3">
-                    <div className="flex gap-2 overflow-x-auto pb-1">
+                    <div className="flex flex-wrap gap-2">
                       {SUPPLEMENT_FOODS.map((food) => (
                         <Chip
                           key={food.label}
@@ -1407,31 +1407,34 @@ export default function Home() {
                           color={DIET_COLOR}
                         />
                       ))}
+                      {customEntriesByCategory(customMealItems, "supplement").map(({ item, index }) => (
+                        <CustomFoodRow
+                          key={`${item.name}-${index}`}
+                          item={item}
+                          color={DIET_COLOR}
+                          compact
+                          onSave={(entry) => updateCustomMealItem(index, entry)}
+                          onRemove={() => removeCustomMealItem(index)}
+                        />
+                      ))}
                     </div>
-
-                    {customEntriesByCategory(customMealItems, "supplement").map(({ item, index }) => (
-                      <CustomFoodRow
-                        key={`${item.name}-${index}`}
-                        item={item}
-                        color={DIET_COLOR}
-                        onSave={(entry) => updateCustomMealItem(index, entry)}
-                        onRemove={() => removeCustomMealItem(index)}
-                      />
-                    ))}
                   </div>
                 </CollapsibleBlock>
 
                 <CollapsibleBlock title={`🍽 일반식 · ${generalFoodKcal}kcal`}>
                   <div className="space-y-3">
-                    {customEntriesByCategory(customMealItems, "general").map(({ item, index }) => (
-                      <CustomFoodRow
-                        key={`${item.name}-${index}`}
-                        item={item}
-                        color={DIET_COLOR}
-                        onSave={(entry) => updateCustomMealItem(index, entry)}
-                        onRemove={() => removeCustomMealItem(index)}
-                      />
-                    ))}
+                    <div className="flex flex-wrap gap-2">
+                      {customEntriesByCategory(customMealItems, "general").map(({ item, index }) => (
+                        <CustomFoodRow
+                          key={`${item.name}-${index}`}
+                          item={item}
+                          color={DIET_COLOR}
+                          compact
+                          onSave={(entry) => updateCustomMealItem(index, entry)}
+                          onRemove={() => removeCustomMealItem(index)}
+                        />
+                      ))}
+                    </div>
 
                     {foodHistory.length > 0 && (
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
@@ -1978,11 +1981,13 @@ function CustomFoodRow({
   color,
   onSave,
   onRemove,
+  compact = false,
 }: {
   item: CustomFoodEntry;
   color: BlockColor;
   onSave: (entry: CustomFoodEntry) => void;
   onRemove: () => void;
+  compact?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const f = useCustomFoodFormState(item);
@@ -1996,6 +2001,32 @@ function CustomFoodRow({
     if (!f.canSubmit || f.totalCalorie === null) return;
     onSave({ name: f.name.trim(), unit: f.unit, quantity: f.quantity, totalCalorie: f.totalCalorie, kcalPer100g: f.kcalPer100g, category: f.category });
     setEditing(false);
+  }
+
+  if (!editing && compact) {
+    // 보충음식/일반식은 카탈로그가 칩(Chip) 형태라, 직접입력 항목도 같은 크기의 칩으로 보여준다.
+    return (
+      <button
+        type="button"
+        onClick={startEdit}
+        className={["inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 bg-zinc-800 px-4 py-2.5 text-sm font-bold text-zinc-100", color.border].join(" ")}
+      >
+        <span>
+          {item.name} · {item.totalCalorie}kcal
+        </span>
+        <span
+          role="button"
+          tabIndex={-1}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="text-zinc-400"
+        >
+          ✕
+        </span>
+      </button>
+    );
   }
 
   if (!editing) {
@@ -2022,7 +2053,7 @@ function CustomFoodRow({
   }
 
   return (
-    <div className={["rounded-2xl border-2 bg-zinc-900 p-3", color.border].join(" ")}>
+    <div className={["rounded-2xl border-2 bg-zinc-900 p-3", compact ? "w-full" : "", color.border].join(" ")}>
       <div className="space-y-2">
         <CustomFoodFields
           name={f.name} setName={f.setName}
