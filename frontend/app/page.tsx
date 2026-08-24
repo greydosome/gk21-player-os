@@ -78,6 +78,16 @@ const WORKOUT_TYPES: WorkoutType[] = [
   },
   { label: "자전거", category: "cardio", kcalPerMin: 7, defaultMinutes: 30 },
   { label: "계단 오르기", category: "cardio", kcalPerMin: 10, defaultMinutes: 20 },
+  // 30분 기준 200kcal/180kcal로 거의 매일 하는 기본 유산소라 매일 기본 선택되도록 한다
+  // (DEFAULT_SELECTED_WORKOUTS 참고).
+  { label: "인클라인 워킹", category: "cardio", kcalPerMin: 200 / 30, defaultMinutes: 30 },
+  { label: "스텝퍼", category: "cardio", kcalPerMin: 180 / 30, defaultMinutes: 30 },
+];
+
+// 기록이 하나도 없는 새 날짜를 열었을 때 기본으로 체크되어 있을 운동들.
+const DEFAULT_SELECTED_WORKOUTS: { label: string; minutes: number }[] = [
+  { label: "인클라인 워킹", minutes: 30 },
+  { label: "스텝퍼", minutes: 30 },
 ];
 
 // 0=일 1=월 2=화 3=수 4=목 5=금 6=토 (Bible 주간 일정 기준)
@@ -978,6 +988,14 @@ export default function Home() {
             }
           }
         );
+
+        // 그 날짜에 기록된 운동이 하나도 없는 완전히 새 날짜라면, 거의 매일 하는
+        // 기본 유산소(인클라인 워킹/스텝퍼)를 기본 선택 상태로 미리 체크해둔다.
+        if ((detail?.workout_items ?? []).length === 0) {
+          DEFAULT_SELECTED_WORKOUTS.forEach((w) => {
+            workoutMap.set(w.label, { minutes: w.minutes, details: new Set() });
+          });
+        }
 
         const proteinMap = parseFoodItems(detail?.protein_items ?? []);
         const carbMap = parseFoodItems(detail?.carb_items ?? []);
@@ -1944,7 +1962,7 @@ function CustomFoodFields({
           value={calorieInput}
           onChange={(e) => setCalorieInput(e.target.value)}
           placeholder="총 칼로리 (kcal)"
-          className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
         />
         <div className="shrink-0 rounded-xl bg-zinc-800 px-3 py-2 text-right">
           <p className="text-[10px] font-bold text-zinc-500">100g당</p>
@@ -2063,7 +2081,9 @@ function CustomFoodRow({
         ].join(" ")}
       >
         <span>
-          {item.name} · {item.totalCalorie}kcal
+          {/* 단백질/탄수화물/지방/보충음식으로 분류된 항목은 각 블럭 제목 옆에 이미 합계 kcal이
+              표시되므로 칩에는 이름만 보여준다. 미분류(일반식)일 때만 개별 kcal도 같이 보여준다. */}
+          {item.category === "general" ? `${item.name} · ${item.totalCalorie}kcal` : item.name}
         </span>
         <span
           role="button"
@@ -2094,11 +2114,13 @@ function CustomFoodRow({
             </button>
           </div>
         </div>
-        <p className="mt-1 text-sm font-bold text-zinc-100">
-          {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} / ` : ""}
-          {item.totalCalorie}kcal
-          {item.kcalPer100g !== null ? ` · 100g당 ${item.kcalPer100g}kcal` : ""}
-        </p>
+        {item.category === "general" && (
+          <p className="mt-1 text-sm font-bold text-zinc-100">
+            {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} / ` : ""}
+            {item.totalCalorie}kcal
+            {item.kcalPer100g !== null ? ` · 100g당 ${item.kcalPer100g}kcal` : ""}
+          </p>
+        )}
       </div>
     );
   }
@@ -2171,7 +2193,7 @@ function CustomWorkoutFields({
           value={minutesInput}
           onChange={(e) => setMinutesInput(e.target.value)}
           placeholder="시간 (분)"
-          className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
         />
         <input
           type="number"
@@ -2180,7 +2202,7 @@ function CustomWorkoutFields({
           value={calorieInput}
           onChange={(e) => setCalorieInput(e.target.value)}
           placeholder="소모 칼로리(kcal)"
-          className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
         />
       </div>
     </>
