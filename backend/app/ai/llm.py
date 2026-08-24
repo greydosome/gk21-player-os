@@ -7,6 +7,25 @@ from openai import OpenAI
 
 from app.core.config import settings
 
+# 호출마다 새 OpenAI()를 만들면 매번 새 커넥션 풀/TLS 핸드셰이크가 발생한다.
+# 클라이언트를 한 번만 만들어 재사용하고, 응답이 멈춰도 백그라운드 스레드가
+# 무한정 블로킹되지 않도록 명시적 timeout을 둔다.
+_client: OpenAI | None = None
+
+
+def _get_client() -> OpenAI:
+    global _client
+
+    if _client is None:
+        _client = OpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            timeout=30.0,
+            max_retries=2,
+        )
+
+    return _client
+
+
 def _clean_json_text(text: str):
 
     cleaned = text.strip()
@@ -37,11 +56,7 @@ def call_ai(prompt: str):
 
     started = time.time()
 
-    client = OpenAI(
-
-        api_key=settings.OPENAI_API_KEY
-
-    )
+    client = _get_client()
 
     response = client.responses.create(
 

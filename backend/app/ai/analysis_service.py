@@ -11,7 +11,7 @@ from app.db.session import engine
 
 
 def generate_daily_rule_analysis(conn, day_record_id, record_date):
-    context = get_ai_context(record_date)
+    context = get_ai_context(record_date, conn=conn)
     metrics = calculate_ai_metrics(context)
     rule_analysis = build_daily_rule_analysis(context, metrics)
 

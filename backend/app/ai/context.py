@@ -1,4 +1,6 @@
 
+from contextlib import nullcontext
+
 from datetime import date
 
 from sqlalchemy import text
@@ -7,9 +9,13 @@ from app.ai.progress import calculate_goal_progress
 
 from app.db.session import engine
 
-def get_ai_context(target_date: date):
+def get_ai_context(target_date: date, conn=None):
 
-    with engine.connect() as conn:
+    # save_day()처럼 이미 열려있는 트랜잭션 안에서 호출될 때는 그 conn을 그대로 재사용해
+    # 커넥션 풀을 추가로 점유하거나(같은 요청에서 커넥션 2개), 아직 커밋되지 않은 방금 쓴
+    # 데이터를 별도 커넥션이 못 보는 문제를 피한다. conn이 없을 때(예: 백그라운드 LLM 분석)만
+    # 새 커넥션을 연다.
+    with (nullcontext(conn) if conn is not None else engine.connect()) as conn:
 
         today = conn.execute(
 

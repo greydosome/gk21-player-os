@@ -27,11 +27,14 @@ def api_get_today(record_date: date | None = Query(default=None)):
 def api_save_day(req: DayRecordRequest, background_tasks: BackgroundTasks):
     day_record_id = save_day(req)
 
-    background_tasks.add_task(
-        run_daily_llm_analysis,
-        day_record_id,
-        req.record_date
-    )
+    # 자동저장마다 실제 OpenAI 호출이 나가지 않도록, "AI 코칭 받기"를 눌렀을 때만
+    # (trigger_ai_coaching=True) 백그라운드 LLM 분석을 큐잉한다.
+    if req.trigger_ai_coaching:
+        background_tasks.add_task(
+            run_daily_llm_analysis,
+            day_record_id,
+            req.record_date
+        )
 
     return {
         "success": True,

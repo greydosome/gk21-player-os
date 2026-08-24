@@ -1,4 +1,6 @@
 
+from contextlib import nullcontext
+
 from datetime import date
 
 from sqlalchemy import text
@@ -91,7 +93,7 @@ def _build_ai_response(row):
 
     }
 
-def get_daily_ai_analysis(target_date: date):
+def get_daily_ai_analysis(target_date: date, conn=None):
 
     sql = text("""
 
@@ -153,7 +155,7 @@ def get_daily_ai_analysis(target_date: date):
 
     """)
 
-    with engine.connect() as conn:
+    with (nullcontext(conn) if conn is not None else engine.connect()) as conn:
 
         row = conn.execute(
 

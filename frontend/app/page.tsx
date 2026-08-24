@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type WorkoutType = {
   label: string;
@@ -535,6 +535,10 @@ export default function Home() {
   const lastLoadedSnapshotRef = useRef<string | null>(null);
   const loadedDateRef = useRef<string | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // pollCoachFeedback의 재귀 setTimeout 체인을 무효화하기 위한 세대 번호.
+  // 날짜가 바뀌거나 새 코칭 요청이 시작되면 증가시켜, 이전 체인이 더 이상
+  // fetch/setState를 하지 않고 스스로 멈추게 한다.
+  const coachPollGenRef = useRef(0);
 
   // 테마: 기본은 검은색(dark), localStorage에 저장해 다음 방문에도 유지한다.
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -608,12 +612,16 @@ export default function Home() {
   }, [foodHistory, foodHistoryQuery]);
 
   const workoutDone = selectedWorkouts.size > 0 || customCardioWorkouts.length > 0;
-  const totalWorkoutKcal = useMemo(
-    () =>
-      workoutCategoryTotals("strength", selectedWorkouts).kcal +
-      workoutCategoryTotals("cardio", selectedWorkouts, customCardioWorkouts).kcal,
+  // 근력/유산소 분류별 합계를 한 번만 계산해서 Section 부제목과 운동 섹션 렌더링에서 같이 쓴다
+  // (예전엔 같은 값을 useMemo 밖에서 JSX 중에 한 번 더 계산했음).
+  const workoutBreakdown = useMemo(
+    () => ({
+      strength: workoutCategoryTotals("strength", selectedWorkouts),
+      cardio: workoutCategoryTotals("cardio", selectedWorkouts, customCardioWorkouts),
+    }),
     [selectedWorkouts, customCardioWorkouts]
   );
+  const totalWorkoutKcal = workoutBreakdown.strength.kcal + workoutBreakdown.cardio.kcal;
   const todaySchedule = useMemo(() => scheduleFor(recordDate), [recordDate]);
 
   // DB에 기록 행이 존재하는지가 아니라, 실제로 뭔가 하나라도 체크했는지로 BREAK 여부를 판단한다.
@@ -737,17 +745,36 @@ export default function Home() {
     setCustomCardioWorkouts((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function updateFoodCount(
-    setCounts: React.Dispatch<React.SetStateAction<Map<string, number>>>,
-    label: string,
-    count: number
-  ) {
-    setCounts((prev) => {
-      const next = new Map(prev);
-      next.set(label, Math.max(0, count));
-      return next;
-    });
-  }
+  // useCallback + 함수형 setState(prev => ...)로만 구현해 항상 같은 함수 아이덴티티를 유지한다.
+  // FoodSection을 memo로 감쌌기 때문에, 이렇게 안정된 콜백을 넘겨야 무관한 필드를
+  // 수정할 때(예: 몸무게, 운동 코멘트) 단백질/탄수화물/지방 섹션이 불필요하게 리렌더링되지 않는다.
+  const updateFoodCount = useCallback(
+    (
+      setCounts: React.Dispatch<React.SetStateAction<Map<string, number>>>,
+      label: string,
+      count: number
+    ) => {
+      setCounts((prev) => {
+        const next = new Map(prev);
+        next.set(label, Math.max(0, count));
+        return next;
+      });
+    },
+    []
+  );
+
+  const onChangeProteinCount = useCallback(
+    (label: string, v: number) => updateFoodCount(setProteinCounts, label, v),
+    [updateFoodCount]
+  );
+  const onChangeCarbCount = useCallback(
+    (label: string, v: number) => updateFoodCount(setCarbCounts, label, v),
+    [updateFoodCount]
+  );
+  const onChangeFatCount = useCallback(
+    (label: string, v: number) => updateFoodCount(setFatCounts, label, v),
+    [updateFoodCount]
+  );
 
   function toggleSupplement(label: string) {
     setSupplementItems((prev) => {
@@ -762,15 +789,15 @@ export default function Home() {
     setCustomMealItems((prev) => [...prev, entry]);
   }
 
-  function updateCustomMealItem(index: number, entry: CustomFoodEntry) {
+  const updateCustomMealItem = useCallback((index: number, entry: CustomFoodEntry) => {
     setCustomMealItems((prev) => prev.map((item, i) => (i === index ? entry : item)));
-  }
+  }, []);
 
-  function removeCustomMealItem(index: number) {
+  const removeCustomMealItem = useCallback((index: number) => {
     setCustomMealItems((prev) => prev.filter((_, i) => i !== index));
-  }
+  }, []);
 
-  function buildPayload() {
+  function buildPayload(triggerAiCoaching: boolean) {
     const bikeMinutes = selectedWorkouts.get("자전거")?.minutes ?? 0;
 
     const completedWorkout = [
@@ -788,6 +815,9 @@ export default function Home() {
 
     return {
       record_date: recordDate,
+      // 자동저장에서는 AI 코칭을 트리거하지 않는다 — "AI 코칭 받기"를 눌렀을 때만 true.
+      // (그전에는 필드 하나 바꿀 때마다 자동저장이 실제 OpenAI 호출을 매번 발생시켰음)
+      trigger_ai_coaching: triggerAiCoaching,
       score: ready.score,
       grade: ready.level.label,
       mood_score: moodScore,
@@ -838,21 +868,27 @@ export default function Home() {
     };
   }
 
-  async function saveToServer() {
+  async function saveToServer(triggerAiCoaching: boolean) {
     const res = await fetch("/api/day", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildPayload()),
+      body: JSON.stringify(buildPayload(triggerAiCoaching)),
     });
     const data = await res.json();
     if (!res.ok || !data.success) throw new Error(JSON.stringify(data));
     return data;
   }
 
-  async function pollCoachFeedback(date: string, attemptsLeft: number) {
+  async function pollCoachFeedback(date: string, attemptsLeft: number, generation: number) {
+    // 폴링 도중 날짜가 바뀌거나 새 코칭 요청이 시작되면 이 체인은 더 이상 유효하지 않다.
+    if (generation !== coachPollGenRef.current) return;
+
     try {
       const res = await fetch(`/api/dashboard?record_date=${date}`, { cache: "no-store" });
       const data = await res.json();
+
+      if (generation !== coachPollGenRef.current) return;
+
       const ai = data?.ai;
       const text = ai?.cards?.coach ?? ai?.summary;
 
@@ -865,9 +901,9 @@ export default function Home() {
         return;
       }
 
-      setTimeout(() => pollCoachFeedback(date, attemptsLeft - 1), 3000);
+      setTimeout(() => pollCoachFeedback(date, attemptsLeft - 1, generation), 3000);
     } catch {
-      setCoachStatus("ready");
+      if (generation === coachPollGenRef.current) setCoachStatus("ready");
     }
   }
 
@@ -897,7 +933,11 @@ export default function Home() {
     setDataReady(false);
     setCoachStatus("idle");
     setCoachText("");
+    setCoachWorkoutText("");
+    setCoachMealText("");
     setAutoSaveStatus("idle");
+    // 날짜를 바꾸면 이전 날짜에 대해 돌고 있던 AI 코칭 폴링 체인을 무효화한다.
+    coachPollGenRef.current += 1;
 
     fetch(`/api/dashboard?record_date=${recordDate}`, { cache: "no-store" })
       .then((res) => res.json())
@@ -1030,7 +1070,7 @@ export default function Home() {
     autoSaveTimer.current = setTimeout(async () => {
       setAutoSaveStatus("saving");
       try {
-        await saveToServer();
+        await saveToServer(false);
         lastLoadedSnapshotRef.current = currentSnapshot;
         setAutoSaveStatus("saved");
       } catch {
@@ -1067,11 +1107,13 @@ export default function Home() {
     setCoachText("");
     setCoachWorkoutText("");
     setCoachMealText("");
+    // 이전에 돌고 있던 폴링 체인(있다면)을 무효화하고 이번 요청만의 세대를 새로 만든다.
+    const myGeneration = ++coachPollGenRef.current;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
     try {
       setAutoSaveStatus("saving");
-      await saveToServer();
+      await saveToServer(true);
       lastLoadedSnapshotRef.current = snapshotFormState({
         morningMed,
         eveningMed,
@@ -1091,7 +1133,7 @@ export default function Home() {
         supplementItems,
       });
       setAutoSaveStatus("saved");
-      pollCoachFeedback(recordDate, 8);
+      pollCoachFeedback(recordDate, 8, myGeneration);
     } catch (e) {
       setCoachStatus("idle");
       setAutoSaveStatus("idle");
@@ -1360,7 +1402,7 @@ export default function Home() {
                   target={proteinTarget}
                   foods={PROTEIN_FOODS}
                   counts={proteinCounts}
-                  onChangeCount={(label, v) => updateFoodCount(setProteinCounts, label, v)}
+                  onChangeCount={onChangeProteinCount}
                   category="protein"
                   customItems={customMealItems}
                   onSaveCustom={updateCustomMealItem}
@@ -1373,7 +1415,7 @@ export default function Home() {
                   target={carbTarget}
                   foods={CARB_FOODS}
                   counts={carbCounts}
-                  onChangeCount={(label, v) => updateFoodCount(setCarbCounts, label, v)}
+                  onChangeCount={onChangeCarbCount}
                   category="carb"
                   customItems={customMealItems}
                   onSaveCustom={updateCustomMealItem}
@@ -1386,7 +1428,7 @@ export default function Home() {
                   target={fatTarget}
                   foods={FAT_FOODS}
                   counts={fatCounts}
-                  onChangeCount={(label, v) => updateFoodCount(setFatCounts, label, v)}
+                  onChangeCount={onChangeFatCount}
                   category="fat"
                   customItems={customMealItems}
                   onSaveCustom={updateCustomMealItem}
@@ -1482,11 +1524,7 @@ export default function Home() {
                     { key: "cardio", title: "🏃 유산소" },
                   ] as const
                 ).map((group) => {
-                  const totals = workoutCategoryTotals(
-                    group.key,
-                    selectedWorkouts,
-                    group.key === "cardio" ? customCardioWorkouts : []
-                  );
+                  const totals = workoutBreakdown[group.key];
                   return (
                   <CollapsibleBlock key={group.key} title={`${group.title} · ${totals.minutes}분 · ${totals.kcal}kcal`}>
                     <div className="space-y-2">
@@ -1714,7 +1752,11 @@ function Section({
   );
 }
 
-function FoodSection({
+// 식단 섹션 중 가장 무거운 하위 트리(음식 카탈로그 + 직접입력 목록)라 memo로 감싼다.
+// 몸무게/운동 코멘트처럼 무관한 필드를 입력할 때 이 트리 전체가 다시 렌더링되지 않으려면
+// props(특히 onChangeCount/onSaveCustom/onRemoveCustom)가 매 렌더 새로 생성되지 않고
+// 안정적이어야 하므로, 호출하는 쪽에서 useCallback으로 감싼 함수를 넘긴다.
+const FoodSection = memo(function FoodSection({
   title,
   kcal,
   target,
@@ -1805,7 +1847,7 @@ function FoodSection({
       </div>
     </CollapsibleBlock>
   );
-}
+});
 
 // CustomFoodForm(추가)과 CustomFoodRow(수정)가 공유하는 입력 필드 UI.
 function CustomFoodFields({

@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 from datetime import date
 
 from sqlalchemy import text
@@ -5,7 +7,7 @@ from sqlalchemy import text
 from app.db.session import engine
 
 
-def get_dashboard(record_date: date):
+def get_dashboard(record_date: date, conn=None):
     sql = text("""
         SELECT *
         FROM v_dashboard
@@ -13,7 +15,7 @@ def get_dashboard(record_date: date):
         LIMIT 1
     """)
 
-    with engine.connect() as conn:
+    with (nullcontext(conn) if conn is not None else engine.connect()) as conn:
         row = conn.execute(
             sql,
             {"record_date": record_date}
@@ -22,8 +24,8 @@ def get_dashboard(record_date: date):
     return dict(row) if row else None
 
 
-def get_day_detail(record_date: date):
-    with engine.connect() as conn:
+def get_day_detail(record_date: date, conn=None):
+    with (nullcontext(conn) if conn is not None else engine.connect()) as conn:
         day_record_id = conn.execute(
             text("SELECT day_record_id FROM day_record WHERE record_date = :record_date"),
             {"record_date": record_date}
@@ -75,7 +77,7 @@ def get_day_detail(record_date: date):
     }
 
 
-def get_active_goal():
+def get_active_goal(conn=None):
     sql = text("""
         SELECT
             target_weight_kg,
@@ -90,7 +92,7 @@ def get_active_goal():
         LIMIT 1
     """)
 
-    with engine.connect() as conn:
+    with (nullcontext(conn) if conn is not None else engine.connect()) as conn:
         row = conn.execute(sql).mappings().first()
 
     return dict(row) if row else None

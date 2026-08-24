@@ -58,6 +58,9 @@ class GkRecord(BaseModel):
 
 class DayRecordRequest(BaseModel):
     record_date: date
+    # True일 때만 백그라운드 LLM 코칭 분석을 트리거한다("AI 코칭 받기" 클릭 시).
+    # 자동저장(필드 하나 바꿀 때마다)에서는 False로 보내 매번 OpenAI를 호출하지 않도록 한다.
+    trigger_ai_coaching: bool = False
     score: int = 0
     grade: str = "GREEN"
     mood_score: int | None = None
