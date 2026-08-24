@@ -125,13 +125,37 @@ type BlockColor = { border: string; borderSoft: string; bg: string; text: string
 // 세 섹션(데일리체크/식단/운동)을 한눈에 구분할 수 있도록 각자 고유 색을 준다.
 const DAILY_COLOR: BlockColor = { border: "border-zinc-500", borderSoft: "border-zinc-600/40", bg: "bg-zinc-500", text: "text-zinc-400" };
 const DIET_COLOR: BlockColor = { border: "border-yellow-500", borderSoft: "border-yellow-500/40", bg: "bg-yellow-500", text: "text-yellow-400" };
-const WORKOUT_COLOR: BlockColor = { border: "border-blue-500", borderSoft: "border-blue-500/40", bg: "bg-blue-500", text: "text-blue-400" };
+// 운동/AI 코치는 팔레트의 시그니처 강조색(--accent-secondary/--accent-primary)을 쓴다.
+// 칼로리(emerald)/식단(amber)은 기능색이라 팔레트가 바뀌어도 고정한다.
+const WORKOUT_COLOR: BlockColor = {
+  border: "border-[var(--accent-secondary)]",
+  borderSoft: "border-[var(--accent-secondary)]/40",
+  bg: "bg-[var(--accent-secondary)]",
+  text: "text-[var(--accent-secondary)]",
+};
 const CALORIE_COLOR: BlockColor = { border: "border-emerald-500", borderSoft: "border-emerald-500/40", bg: "bg-emerald-500", text: "text-emerald-400" };
 const OVER_BUDGET_COLOR: BlockColor = { border: "border-red-500", borderSoft: "border-red-500/40", bg: "bg-red-500", text: "text-red-400" };
-const AI_COLOR: BlockColor = { border: "border-violet-500", borderSoft: "border-violet-500/40", bg: "bg-violet-500", text: "text-violet-400" };
+const AI_COLOR: BlockColor = {
+  border: "border-[var(--accent-primary)]",
+  borderSoft: "border-[var(--accent-primary)]/40",
+  bg: "bg-[var(--accent-primary)]",
+  text: "text-[var(--accent-primary)]",
+};
 
 // 하루 섭취 가능 칼로리 상한. 식단 섹션에서 계산되는 총 섭취 칼로리와 비교해 잔여 칼로리를 보여준다.
 const DAILY_CALORIE_BUDGET = 1200;
+
+// 다크 모드 전용 베이스 팔레트 5종 + 기본(현재 검정/흰색). "기본"은 data-palette를
+// 아예 안 붙여서 globals.css의 팔레트 오버라이드가 하나도 안 걸리게 한다.
+// swatch는 피커에서 보여줄 대표색(각 팔레트의 --accent-primary와 동일).
+const DARK_PALETTES: { key: string; label: string; emoji: string; swatch: string }[] = [
+  { key: "default", label: "기본", emoji: "⚫", swatch: "#71717a" },
+  { key: "midnight-violet", label: "Midnight Violet", emoji: "🌌", swatch: "#8b5cf6" },
+  { key: "deep-ocean", label: "Deep Ocean", emoji: "🌊", swatch: "#00d4c8" },
+  { key: "graphite-rose", label: "Graphite Rose", emoji: "🌹", swatch: "#f43f7a" },
+  { key: "carbon-orange", label: "Carbon Orange", emoji: "🔥", swatch: "#ff6b35" },
+  { key: "slate-ice", label: "Slate Ice", emoji: "🧊", swatch: "#60a5fa" },
+];
 
 // 다크/라이트 두 테마 모두에서 "가장 눈에 띄는 강조색"이 되도록 테마에 따라 반전되는 색.
 // (다크: 흰 배경 + 검정 글씨, 라이트: 검정 배경 + 흰 글씨) — globals.css의 --pop-bg/--pop-fg 참고.
@@ -552,11 +576,19 @@ export default function Home() {
 
   // 테마: 기본은 검은색(dark), localStorage에 저장해 다음 방문에도 유지한다.
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  // 다크 모드일 때만 의미 있는 베이스 팔레트. 라이트 모드에서는 무시된다.
+  const [palette, setPalette] = useState<string>("default");
 
   useEffect(() => {
     const saved = localStorage.getItem("gk21-theme");
     if (saved === "light" || saved === "dark") setTheme(saved);
+    const savedPalette = localStorage.getItem("gk21-palette");
+    if (savedPalette && DARK_PALETTES.some((p) => p.key === savedPalette)) setPalette(savedPalette);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("gk21-palette", palette);
+  }, [palette]);
 
   useEffect(() => {
     localStorage.setItem("gk21-theme", theme);
@@ -1179,7 +1211,11 @@ export default function Home() {
   }, [view, recordDate]);
 
   return (
-    <main data-theme={theme} className="min-h-screen bg-zinc-950 pb-8 text-zinc-100 transition-colors duration-300">
+    <main
+      data-theme={theme}
+      data-palette={palette}
+      className="min-h-screen bg-zinc-950 pb-8 text-zinc-100 transition-colors duration-300"
+    >
       <div className="mx-auto max-w-xl p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-baseline gap-2">
@@ -1203,6 +1239,29 @@ export default function Home() {
             />
           </div>
         </div>
+
+        {theme === "dark" && (
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+            {DARK_PALETTES.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setPalette(p.key)}
+                aria-label={p.label}
+                title={p.label}
+                className={[
+                  "grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition-colors",
+                  palette === p.key ? "border-zinc-100" : "border-transparent",
+                ].join(" ")}
+              >
+                <span
+                  className="h-5 w-5 rounded-full"
+                  style={{ backgroundColor: p.swatch }}
+                />
+              </button>
+            ))}
+          </div>
+        )}
 
         <section
           className={[

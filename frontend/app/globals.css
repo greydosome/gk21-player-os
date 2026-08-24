@@ -37,6 +37,104 @@ body {
 :root {
   --pop-bg: #ffffff;
   --pop-fg: oklch(14.1% 0.005 285.823);
+
+  /* AI 코치/운동 블럭과 선택된 탭·뱃지에 쓰는 시그니처 강조색. 칼로리(emerald)/
+     식단(amber)은 기능색이라 팔레트가 바뀌어도 고정하고 건드리지 않는다.
+     기본값은 기존 violet-500/blue-500과 동일해서 팔레트를 "기본"으로 두면
+     지금 모습 그대로 유지된다. */
+  --accent-primary: #8b5cf6;
+  --accent-secondary: #3b82f6;
+}
+
+/*
+ * 다크 모드 전용 5가지 베이스 팔레트. 배경/서페이스만 팔레트 고유 톤으로 바꾸고,
+ * 그 사이 단계(zinc-800~200)는 서페이스와 텍스트 색을 color-mix로 보간해
+ * 자연스러운 톤온톤 램프를 만든다. --accent-primary/secondary와 --pop-bg/fg도
+ * 팔레트에 맞춰 같이 바뀐다.
+ */
+[data-theme="dark"][data-palette="midnight-violet"] {
+  --color-zinc-950: #090a12;
+  --color-zinc-900: #151622;
+  --color-zinc-800: color-mix(in srgb, #151622 82%, #f5f3ff 18%);
+  --color-zinc-700: color-mix(in srgb, #151622 65%, #f5f3ff 35%);
+  --color-zinc-600: color-mix(in srgb, #151622 45%, #f5f3ff 55%);
+  --color-zinc-500: color-mix(in srgb, #151622 30%, #f5f3ff 70%);
+  --color-zinc-400: color-mix(in srgb, #151622 15%, #f5f3ff 85%);
+  --color-zinc-300: color-mix(in srgb, #151622 10%, #f5f3ff 90%);
+  --color-zinc-200: color-mix(in srgb, #151622 5%, #f5f3ff 95%);
+  --color-zinc-100: #f5f3ff;
+  --accent-primary: #8b5cf6;
+  --accent-secondary: #22d3ee;
+  --pop-bg: #8b5cf6;
+  --pop-fg: #090a12;
+}
+
+[data-theme="dark"][data-palette="deep-ocean"] {
+  --color-zinc-950: #07131a;
+  --color-zinc-900: #10232b;
+  --color-zinc-800: color-mix(in srgb, #10232b 82%, #ecfeff 18%);
+  --color-zinc-700: color-mix(in srgb, #10232b 65%, #ecfeff 35%);
+  --color-zinc-600: color-mix(in srgb, #10232b 45%, #ecfeff 55%);
+  --color-zinc-500: color-mix(in srgb, #10232b 30%, #ecfeff 70%);
+  --color-zinc-400: color-mix(in srgb, #10232b 15%, #ecfeff 85%);
+  --color-zinc-300: color-mix(in srgb, #10232b 10%, #ecfeff 90%);
+  --color-zinc-200: color-mix(in srgb, #10232b 5%, #ecfeff 95%);
+  --color-zinc-100: #ecfeff;
+  --accent-primary: #00d4c8;
+  --accent-secondary: #38bdf8;
+  --pop-bg: #00d4c8;
+  --pop-fg: #07131a;
+}
+
+[data-theme="dark"][data-palette="graphite-rose"] {
+  --color-zinc-950: #0e0d10;
+  --color-zinc-900: #1c191d;
+  --color-zinc-800: color-mix(in srgb, #1c191d 82%, #fff1f5 18%);
+  --color-zinc-700: color-mix(in srgb, #1c191d 65%, #fff1f5 35%);
+  --color-zinc-600: color-mix(in srgb, #1c191d 45%, #fff1f5 55%);
+  --color-zinc-500: color-mix(in srgb, #1c191d 30%, #fff1f5 70%);
+  --color-zinc-400: color-mix(in srgb, #1c191d 15%, #fff1f5 85%);
+  --color-zinc-300: color-mix(in srgb, #1c191d 10%, #fff1f5 90%);
+  --color-zinc-200: color-mix(in srgb, #1c191d 5%, #fff1f5 95%);
+  --color-zinc-100: #fff1f5;
+  --accent-primary: #f43f7a;
+  --accent-secondary: #a78bfa;
+  --pop-bg: #f43f7a;
+  --pop-fg: #0e0d10;
+}
+
+[data-theme="dark"][data-palette="carbon-orange"] {
+  --color-zinc-950: #0d0e0f;
+  --color-zinc-900: #1a1c1e;
+  --color-zinc-800: color-mix(in srgb, #1a1c1e 82%, #fafafa 18%);
+  --color-zinc-700: color-mix(in srgb, #1a1c1e 65%, #fafafa 35%);
+  --color-zinc-600: color-mix(in srgb, #1a1c1e 45%, #fafafa 55%);
+  --color-zinc-500: color-mix(in srgb, #1a1c1e 30%, #fafafa 70%);
+  --color-zinc-400: color-mix(in srgb, #1a1c1e 15%, #fafafa 85%);
+  --color-zinc-300: color-mix(in srgb, #1a1c1e 10%, #fafafa 90%);
+  --color-zinc-200: color-mix(in srgb, #1a1c1e 5%, #fafafa 95%);
+  --color-zinc-100: #fafafa;
+  --accent-primary: #ff6b35;
+  --accent-secondary: #fbbf24;
+  --pop-bg: #ff6b35;
+  --pop-fg: #0d0e0f;
+}
+
+[data-theme="dark"][data-palette="slate-ice"] {
+  --color-zinc-950: #0b1118;
+  --color-zinc-900: #151d27;
+  --color-zinc-800: color-mix(in srgb, #151d27 82%, #f1f5f9 18%);
+  --color-zinc-700: color-mix(in srgb, #151d27 65%, #f1f5f9 35%);
+  --color-zinc-600: color-mix(in srgb, #151d27 45%, #f1f5f9 55%);
+  --color-zinc-500: color-mix(in srgb, #151d27 30%, #f1f5f9 70%);
+  --color-zinc-400: color-mix(in srgb, #151d27 15%, #f1f5f9 85%);
+  --color-zinc-300: color-mix(in srgb, #151d27 10%, #f1f5f9 90%);
+  --color-zinc-200: color-mix(in srgb, #151d27 5%, #f1f5f9 95%);
+  --color-zinc-100: #f1f5f9;
+  --accent-primary: #60a5fa;
+  --accent-secondary: #2dd4bf;
+  --pop-bg: #60a5fa;
+  --pop-fg: #0b1118;
 }
 
 [data-theme="light"] {
