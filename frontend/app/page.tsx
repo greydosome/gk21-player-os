@@ -962,7 +962,9 @@ export default function Home() {
     }
   }
 
-  // 일반식 직접입력 히스토리는 날짜와 무관하게 한 번만 불러온다 (조회해서 선택하기용).
+  // 일반식 직접입력 히스토리(조회해서 선택하기용)는 모든 날짜의 기록을 통틀어 보여준다.
+  // 날짜를 바꿀 때마다 다시 불러와야, 방금 다른 날짜에 저장한 음식이 바로 반영된다
+  // (한 번만 불러오면 세션 중 다른 날짜에 추가한 음식이 목록에 안 보이는 문제가 있었음).
   useEffect(() => {
     let cancelled = false;
 
@@ -980,7 +982,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [recordDate]);
 
   // 날짜가 바뀌면 그 날짜의 기존 기록을 불러와서 폼을 채운다 (없으면 기본값으로 초기화).
   useEffect(() => {
@@ -1034,9 +1036,12 @@ export default function Home() {
           }
         );
 
-        // 그 날짜에 기록된 운동이 하나도 없는 완전히 새 날짜라면, 거의 매일 하는
+        // "운동 기록이 없다(workout_items.length===0)"만으로는 오늘 처음 여는 완전히
+        // 새 날짜인지, 이미 저장은 했지만 유산소를 의도적으로 다 지운 날인지 구분할 수
+        // 없다. 그 상태로 판단하면 지웠다가 다시 열 때마다 기본값이 되살아나 버린다.
+        // day_record 자체가 아직 없는(=이 날짜로 한 번도 저장한 적 없는) 경우에만
         // 기본 유산소(인클라인 워킹/스텝퍼)를 기본 선택 상태로 미리 체크해둔다.
-        if ((detail?.workout_items ?? []).length === 0) {
+        if (!d) {
           DEFAULT_SELECTED_WORKOUTS.forEach((w) => {
             workoutMap.set(w.label, { minutes: w.minutes, details: new Set() });
           });
