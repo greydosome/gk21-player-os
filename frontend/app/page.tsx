@@ -120,6 +120,14 @@ function scheduleFor(dateStr: string) {
   return WEEKLY_SCHEDULE[dayOfWeek];
 }
 
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+
+// "2026-08-20" -> "8/20(목)"
+function shortDateLabel(dateStr: string) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_LABELS[d.getDay()]})`;
+}
+
 type BlockColor = { border: string; borderSoft: string; bg: string; text: string };
 
 // 세 섹션(데일리체크/식단/운동)을 한눈에 구분할 수 있도록 각자 고유 색을 준다.
@@ -379,6 +387,12 @@ type HistoryRow = {
   workout_done_yn: boolean | null;
   mood_score: number | null;
   binge_yn: boolean | null;
+};
+
+type PeriodDetailRow = {
+  record_date: string;
+  general_food_items: string[];
+  workout_items: { workout_type: string; minutes: number; calorie_estimate: number | null; detail: string | null }[];
 };
 
 type NumericHistoryKey = "weight_kg" | "sleep_hours" | "water_liter" | "protein_kcal" | "carb_kcal" | "fat_kcal";
@@ -643,6 +657,8 @@ export default function Home() {
   const [stats, setStats] = useState<PeriodStats | null>(null);
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  // 위클리 요약 전용: 요일별 식단 총 kcal / 운동 종목을 만들기 위한 원본 데이터.
+  const [periodDetail, setPeriodDetail] = useState<PeriodDetailRow[] | null>(null);
 
   const proteinKcal = useMemo(
     () => computeKcal(PROTEIN_FOODS, proteinCounts) + sumCustomKcal(customMealItems, "protein"),
@@ -1220,13 +1236,54 @@ export default function Home() {
       fetch(`/api/stats/history?period=${view}&record_date=${recordDate}`, { cache: "no-store" }).then(
         (res) => res.json()
       ),
+      // 위클리 요약(식단 총합/요일별 운동)에만 필요한 원본 데이터라 "위클리"에서만 불러온다.
+      view === "week"
+        ? fetch(`/api/stats/detail?period=week&record_date=${recordDate}`, { cache: "no-store" }).then((res) =>
+            res.json()
+          )
+        : Promise.resolve(null),
     ])
-      .then(([statsData, historyData]) => {
+      .then(([statsData, historyData, detailData]) => {
         setStats(statsData?.stats ?? null);
         setHistory(historyData?.history ?? null);
+        setPeriodDetail(detailData?.detail ?? null);
       })
       .finally(() => setStatsLoading(false));
   }, [view, recordDate]);
+
+  // 위클리 요약: 하루 목표(1200kcal) 대비 7일 총 섭취량/비율, 요일별 식단 총 kcal
+  // (매크로 구분 없이 합계만), 요일별 유산소/근력 운동 종목을 만든다.
+  const weeklySummary = useMemo(() => {
+    if (!history || !periodDetail) return null;
+
+    const detailByDate = new Map(periodDetail.map((d) => [d.record_date, d]));
+
+    const days = history.map((h) => {
+      const detail = detailByDate.get(h.record_date);
+      const customItems = parseGeneralFoodItems(detail?.general_food_items ?? []);
+      // protein/carb/fat_kcal는 저장 시점에 이미 그 매크로로 분류된 직접입력 항목까지
+      // 합산되어 있으므로, 여기서는 보충음식/일반식(미분류) 몫만 더해야 중복 합산을 피한다.
+      const extraKcal = sumCustomKcal(customItems, "supplement") + sumCustomKcal(customItems, "general");
+      const dietKcal = (h.protein_kcal ?? 0) + (h.carb_kcal ?? 0) + (h.fat_kcal ?? 0) + extraKcal;
+
+      const cardioLabels: string[] = [];
+      const strengthLabels: string[] = [];
+      (detail?.workout_items ?? []).forEach((item) => {
+        const known = WORKOUT_TYPES.find((w) => w.label === item.workout_type);
+        const label = `${item.workout_type} ${item.minutes}분`;
+        if (known?.category === "strength") strengthLabels.push(label);
+        else cardioLabels.push(label);
+      });
+
+      return { recordDate: h.record_date, dietKcal, cardioLabels, strengthLabels };
+    });
+
+    const totalKcal = days.reduce((sum, d) => sum + d.dietKcal, 0);
+    const budget = DAILY_CALORIE_BUDGET * days.length;
+    const ratio = budget > 0 ? Math.round((totalKcal / budget) * 100) : 0;
+
+    return { days, totalKcal, budget, ratio };
+  }, [history, periodDetail]);
 
   return (
     <main
@@ -1349,12 +1406,93 @@ export default function Home() {
           ))}
         </div>
 
-        {view !== "today" ? (
+        {view === "week" ? (
+          <section className="mt-3 space-y-3">
+            {statsLoading || !weeklySummary ? (
+              <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
+                <p className="text-sm font-bold text-zinc-500">불러오는 중...</p>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
+                  <h2 className="text-base font-black text-zinc-100">이번 주 요약</h2>
+                  <p className="mt-2 text-sm font-bold text-zinc-300">
+                    7일간 총 섭취{" "}
+                    <span className="text-[var(--accent-calorie)]">{weeklySummary.totalKcal}kcal</span> / 목표{" "}
+                    {weeklySummary.budget}kcal
+                    <span className="ml-1 text-zinc-500">({weeklySummary.ratio}%)</span>
+                  </p>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+                    <div
+                      className="h-full rounded-full bg-[var(--accent-calorie)]"
+                      style={{ width: `${Math.min(100, weeklySummary.ratio)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-yellow-500/40 bg-zinc-900 p-4 shadow-sm">
+                  <h2 className="text-base font-black text-zinc-100">🍱 식단 (요일별 합계)</h2>
+                  <div className="mt-2 space-y-1">
+                    {weeklySummary.days.map((d) => (
+                      <div key={d.recordDate} className="flex items-center justify-between text-sm">
+                        <span className="font-bold text-zinc-400">{shortDateLabel(d.recordDate)}</span>
+                        <span className="font-bold text-zinc-100">{d.dietKcal}kcal</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-[var(--accent-secondary)]/40 bg-zinc-900 p-4 shadow-sm">
+                  <h2 className="text-base font-black text-zinc-100">🏋 운동 (요일별)</h2>
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full min-w-[320px] text-sm">
+                      <thead>
+                        <tr className="text-left text-zinc-500">
+                          <th className="pb-1 pr-2 font-bold">날짜</th>
+                          <th className="pb-1 pr-2 font-bold">🏃 유산소</th>
+                          <th className="pb-1 font-bold">💪 근력</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weeklySummary.days.map((d) => (
+                          <tr key={d.recordDate} className="border-t border-zinc-800 align-top">
+                            <td className="whitespace-nowrap py-1.5 pr-2 font-bold text-zinc-400">
+                              {shortDateLabel(d.recordDate)}
+                            </td>
+                            <td className="py-1.5 pr-2 font-bold text-zinc-200">
+                              {d.cardioLabels.length > 0 ? d.cardioLabels.join(", ") : "-"}
+                            </td>
+                            <td className="py-1.5 font-bold text-zinc-200">
+                              {d.strengthLabels.length > 0 ? d.strengthLabels.join(", ") : "-"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 text-sm font-bold shadow-sm">
+                  <p className="text-zinc-300">
+                    😴 수면 평균{" "}
+                    {stats?.avg_sleep_hours != null ? `${Number(stats.avg_sleep_hours).toFixed(1)}h` : "-"}
+                  </p>
+                  <p className="text-zinc-300">
+                    💧 수분 평균{" "}
+                    {stats?.avg_water_liter != null ? `${Number(stats.avg_water_liter).toFixed(1)}L` : "-"}
+                  </p>
+                  <p className="text-zinc-300">
+                    ⚖️ 체중 평균{" "}
+                    {stats?.avg_weight_kg != null ? `${Number(stats.avg_weight_kg).toFixed(1)}kg` : "-"}
+                  </p>
+                </div>
+              </>
+            )}
+          </section>
+        ) : view === "month" ? (
           <section className="mt-3 space-y-3">
             <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
-              <h2 className="text-base font-black text-zinc-100">
-                {view === "week" ? "최근 7일" : "최근 30일"} 요약
-              </h2>
+              <h2 className="text-base font-black text-zinc-100">최근 30일 요약</h2>
 
               {statsLoading || !stats ? (
                 <p className="mt-3 text-sm font-bold text-zinc-500">불러오는 중...</p>
