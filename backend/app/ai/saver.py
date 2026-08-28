@@ -303,6 +303,8 @@ def save_ai_analysis(conn, day_record_id, context, metrics, analysis):
 
                 updated_at = now()
 
+            WHERE ai_analysis.ai_status IS DISTINCT FROM 'COMPLETED'
+
         """),
 
         params
