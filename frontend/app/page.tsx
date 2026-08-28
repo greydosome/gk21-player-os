@@ -1753,8 +1753,8 @@ export default function Home() {
                     </div>
                   ) : (
                     // 달력 형태: 이번 달 커버리지 바 + 요일 헤더 + 날짜 셀.
-                    // 각 셀에 유산소(보라)/무산소(회색) 점을 찍되, 그날 수행 분량만큼 점 크기를 키워
-                    // "얼마나 했는지"까지 한눈에 보이게 한다. 식단을 기록했고 1200kcal 이내였으면
+                    // 각 셀 날짜 아래 미니 바로 그날 유산소(보라)/무산소(회색) 비중을 보여준다.
+                    // 식단을 기록했고 1200kcal 이내였으면
                     // (=식단관리 성공) 노란 테두리로 표시한다.
                     <div className="mt-3">
                       <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">
@@ -1794,8 +1794,7 @@ export default function Home() {
                         {periodSummary.days.map((d) => {
                           const hasCardio = d.cardioLabels.length > 0;
                           const hasStrength = d.strengthLabels.length > 0;
-                          const cardioSize = Math.max(5, Math.min(9, 5 + Math.round(d.cardioMinutes / 20)));
-                          const strengthSize = Math.max(5, Math.min(9, 5 + Math.round(d.strengthMinutes / 20)));
+                          const totalMinutes = d.cardioMinutes + d.strengthMinutes;
                           const dietSuccess = d.dietKcal > 0 && d.dietKcal <= DAILY_CALORIE_BUDGET;
                           const titleParts = [shortDateLabel(d.recordDate)];
                           if (hasCardio) titleParts.push(`유산소: ${d.cardioLabels.join(", ")} (${d.cardioMinutes}분)`);
@@ -1806,30 +1805,26 @@ export default function Home() {
                               key={d.recordDate}
                               title={titleParts.join(" · ")}
                               className={[
-                                "flex flex-col items-center gap-1 rounded-lg border py-1.5",
+                                "flex flex-col items-center gap-1.5 rounded-lg border py-1.5",
                                 dietSuccess ? "border-yellow-500/70 bg-yellow-500/10" : "border-transparent",
                               ].join(" ")}
                             >
                               <span className="text-xs font-medium text-zinc-300">
                                 {Number(d.recordDate.slice(-2))}
                               </span>
-                              <span className="flex items-center gap-1">
-                                <span className="flex h-2.5 w-2.5 items-center justify-center">
-                                  {hasCardio && (
+                              <span className="flex h-[3px] w-3/4 overflow-hidden rounded-full bg-zinc-800">
+                                {totalMinutes > 0 && (
+                                  <>
                                     <span
-                                      className="rounded-full bg-violet-400 ring-2 ring-zinc-900"
-                                      style={{ width: cardioSize, height: cardioSize }}
+                                      className="h-full bg-violet-400"
+                                      style={{ width: `${(d.cardioMinutes / totalMinutes) * 100}%` }}
                                     />
-                                  )}
-                                </span>
-                                <span className="flex h-2.5 w-2.5 items-center justify-center">
-                                  {hasStrength && (
                                     <span
-                                      className="rounded-full bg-zinc-400 ring-2 ring-zinc-900"
-                                      style={{ width: strengthSize, height: strengthSize }}
+                                      className="h-full bg-zinc-400"
+                                      style={{ width: `${(d.strengthMinutes / totalMinutes) * 100}%` }}
                                     />
-                                  )}
-                                </span>
+                                  </>
+                                )}
                               </span>
                             </div>
                           );
@@ -1838,7 +1833,7 @@ export default function Home() {
                       <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-normal text-zinc-500">
                         <span className="flex items-center gap-1">
                           <span className="h-2 w-2 rounded-full bg-violet-400" />
-                          유산소 <span className="text-zinc-600">(클수록 오래 함)</span>
+                          유산소
                         </span>
                         <span className="flex items-center gap-1">
                           <span className="h-2 w-2 rounded-full bg-zinc-400" />
