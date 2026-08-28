@@ -128,6 +128,11 @@ function shortDateLabel(dateStr: string) {
   return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_LABELS[d.getDay()]})`;
 }
 
+// 위클리/먼슬리 운동 점 크기: 그날 수행 분량이 많을수록 점을 살짝 키운다 (5~9px).
+function workoutDotSize(minutes: number) {
+  return Math.max(5, Math.min(9, 5 + Math.round(minutes / 20)));
+}
+
 type BlockColor = { border: string; borderSoft: string; bg: string; text: string };
 
 // 세 섹션(데일리체크/식단/운동)을 한눈에 구분할 수 있도록 각자 고유 색을 준다.
@@ -1292,6 +1297,10 @@ export default function Home() {
       return {
         recordDate: h.record_date,
         dietKcal,
+        proteinKcal: h.protein_kcal ?? 0,
+        carbKcal: h.carb_kcal ?? 0,
+        fatKcal: h.fat_kcal ?? 0,
+        extraKcal,
         cardioLabels,
         strengthLabels,
         cardioMinutes,
@@ -1304,6 +1313,14 @@ export default function Home() {
     const budget = DAILY_CALORIE_BUDGET * days.length;
     const ratio = budget > 0 ? Math.round((totalKcal / budget) * 100) : 0;
 
+    // 주간 매크로 합계 (단백질/탄수화물/지방/보충·일반식) — 위클리 예산 바를 구간별로 나눠 보여줄 때 쓴다.
+    const macroTotals = {
+      protein: days.reduce((sum, d) => sum + d.proteinKcal, 0),
+      carb: days.reduce((sum, d) => sum + d.carbKcal, 0),
+      fat: days.reduce((sum, d) => sum + d.fatKcal, 0),
+      extra: days.reduce((sum, d) => sum + d.extraKcal, 0),
+    };
+
     // 이번 달 운동 커버리지: 유산소/근력을 모두 한 날 · 유산소만 · 근력만 · 기록 없는 날
     const bothDays = days.filter((d) => d.cardioLabels.length > 0 && d.strengthLabels.length > 0).length;
     const cardioOnlyDays = days.filter((d) => d.cardioLabels.length > 0 && d.strengthLabels.length === 0).length;
@@ -1311,7 +1328,7 @@ export default function Home() {
     const noneDays = days.length - bothDays - cardioOnlyDays - strengthOnlyDays;
     const coverage = { bothDays, cardioOnlyDays, strengthOnlyDays, noneDays };
 
-    return { days, totalKcal, budget, ratio, coverage };
+    return { days, totalKcal, budget, ratio, macroTotals, coverage };
   }, [history, periodDetail]);
 
   async function requestPeriodCoaching() {
@@ -1542,23 +1559,79 @@ export default function Home() {
                         {periodSummary.budget}kcal
                         <span className="ml-1 text-zinc-500">({periodSummary.ratio}%)</span>
                       </p>
-                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-800">
-                        <div
-                          className="h-full rounded-full bg-[var(--accent-calorie)]"
-                          style={{ width: `${Math.min(100, periodSummary.ratio)}%` }}
-                        />
+                      {/* 예산 바를 매크로 구성으로 나눠서, 얼마나 먹었는지뿐 아니라 무엇으로 채웠는지도 보여준다. */}
+                      <div className="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                        {periodSummary.totalKcal > 0 &&
+                          (
+                            [
+                              { kcal: periodSummary.macroTotals.protein, cls: "bg-rose-400" },
+                              { kcal: periodSummary.macroTotals.carb, cls: "bg-amber-400" },
+                              { kcal: periodSummary.macroTotals.fat, cls: "bg-emerald-400" },
+                              { kcal: periodSummary.macroTotals.extra, cls: "bg-zinc-400" },
+                            ]
+                          ).map((seg, i) =>
+                            seg.kcal > 0 ? (
+                              <span
+                                key={i}
+                                className={["h-full", seg.cls].join(" ")}
+                                style={{
+                                  width: `${Math.min(100, periodSummary.ratio) * (seg.kcal / periodSummary.totalKcal)}%`,
+                                }}
+                              />
+                            ) : null
+                          )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-zinc-500">
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-rose-400" />
+                          단백질 {periodSummary.macroTotals.protein}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-amber-400" />
+                          탄수화물 {periodSummary.macroTotals.carb}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                          지방 {periodSummary.macroTotals.fat}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-zinc-400" />
+                          보충·일반식 {periodSummary.macroTotals.extra}
+                        </span>
                       </div>
                     </div>
 
                     <div className="rounded-3xl border border-yellow-500/40 bg-zinc-900 p-4 shadow-sm">
                       <h2 className="text-base font-black text-zinc-100">🍱 식단 (요일별 합계)</h2>
-                      <div className="mt-2 space-y-1">
-                        {periodSummary.days.map((d) => (
-                          <div key={d.recordDate} className="flex items-center justify-between text-sm">
-                            <span className="font-bold text-zinc-400">{shortDateLabel(d.recordDate)}</span>
-                            <span className="font-bold text-zinc-100">{d.dietKcal}kcal</span>
-                          </div>
-                        ))}
+                      <div className="mt-3 space-y-2.5">
+                        {periodSummary.days.map((d) => {
+                          const dayRatio =
+                            DAILY_CALORIE_BUDGET > 0 ? (d.dietKcal / DAILY_CALORIE_BUDGET) * 100 : 0;
+                          const over = d.dietKcal > DAILY_CALORIE_BUDGET;
+                          return (
+                            <div key={d.recordDate}>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="font-bold text-zinc-400">{shortDateLabel(d.recordDate)}</span>
+                                <span
+                                  className={["font-bold", over ? "text-[var(--accent-danger)]" : "text-zinc-100"].join(
+                                    " "
+                                  )}
+                                >
+                                  {d.dietKcal}kcal
+                                </span>
+                              </div>
+                              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                                <div
+                                  className={[
+                                    "h-full rounded-full",
+                                    over ? "bg-[var(--accent-danger)]" : "bg-yellow-500",
+                                  ].join(" ")}
+                                  style={{ width: `${Math.min(100, dayRatio)}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </>
@@ -1576,31 +1649,56 @@ export default function Home() {
                   </div>
 
                   {view === "week" ? (
-                    <div className="mt-2 overflow-x-auto">
-                      <table className="w-full min-w-[320px] text-sm">
-                        <thead>
-                          <tr className="text-left text-zinc-500">
-                            <th className="pb-1 pr-2 font-bold">날짜</th>
-                            <th className="pb-1 pr-2 font-bold">🏃 유산소</th>
-                            <th className="pb-1 font-bold">💪 근력</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {periodSummary.days.map((d) => (
-                            <tr key={d.recordDate} className="border-t border-zinc-800 align-top">
-                              <td className="whitespace-nowrap py-1.5 pr-2 font-bold text-zinc-400">
-                                {shortDateLabel(d.recordDate)}
-                              </td>
-                              <td className="py-1.5 pr-2 font-bold text-zinc-200">
-                                {d.cardioLabels.length > 0 ? d.cardioLabels.join(", ") : "-"}
-                              </td>
-                              <td className="py-1.5 font-bold text-zinc-200">
-                                {d.strengthLabels.length > 0 ? d.strengthLabels.join(", ") : "-"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    // 세로 타임라인: 점 색은 그날 한 운동 종류(유산소=보라/근력=회색/둘 다=반반),
+                    // 점 크기는 그날 총 운동 분량을 반영한다.
+                    <div className="relative mt-3">
+                      <div className="absolute bottom-2 left-[11px] top-2 w-px bg-zinc-800" />
+                      <div className="space-y-3.5">
+                        {periodSummary.days.map((d) => {
+                          const hasCardio = d.cardioLabels.length > 0;
+                          const hasStrength = d.strengthLabels.length > 0;
+                          const dotMinutes = hasCardio && hasStrength
+                            ? d.cardioMinutes + d.strengthMinutes
+                            : hasCardio
+                              ? d.cardioMinutes
+                              : d.strengthMinutes;
+                          const size = hasCardio || hasStrength ? workoutDotSize(dotMinutes) : 5;
+                          const dotStyle =
+                            hasCardio && hasStrength
+                              ? { width: size, height: size, backgroundImage: "linear-gradient(90deg, #a78bfa 50%, #a1a1aa 50%)" }
+                              : hasCardio
+                                ? { width: size, height: size, background: "#a78bfa" }
+                                : hasStrength
+                                  ? { width: size, height: size, background: "#a1a1aa" }
+                                  : { width: size, height: size, background: "#3f3f46" };
+                          return (
+                            <div key={d.recordDate} className="relative flex items-start gap-3 pl-1">
+                              <span className="mt-1 flex w-4 shrink-0 items-center justify-center">
+                                <span className="rounded-full ring-2 ring-zinc-900" style={dotStyle} />
+                              </span>
+                              <div className="flex-1">
+                                <p className="text-sm font-bold text-zinc-200">{shortDateLabel(d.recordDate)}</p>
+                                <p className="mt-0.5 text-xs font-bold text-zinc-500">
+                                  {hasCardio && `🏃 ${d.cardioLabels.join(", ")}`}
+                                  {hasCardio && hasStrength && " · "}
+                                  {hasStrength && `💪 ${d.strengthLabels.join(", ")}`}
+                                  {!hasCardio && !hasStrength && "기록 없음"}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-bold text-zinc-500">
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-violet-400" />
+                          유산소 <span className="text-zinc-600">(클수록 오래 함)</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-zinc-400" />
+                          무산소
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     // 달력 형태: 이번 달 커버리지 바 + 요일 헤더 + 날짜 셀.
