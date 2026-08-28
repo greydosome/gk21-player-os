@@ -1601,91 +1601,68 @@ export default function Home() {
                 </div>
 
                 {view === "week" && (
-                  <>
-                    <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
-                      <h2 className="text-base font-semibold text-zinc-100">이번 주 요약</h2>
-                      <p className="mt-2 text-sm font-medium text-zinc-300">
-                        7일간 총 섭취{" "}
-                        <span className="text-[var(--accent-calorie)]">{periodSummary.totalKcal}kcal</span> / 목표{" "}
-                        {periodSummary.budget}kcal
-                        <span className="ml-1 text-zinc-500">({periodSummary.ratio}%)</span>
-                      </p>
-                      {/* 예산 바를 매크로 구성으로 나눠서, 얼마나 먹었는지뿐 아니라 무엇으로 채웠는지도 보여준다. */}
-                      <div className="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                        {periodSummary.totalKcal > 0 &&
-                          (
-                            [
-                              { kcal: periodSummary.macroTotals.protein, cls: "bg-rose-400" },
-                              { kcal: periodSummary.macroTotals.carb, cls: "bg-amber-400" },
-                              { kcal: periodSummary.macroTotals.fat, cls: "bg-emerald-400" },
-                              { kcal: periodSummary.macroTotals.extra, cls: "bg-zinc-400" },
-                            ]
-                          ).map((seg, i) =>
-                            seg.kcal > 0 ? (
-                              <span
-                                key={i}
-                                className={["h-full", seg.cls].join(" ")}
-                                style={{
-                                  width: `${Math.min(100, periodSummary.ratio) * (seg.kcal / periodSummary.totalKcal)}%`,
-                                }}
+                  <div className="rounded-3xl border border-yellow-500/40 bg-zinc-900 p-4 shadow-sm">
+                    <h2 className="text-base font-semibold text-zinc-100">🍱 식단</h2>
+                    <p className="mt-1 text-sm font-medium text-zinc-300">
+                      7일간 총 섭취{" "}
+                      <span className="text-[var(--accent-calorie)]">{periodSummary.totalKcal}kcal</span> / 목표{" "}
+                      {periodSummary.budget}kcal
+                      <span className="ml-1 text-zinc-500">({periodSummary.ratio}%)</span>
+                    </p>
+                    {/* 먼슬리 달력 셀과 같은 문법(요일 + 작은 링)으로 7일을 한 줄에 배치한다. */}
+                    <div className="mt-3 grid grid-cols-7 gap-1.5">
+                      {periodSummary.days.map((d) => {
+                        const pct =
+                          DAILY_CALORIE_BUDGET > 0 ? Math.min(100, (d.dietKcal / DAILY_CALORIE_BUDGET) * 100) : 0;
+                        const over = d.dietKcal > DAILY_CALORIE_BUDGET;
+                        const size = 26;
+                        const r = size / 2 - 2.5;
+                        const c = 2 * Math.PI * r;
+                        const ringColor = over ? "var(--accent-danger)" : "#eab308";
+                        return (
+                          <div
+                            key={d.recordDate}
+                            title={`${shortDateLabel(d.recordDate)} · ${d.dietKcal}kcal`}
+                            className="flex flex-col items-center gap-1 rounded-xl bg-zinc-800 py-2"
+                          >
+                            <span className="text-[10px] font-semibold text-zinc-500">
+                              {WEEKDAY_LABELS[new Date(`${d.recordDate}T00:00:00`).getDay()]}
+                            </span>
+                            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                              <circle
+                                cx={size / 2}
+                                cy={size / 2}
+                                r={r}
+                                fill="none"
+                                stroke="#3f3f46"
+                                strokeWidth={2.5}
                               />
-                            ) : null
-                          )}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-normal text-zinc-500">
-                        <span className="flex items-center gap-1">
-                          <span className="h-2 w-2 rounded-full bg-rose-400" />
-                          단백질 {periodSummary.macroTotals.protein}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="h-2 w-2 rounded-full bg-amber-400" />
-                          탄수화물 {periodSummary.macroTotals.carb}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                          지방 {periodSummary.macroTotals.fat}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="h-2 w-2 rounded-full bg-zinc-400" />
-                          보충·일반식 {periodSummary.macroTotals.extra}
-                        </span>
-                      </div>
+                              <circle
+                                cx={size / 2}
+                                cy={size / 2}
+                                r={r}
+                                fill="none"
+                                stroke={ringColor}
+                                strokeWidth={2.5}
+                                strokeLinecap="round"
+                                strokeDasharray={c}
+                                strokeDashoffset={c - (c * pct) / 100}
+                                transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                              />
+                            </svg>
+                            <span
+                              className={[
+                                "text-[9.5px] font-semibold tabular-nums",
+                                over ? "text-[var(--accent-danger)]" : "text-zinc-100",
+                              ].join(" ")}
+                            >
+                              {d.dietKcal}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
-
-                    <div className="rounded-3xl border border-yellow-500/40 bg-zinc-900 p-4 shadow-sm">
-                      <h2 className="text-base font-semibold text-zinc-100">🍱 식단 (요일별 합계)</h2>
-                      <div className="mt-3 space-y-2.5">
-                        {periodSummary.days.map((d) => {
-                          const dayRatio =
-                            DAILY_CALORIE_BUDGET > 0 ? (d.dietKcal / DAILY_CALORIE_BUDGET) * 100 : 0;
-                          const over = d.dietKcal > DAILY_CALORIE_BUDGET;
-                          return (
-                            <div key={d.recordDate}>
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="font-medium text-zinc-400">{shortDateLabel(d.recordDate)}</span>
-                                <span
-                                  className={["font-medium", over ? "text-[var(--accent-danger)]" : "text-zinc-100"].join(
-                                    " "
-                                  )}
-                                >
-                                  {d.dietKcal}kcal
-                                </span>
-                              </div>
-                              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                                <div
-                                  className={[
-                                    "h-full rounded-full",
-                                    over ? "bg-[var(--accent-danger)]" : "bg-yellow-500",
-                                  ].join(" ")}
-                                  style={{ width: `${Math.min(100, dayRatio)}%` }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </>
+                  </div>
                 )}
 
                 <div className="rounded-3xl border border-[var(--accent-secondary)]/40 bg-zinc-900 p-4 shadow-sm">
