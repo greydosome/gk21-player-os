@@ -642,6 +642,8 @@ export default function Home() {
   const [coachText, setCoachText] = useState("");
   const [coachWorkoutText, setCoachWorkoutText] = useState("");
   const [coachMealText, setCoachMealText] = useState("");
+  // 오늘 운동 기록이 없을 때, workout_type_history 기반으로 추천된 운동 종목명 목록.
+  const [coachRecommendedExercises, setCoachRecommendedExercises] = useState<string[]>([]);
 
   const [view, setView] = useState<"today" | "week" | "month">("today");
   const [stats, setStats] = useState<PeriodStats | null>(null);
@@ -965,6 +967,7 @@ export default function Home() {
       if (text) setCoachText(text);
       if (ai?.comments?.workout) setCoachWorkoutText(ai.comments.workout);
       if (ai?.comments?.meal) setCoachMealText(ai.comments.meal);
+      if (Array.isArray(ai?.recommendations?.exercise)) setCoachRecommendedExercises(ai.recommendations.exercise);
 
       if (ai?.overview?.status === "COMPLETED" || attemptsLeft <= 0) {
         setCoachStatus("ready");
@@ -1007,6 +1010,7 @@ export default function Home() {
     setCoachText("");
     setCoachWorkoutText("");
     setCoachMealText("");
+    setCoachRecommendedExercises([]);
     setAutoSaveStatus("idle");
     // 날짜를 바꾸면 이전 날짜에 대해 돌고 있던 AI 코칭 폴링 체인을 무효화한다.
     coachPollGenRef.current += 1;
@@ -1190,6 +1194,7 @@ export default function Home() {
     setCoachText("");
     setCoachWorkoutText("");
     setCoachMealText("");
+    setCoachRecommendedExercises([]);
     // 이전에 돌고 있던 폴링 체인(있다면)을 무효화하고 이번 요청만의 세대를 새로 만든다.
     const myGeneration = ++coachPollGenRef.current;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -1574,42 +1579,71 @@ export default function Home() {
                       </table>
                     </div>
                   ) : (
-                    // 30일치는 표로 보여주기엔 너무 길어서, 유산소/무산소 여부를 요일 순서대로
-                    // 동그라미(흰 원=했음, 테두리만=기록은 있지만 안 함, 흐린 점=그날 기록 자체가 없음)로 보여준다.
-                    <div className="mt-3 space-y-3">
-                      {(
-                        [
-                          { key: "cardio" as const, label: "🏃 유산소" },
-                          { key: "strength" as const, label: "💪 무산소" },
-                        ]
-                      ).map((row) => (
-                        <div key={row.key}>
-                          <p className="text-xs font-bold text-zinc-500">{row.label}</p>
-                          <div className="mt-1.5 flex flex-wrap gap-1.5">
-                            {periodSummary.days.map((d) => {
-                              const labels = row.key === "cardio" ? d.cardioLabels : d.strengthLabels;
-                              const done = labels.length > 0;
-                              return (
+                    // 달력 형태: 요일 헤더 + 날짜 셀. 각 셀에 유산소(보라)/무산소(회색) 점을 찍고,
+                    // 그날 식단을 기록했고 1200kcal 예산 이내였으면(=식단관리 성공) 노란 테두리로 표시한다.
+                    <div className="mt-3">
+                      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-zinc-600">
+                        {WEEKDAY_LABELS.map((w) => (
+                          <div key={w}>{w}</div>
+                        ))}
+                      </div>
+                      <div className="mt-1 grid grid-cols-7 gap-1">
+                        {Array.from({
+                          length: new Date(`${periodSummary.days[0]?.recordDate}T00:00:00`).getDay(),
+                        }).map((_, i) => (
+                          <div key={`blank-${i}`} />
+                        ))}
+                        {periodSummary.days.map((d) => {
+                          const hasCardio = d.cardioLabels.length > 0;
+                          const hasStrength = d.strengthLabels.length > 0;
+                          const dietSuccess = d.dietKcal > 0 && d.dietKcal <= DAILY_CALORIE_BUDGET;
+                          const titleParts = [shortDateLabel(d.recordDate)];
+                          if (hasCardio) titleParts.push(`유산소: ${d.cardioLabels.join(", ")}`);
+                          if (hasStrength) titleParts.push(`무산소: ${d.strengthLabels.join(", ")}`);
+                          titleParts.push(dietSuccess ? "식단관리 성공" : `${d.dietKcal}kcal`);
+                          return (
+                            <div
+                              key={d.recordDate}
+                              title={titleParts.join(" · ")}
+                              className={[
+                                "flex flex-col items-center gap-1 rounded-lg border py-1.5",
+                                dietSuccess ? "border-yellow-500/70 bg-yellow-500/10" : "border-transparent",
+                              ].join(" ")}
+                            >
+                              <span className="text-xs font-bold text-zinc-300">
+                                {Number(d.recordDate.slice(-2))}
+                              </span>
+                              <span className="flex gap-0.5">
                                 <span
-                                  key={d.recordDate}
-                                  title={`${shortDateLabel(d.recordDate)}${done ? " · " + labels.join(", ") : ""}`}
                                   className={[
-                                    "h-3.5 w-3.5 shrink-0 rounded-full border-2",
-                                    done
-                                      ? "border-zinc-100 bg-zinc-100"
-                                      : d.hasData
-                                        ? "border-zinc-600 bg-transparent"
-                                        : "border-zinc-800 bg-zinc-800",
+                                    "h-1.5 w-1.5 rounded-full",
+                                    hasCardio ? "bg-violet-400" : "bg-transparent",
                                   ].join(" ")}
                                 />
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                      <div className="flex justify-between text-xs font-bold text-zinc-600">
-                        <span>{shortDateLabel(periodSummary.days[0]?.recordDate)}</span>
-                        <span>{shortDateLabel(periodSummary.days[periodSummary.days.length - 1]?.recordDate)}</span>
+                                <span
+                                  className={[
+                                    "h-1.5 w-1.5 rounded-full",
+                                    hasStrength ? "bg-zinc-400" : "bg-transparent",
+                                  ].join(" ")}
+                                />
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-bold text-zinc-500">
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-violet-400" />
+                          유산소
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-zinc-400" />
+                          무산소
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full border border-yellow-500 bg-yellow-500/20" />
+                          식단관리 성공
+                        </span>
                       </div>
                     </div>
                   )}
@@ -2017,6 +2051,18 @@ export default function Home() {
                         <div>
                           <p className="text-xs font-black text-blue-400">🏋 운동</p>
                           <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">{coachWorkoutText}</p>
+                          {coachRecommendedExercises.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {coachRecommendedExercises.map((label) => (
+                                <span
+                                  key={label}
+                                  className="rounded-full border border-blue-400/40 bg-zinc-800 px-3 py-1 text-xs font-bold text-blue-300"
+                                >
+                                  💡 {label}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                       {coachMealText && (
