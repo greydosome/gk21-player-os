@@ -1275,11 +1275,18 @@ export default function Home() {
 
       const cardioLabels: string[] = [];
       const strengthLabels: string[] = [];
+      let cardioMinutes = 0;
+      let strengthMinutes = 0;
       (detail?.workout_items ?? []).forEach((item) => {
         const known = WORKOUT_TYPES.find((w) => w.label === item.workout_type);
         const label = item.workout_type;
-        if (known?.category === "strength") strengthLabels.push(label);
-        else cardioLabels.push(label);
+        if (known?.category === "strength") {
+          strengthLabels.push(label);
+          strengthMinutes += item.minutes ?? 0;
+        } else {
+          cardioLabels.push(label);
+          cardioMinutes += item.minutes ?? 0;
+        }
       });
 
       return {
@@ -1287,6 +1294,8 @@ export default function Home() {
         dietKcal,
         cardioLabels,
         strengthLabels,
+        cardioMinutes,
+        strengthMinutes,
         hasData: h.protein_kcal !== null || h.workout_done_yn !== null,
       };
     });
@@ -1295,7 +1304,14 @@ export default function Home() {
     const budget = DAILY_CALORIE_BUDGET * days.length;
     const ratio = budget > 0 ? Math.round((totalKcal / budget) * 100) : 0;
 
-    return { days, totalKcal, budget, ratio };
+    // 이번 달 운동 커버리지: 유산소/근력을 모두 한 날 · 유산소만 · 근력만 · 기록 없는 날
+    const bothDays = days.filter((d) => d.cardioLabels.length > 0 && d.strengthLabels.length > 0).length;
+    const cardioOnlyDays = days.filter((d) => d.cardioLabels.length > 0 && d.strengthLabels.length === 0).length;
+    const strengthOnlyDays = days.filter((d) => d.strengthLabels.length > 0 && d.cardioLabels.length === 0).length;
+    const noneDays = days.length - bothDays - cardioOnlyDays - strengthOnlyDays;
+    const coverage = { bothDays, cardioOnlyDays, strengthOnlyDays, noneDays };
+
+    return { days, totalKcal, budget, ratio, coverage };
   }, [history, periodDetail]);
 
   async function requestPeriodCoaching() {
@@ -1549,7 +1565,15 @@ export default function Home() {
                 )}
 
                 <div className="rounded-3xl border border-[var(--accent-secondary)]/40 bg-zinc-900 p-4 shadow-sm">
-                  <h2 className="text-base font-black text-zinc-100">🏋 운동</h2>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h2 className="text-base font-black text-zinc-100">🏋 운동</h2>
+                    {view === "month" && (
+                      <p className="text-xs font-bold text-zinc-500">
+                        🏃 {periodSummary.coverage.cardioOnlyDays + periodSummary.coverage.bothDays}일 · 💪{" "}
+                        {periodSummary.coverage.strengthOnlyDays + periodSummary.coverage.bothDays}일
+                      </p>
+                    )}
+                  </div>
 
                   {view === "week" ? (
                     <div className="mt-2 overflow-x-auto">
@@ -1579,10 +1603,35 @@ export default function Home() {
                       </table>
                     </div>
                   ) : (
-                    // 달력 형태: 요일 헤더 + 날짜 셀. 각 셀에 유산소(보라)/무산소(회색) 점을 찍고,
-                    // 그날 식단을 기록했고 1200kcal 예산 이내였으면(=식단관리 성공) 노란 테두리로 표시한다.
+                    // 달력 형태: 이번 달 커버리지 바 + 요일 헤더 + 날짜 셀.
+                    // 각 셀에 유산소(보라)/무산소(회색) 점을 찍되, 그날 수행 분량만큼 점 크기를 키워
+                    // "얼마나 했는지"까지 한눈에 보이게 한다. 식단을 기록했고 1200kcal 이내였으면
+                    // (=식단관리 성공) 노란 테두리로 표시한다.
                     <div className="mt-3">
-                      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-zinc-600">
+                      <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">
+                        {(
+                          [
+                            { count: periodSummary.coverage.bothDays, cls: "bg-[var(--accent-primary)]" },
+                            { count: periodSummary.coverage.cardioOnlyDays, cls: "bg-violet-400" },
+                            { count: periodSummary.coverage.strengthOnlyDays, cls: "bg-zinc-400" },
+                            { count: periodSummary.coverage.noneDays, cls: "bg-zinc-800" },
+                          ]
+                        ).map((seg, i) =>
+                          seg.count > 0 ? (
+                            <span
+                              key={i}
+                              className={["h-full", seg.cls].join(" ")}
+                              style={{ width: `${(seg.count / periodSummary.days.length) * 100}%` }}
+                            />
+                          ) : null
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-[11px] font-bold text-zinc-500">
+                        둘 다 {periodSummary.coverage.bothDays}일 · 유산소만 {periodSummary.coverage.cardioOnlyDays}일 ·
+                        근력만 {periodSummary.coverage.strengthOnlyDays}일 · 기록 없음 {periodSummary.coverage.noneDays}일
+                      </p>
+
+                      <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-zinc-600">
                         {WEEKDAY_LABELS.map((w) => (
                           <div key={w}>{w}</div>
                         ))}
@@ -1596,10 +1645,12 @@ export default function Home() {
                         {periodSummary.days.map((d) => {
                           const hasCardio = d.cardioLabels.length > 0;
                           const hasStrength = d.strengthLabels.length > 0;
+                          const cardioSize = Math.max(5, Math.min(9, 5 + Math.round(d.cardioMinutes / 20)));
+                          const strengthSize = Math.max(5, Math.min(9, 5 + Math.round(d.strengthMinutes / 20)));
                           const dietSuccess = d.dietKcal > 0 && d.dietKcal <= DAILY_CALORIE_BUDGET;
                           const titleParts = [shortDateLabel(d.recordDate)];
-                          if (hasCardio) titleParts.push(`유산소: ${d.cardioLabels.join(", ")}`);
-                          if (hasStrength) titleParts.push(`무산소: ${d.strengthLabels.join(", ")}`);
+                          if (hasCardio) titleParts.push(`유산소: ${d.cardioLabels.join(", ")} (${d.cardioMinutes}분)`);
+                          if (hasStrength) titleParts.push(`무산소: ${d.strengthLabels.join(", ")} (${d.strengthMinutes}분)`);
                           titleParts.push(dietSuccess ? "식단관리 성공" : `${d.dietKcal}kcal`);
                           return (
                             <div
@@ -1613,19 +1664,23 @@ export default function Home() {
                               <span className="text-xs font-bold text-zinc-300">
                                 {Number(d.recordDate.slice(-2))}
                               </span>
-                              <span className="flex gap-0.5">
-                                <span
-                                  className={[
-                                    "h-1.5 w-1.5 rounded-full",
-                                    hasCardio ? "bg-violet-400" : "bg-transparent",
-                                  ].join(" ")}
-                                />
-                                <span
-                                  className={[
-                                    "h-1.5 w-1.5 rounded-full",
-                                    hasStrength ? "bg-zinc-400" : "bg-transparent",
-                                  ].join(" ")}
-                                />
+                              <span className="flex items-center gap-1">
+                                <span className="flex h-2.5 w-2.5 items-center justify-center">
+                                  {hasCardio && (
+                                    <span
+                                      className="rounded-full bg-violet-400 ring-2 ring-zinc-900"
+                                      style={{ width: cardioSize, height: cardioSize }}
+                                    />
+                                  )}
+                                </span>
+                                <span className="flex h-2.5 w-2.5 items-center justify-center">
+                                  {hasStrength && (
+                                    <span
+                                      className="rounded-full bg-zinc-400 ring-2 ring-zinc-900"
+                                      style={{ width: strengthSize, height: strengthSize }}
+                                    />
+                                  )}
+                                </span>
                               </span>
                             </div>
                           );
@@ -1634,7 +1689,7 @@ export default function Home() {
                       <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-bold text-zinc-500">
                         <span className="flex items-center gap-1">
                           <span className="h-2 w-2 rounded-full bg-violet-400" />
-                          유산소
+                          유산소 <span className="text-zinc-600">(클수록 오래 함)</span>
                         </span>
                         <span className="flex items-center gap-1">
                           <span className="h-2 w-2 rounded-full bg-zinc-400" />
