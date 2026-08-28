@@ -395,16 +395,6 @@ type PeriodDetailRow = {
   workout_items: { workout_type: string; minutes: number; calorie_estimate: number | null; detail: string | null }[];
 };
 
-type NumericHistoryKey = "weight_kg" | "sleep_hours" | "water_liter" | "protein_kcal" | "carb_kcal" | "fat_kcal";
-
-const TREND_METRICS: { key: NumericHistoryKey; title: string; unit: string }[] = [
-  { key: "weight_kg", title: "⚖️ 체중", unit: "kg" },
-  { key: "sleep_hours", title: "😴 수면", unit: "h" },
-  { key: "water_liter", title: "💧 수분", unit: "L" },
-  { key: "protein_kcal", title: "🥩 단백질", unit: "kcal" },
-  { key: "carb_kcal", title: "🍚 탄수화물", unit: "kcal" },
-  { key: "fat_kcal", title: "🥑 지방", unit: "kcal" },
-];
 
 function today() {
   const now = new Date();
@@ -1236,12 +1226,10 @@ export default function Home() {
       fetch(`/api/stats/history?period=${view}&record_date=${recordDate}`, { cache: "no-store" }).then(
         (res) => res.json()
       ),
-      // 위클리 요약(식단 총합/요일별 운동)에만 필요한 원본 데이터라 "위클리"에서만 불러온다.
-      view === "week"
-        ? fetch(`/api/stats/detail?period=week&record_date=${recordDate}`, { cache: "no-store" }).then((res) =>
-            res.json()
-          )
-        : Promise.resolve(null),
+      // 위클리/먼슬리 요약(식단 총합, 유산소/무산소 운동 표시)에 쓰는 원본 데이터.
+      fetch(`/api/stats/detail?period=${view}&record_date=${recordDate}`, { cache: "no-store" }).then((res) =>
+        res.json()
+      ),
     ])
       .then(([statsData, historyData, detailData]) => {
         setStats(statsData?.stats ?? null);
@@ -1251,9 +1239,10 @@ export default function Home() {
       .finally(() => setStatsLoading(false));
   }, [view, recordDate]);
 
-  // 위클리 요약: 하루 목표(1200kcal) 대비 7일 총 섭취량/비율, 요일별 식단 총 kcal
-  // (매크로 구분 없이 합계만), 요일별 유산소/근력 운동 종목을 만든다.
-  const weeklySummary = useMemo(() => {
+  // 위클리/먼슬리 공용 요약: 요일(날짜)별 식단 총 kcal(매크로 구분 없이 합계만)와
+  // 유산소/무산소 운동 종목·수행 여부를 만든다. 위클리는 이 중 kcal 합계/목표 대비
+  // 비율까지 보여주고, 먼슬리는 칼로리는 빼고 유산소/무산소 여부만 점으로 보여준다.
+  const periodSummary = useMemo(() => {
     if (!history || !periodDetail) return null;
 
     const detailByDate = new Map(periodDetail.map((d) => [d.record_date, d]));
@@ -1270,12 +1259,18 @@ export default function Home() {
       const strengthLabels: string[] = [];
       (detail?.workout_items ?? []).forEach((item) => {
         const known = WORKOUT_TYPES.find((w) => w.label === item.workout_type);
-        const label = `${item.workout_type} ${item.minutes}분`;
+        const label = item.workout_type;
         if (known?.category === "strength") strengthLabels.push(label);
         else cardioLabels.push(label);
       });
 
-      return { recordDate: h.record_date, dietKcal, cardioLabels, strengthLabels };
+      return {
+        recordDate: h.record_date,
+        dietKcal,
+        cardioLabels,
+        strengthLabels,
+        hasData: h.protein_kcal !== null || h.workout_done_yn !== null,
+      };
     });
 
     const totalKcal = days.reduce((sum, d) => sum + d.dietKcal, 0);
@@ -1406,70 +1401,116 @@ export default function Home() {
           ))}
         </div>
 
-        {view === "week" ? (
+        {view === "week" || view === "month" ? (
           <section className="mt-3 space-y-3">
-            {statsLoading || !weeklySummary ? (
+            {statsLoading || !periodSummary ? (
               <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
                 <p className="text-sm font-bold text-zinc-500">불러오는 중...</p>
               </div>
             ) : (
               <>
-                <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
-                  <h2 className="text-base font-black text-zinc-100">이번 주 요약</h2>
-                  <p className="mt-2 text-sm font-bold text-zinc-300">
-                    7일간 총 섭취{" "}
-                    <span className="text-[var(--accent-calorie)]">{weeklySummary.totalKcal}kcal</span> / 목표{" "}
-                    {weeklySummary.budget}kcal
-                    <span className="ml-1 text-zinc-500">({weeklySummary.ratio}%)</span>
-                  </p>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-800">
-                    <div
-                      className="h-full rounded-full bg-[var(--accent-calorie)]"
-                      style={{ width: `${Math.min(100, weeklySummary.ratio)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-yellow-500/40 bg-zinc-900 p-4 shadow-sm">
-                  <h2 className="text-base font-black text-zinc-100">🍱 식단 (요일별 합계)</h2>
-                  <div className="mt-2 space-y-1">
-                    {weeklySummary.days.map((d) => (
-                      <div key={d.recordDate} className="flex items-center justify-between text-sm">
-                        <span className="font-bold text-zinc-400">{shortDateLabel(d.recordDate)}</span>
-                        <span className="font-bold text-zinc-100">{d.dietKcal}kcal</span>
+                {view === "week" && (
+                  <>
+                    <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
+                      <h2 className="text-base font-black text-zinc-100">이번 주 요약</h2>
+                      <p className="mt-2 text-sm font-bold text-zinc-300">
+                        7일간 총 섭취{" "}
+                        <span className="text-[var(--accent-calorie)]">{periodSummary.totalKcal}kcal</span> / 목표{" "}
+                        {periodSummary.budget}kcal
+                        <span className="ml-1 text-zinc-500">({periodSummary.ratio}%)</span>
+                      </p>
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+                        <div
+                          className="h-full rounded-full bg-[var(--accent-calorie)]"
+                          style={{ width: `${Math.min(100, periodSummary.ratio)}%` }}
+                        />
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-yellow-500/40 bg-zinc-900 p-4 shadow-sm">
+                      <h2 className="text-base font-black text-zinc-100">🍱 식단 (요일별 합계)</h2>
+                      <div className="mt-2 space-y-1">
+                        {periodSummary.days.map((d) => (
+                          <div key={d.recordDate} className="flex items-center justify-between text-sm">
+                            <span className="font-bold text-zinc-400">{shortDateLabel(d.recordDate)}</span>
+                            <span className="font-bold text-zinc-100">{d.dietKcal}kcal</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="rounded-3xl border border-[var(--accent-secondary)]/40 bg-zinc-900 p-4 shadow-sm">
-                  <h2 className="text-base font-black text-zinc-100">🏋 운동 (요일별)</h2>
-                  <div className="mt-2 overflow-x-auto">
-                    <table className="w-full min-w-[320px] text-sm">
-                      <thead>
-                        <tr className="text-left text-zinc-500">
-                          <th className="pb-1 pr-2 font-bold">날짜</th>
-                          <th className="pb-1 pr-2 font-bold">🏃 유산소</th>
-                          <th className="pb-1 font-bold">💪 근력</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {weeklySummary.days.map((d) => (
-                          <tr key={d.recordDate} className="border-t border-zinc-800 align-top">
-                            <td className="whitespace-nowrap py-1.5 pr-2 font-bold text-zinc-400">
-                              {shortDateLabel(d.recordDate)}
-                            </td>
-                            <td className="py-1.5 pr-2 font-bold text-zinc-200">
-                              {d.cardioLabels.length > 0 ? d.cardioLabels.join(", ") : "-"}
-                            </td>
-                            <td className="py-1.5 font-bold text-zinc-200">
-                              {d.strengthLabels.length > 0 ? d.strengthLabels.join(", ") : "-"}
-                            </td>
+                  <h2 className="text-base font-black text-zinc-100">🏋 운동</h2>
+
+                  {view === "week" ? (
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="w-full min-w-[320px] text-sm">
+                        <thead>
+                          <tr className="text-left text-zinc-500">
+                            <th className="pb-1 pr-2 font-bold">날짜</th>
+                            <th className="pb-1 pr-2 font-bold">🏃 유산소</th>
+                            <th className="pb-1 font-bold">💪 근력</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {periodSummary.days.map((d) => (
+                            <tr key={d.recordDate} className="border-t border-zinc-800 align-top">
+                              <td className="whitespace-nowrap py-1.5 pr-2 font-bold text-zinc-400">
+                                {shortDateLabel(d.recordDate)}
+                              </td>
+                              <td className="py-1.5 pr-2 font-bold text-zinc-200">
+                                {d.cardioLabels.length > 0 ? d.cardioLabels.join(", ") : "-"}
+                              </td>
+                              <td className="py-1.5 font-bold text-zinc-200">
+                                {d.strengthLabels.length > 0 ? d.strengthLabels.join(", ") : "-"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    // 30일치는 표로 보여주기엔 너무 길어서, 유산소/무산소 여부를 요일 순서대로
+                    // 동그라미(흰 원=했음, 테두리만=기록은 있지만 안 함, 흐린 점=그날 기록 자체가 없음)로 보여준다.
+                    <div className="mt-3 space-y-3">
+                      {(
+                        [
+                          { key: "cardio" as const, label: "🏃 유산소" },
+                          { key: "strength" as const, label: "💪 무산소" },
+                        ]
+                      ).map((row) => (
+                        <div key={row.key}>
+                          <p className="text-xs font-bold text-zinc-500">{row.label}</p>
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {periodSummary.days.map((d) => {
+                              const labels = row.key === "cardio" ? d.cardioLabels : d.strengthLabels;
+                              const done = labels.length > 0;
+                              return (
+                                <span
+                                  key={d.recordDate}
+                                  title={`${shortDateLabel(d.recordDate)}${done ? " · " + labels.join(", ") : ""}`}
+                                  className={[
+                                    "h-3.5 w-3.5 shrink-0 rounded-full border-2",
+                                    done
+                                      ? "border-zinc-100 bg-zinc-100"
+                                      : d.hasData
+                                        ? "border-zinc-600 bg-transparent"
+                                        : "border-zinc-800 bg-zinc-800",
+                                  ].join(" ")}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-xs font-bold text-zinc-600">
+                        <span>{shortDateLabel(periodSummary.days[0]?.recordDate)}</span>
+                        <span>{shortDateLabel(periodSummary.days[periodSummary.days.length - 1]?.recordDate)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 text-sm font-bold shadow-sm">
@@ -1486,38 +1527,6 @@ export default function Home() {
                     {stats?.avg_weight_kg != null ? `${Number(stats.avg_weight_kg).toFixed(1)}kg` : "-"}
                   </p>
                 </div>
-              </>
-            )}
-          </section>
-        ) : view === "month" ? (
-          <section className="mt-3 space-y-3">
-            <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
-              <h2 className="text-base font-black text-zinc-100">최근 30일 요약</h2>
-
-              {statsLoading || !stats ? (
-                <p className="mt-3 text-sm font-bold text-zinc-500">불러오는 중...</p>
-              ) : (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <StatTile label="기록일" value={`${stats.days_logged}/${stats.period_days}일`} />
-                  <StatTile label="운동일" value={`${stats.workout_days}일`} />
-                  <StatTile label="복약 완료일" value={`${stats.full_medication_days}일`} />
-                  <StatTile label="폭식일" value={`${stats.binge_days}일`} />
-                </div>
-              )}
-            </div>
-
-            {!statsLoading && history && (
-              <>
-                {TREND_METRICS.map((m) => (
-                  <TrendChart
-                    key={m.key}
-                    title={m.title}
-                    unit={m.unit}
-                    data={history.map((h) => h[m.key])}
-                    dates={history.map((h) => h.record_date)}
-                  />
-                ))}
-                <WorkoutDots data={history.map((h) => h.workout_done_yn)} dates={history.map((h) => h.record_date)} />
               </>
             )}
           </section>
@@ -2571,116 +2580,6 @@ function CollapsibleBlock({ title, children }: { title: string; children: React.
         <span className="text-xs font-bold text-zinc-500">{open ? "▲ 접기" : "▼ 펼치기"}</span>
       </button>
       {open && <div className="mt-2">{children}</div>}
-    </div>
-  );
-}
-
-function StatTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-zinc-800 p-3">
-      <p className="text-xs font-bold text-zinc-500">{label}</p>
-      <p className="mt-1 text-lg font-black text-zinc-100">{value}</p>
-    </div>
-  );
-}
-
-const CHART_ACCENT = "#e5e7eb"; // zinc-200, monotone chart accent
-
-function TrendChart({
-  title,
-  unit,
-  data,
-  dates,
-}: {
-  title: string;
-  unit: string;
-  data: (number | null)[];
-  dates: string[];
-}) {
-  const width = 300;
-  const height = 70;
-  const padding = 6;
-
-  const validValues = data.filter((v): v is number => v !== null && v !== undefined);
-  const bestValue = validValues.length > 0 ? Math.max(...validValues) : null;
-  const maxValue = Math.max(bestValue ?? 0, 1) * 1.1;
-  const stepX = data.length > 1 ? (width - padding * 2) / (data.length - 1) : 0;
-
-  const points = data.map((v, i) => {
-    if (v === null || v === undefined) return null;
-    const x = padding + i * stepX;
-    const y = height - padding - (v / maxValue) * (height - padding * 2);
-    return { x, y };
-  });
-
-  const pathParts: string[] = [];
-  let drawing = false;
-  points.forEach((p) => {
-    if (!p) {
-      drawing = false;
-      return;
-    }
-    pathParts.push(`${drawing ? "L" : "M"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`);
-    drawing = true;
-  });
-
-  const lastPoint = [...points].reverse().find((p) => p !== null) ?? null;
-  const lastValue = [...validValues].pop();
-  const targetY =
-    bestValue !== null ? height - padding - (bestValue / maxValue) * (height - padding * 2) : null;
-
-  return (
-    <div className="rounded-2xl bg-zinc-800 p-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-bold text-zinc-400">{title}</p>
-        <p className="text-sm font-black text-zinc-100">
-          {lastValue !== undefined ? `${lastValue}${unit}` : "-"}
-        </p>
-      </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="mt-2 w-full" style={{ height: 56 }}>
-        {targetY !== null && (
-          <line x1={padding} x2={width - padding} y1={targetY} y2={targetY} stroke="#52525b" strokeWidth="1" />
-        )}
-        {pathParts.length > 0 && (
-          <path
-            d={pathParts.join(" ")}
-            fill="none"
-            stroke={CHART_ACCENT}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        )}
-        {lastPoint && <circle cx={lastPoint.x} cy={lastPoint.y} r="4" fill={CHART_ACCENT} stroke="#27272a" strokeWidth="2" />}
-      </svg>
-      <div className="flex justify-between text-xs font-bold text-zinc-600">
-        <span>{dates[0]?.slice(5)}</span>
-        <span>{dates[dates.length - 1]?.slice(5)}</span>
-      </div>
-    </div>
-  );
-}
-
-function WorkoutDots({ data, dates }: { data: (boolean | null)[]; dates: string[] }) {
-  return (
-    <div className="rounded-2xl bg-zinc-800 p-3">
-      <p className="text-xs font-bold text-zinc-400">🏋 운동일</p>
-      <div className="mt-2 flex gap-1.5">
-        {data.map((done, i) => (
-          <div
-            key={dates[i] ?? i}
-            title={dates[i]}
-            className={[
-              "h-6 flex-1 rounded-full",
-              done === true ? "bg-[var(--pop-bg)]" : done === false ? "bg-zinc-700" : "bg-zinc-900",
-            ].join(" ")}
-          />
-        ))}
-      </div>
-      <div className="mt-1 flex justify-between text-xs font-bold text-zinc-600">
-        <span>{dates[0]?.slice(5)}</span>
-        <span>{dates[dates.length - 1]?.slice(5)}</span>
-      </div>
     </div>
   );
 }
