@@ -649,6 +649,15 @@ export default function Home() {
   const [statsLoading, setStatsLoading] = useState(false);
   // 위클리 요약 전용: 요일별 식단 총 kcal / 운동 종목을 만들기 위한 원본 데이터.
   const [periodDetail, setPeriodDetail] = useState<PeriodDetailRow[] | null>(null);
+  // 위클리/먼슬리 AI 코칭: 명시적으로 버튼을 눌렀을 때만 요청하는 온디맨드 코칭이라
+  // 일간 코칭처럼 폴링하지 않고 응답을 그대로 받아서 보여준다.
+  const [periodCoachStatus, setPeriodCoachStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [periodCoachResult, setPeriodCoachResult] = useState<{
+    workout_good: string | null;
+    workout_improve: string | null;
+    meal_praise: string | null;
+    summary: string | null;
+  } | null>(null);
 
   const proteinKcal = useMemo(
     () => computeKcal(PROTEIN_FOODS, proteinCounts) + sumCustomKcal(customMealItems, "protein"),
@@ -1218,6 +1227,10 @@ export default function Home() {
   useEffect(() => {
     if (view === "today") return;
 
+    // 기간/날짜가 바뀌면 이전 기간에 대한 AI 코칭 결과는 더 이상 유효하지 않다.
+    setPeriodCoachStatus("idle");
+    setPeriodCoachResult(null);
+
     setStatsLoading(true);
     Promise.all([
       fetch(`/api/stats?period=${view}&record_date=${recordDate}`, { cache: "no-store" }).then((res) =>
@@ -1279,6 +1292,41 @@ export default function Home() {
 
     return { days, totalKcal, budget, ratio };
   }, [history, periodDetail]);
+
+  async function requestPeriodCoaching() {
+    if (!periodSummary || periodSummary.days.length === 0) return;
+
+    setPeriodCoachStatus("loading");
+    try {
+      const res = await fetch("/api/ai/period-coaching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          period: view,
+          start_date: periodSummary.days[0].recordDate,
+          end_date: periodSummary.days[periodSummary.days.length - 1].recordDate,
+          days: periodSummary.days.map((d) => ({
+            record_date: d.recordDate,
+            diet_kcal: d.dietKcal,
+            cardio_labels: d.cardioLabels,
+            strength_labels: d.strengthLabels,
+          })),
+          total_kcal: periodSummary.totalKcal,
+          budget_kcal: periodSummary.budget,
+          ratio_percent: periodSummary.ratio,
+          avg_sleep_hours: stats?.avg_sleep_hours ?? null,
+          avg_water_liter: stats?.avg_water_liter ?? null,
+          avg_weight_kg: stats?.avg_weight_kg ?? null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(JSON.stringify(data));
+      setPeriodCoachResult(data.coaching);
+      setPeriodCoachStatus("ready");
+    } catch {
+      setPeriodCoachStatus("error");
+    }
+  }
 
   return (
     <main
@@ -1409,6 +1457,60 @@ export default function Home() {
               </div>
             ) : (
               <>
+                <div className="rounded-3xl border border-[var(--accent-ai)]/40 bg-zinc-900 p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-base font-black text-zinc-100">
+                      🤖 AI 코치 · {view === "week" ? "이번 주" : "이번 달"}
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={requestPeriodCoaching}
+                      disabled={periodCoachStatus === "loading"}
+                      className="shrink-0 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs font-black text-zinc-100 disabled:opacity-50"
+                    >
+                      {periodCoachStatus === "loading" ? "코칭 받는 중..." : "AI 코칭 받기"}
+                    </button>
+                  </div>
+
+                  {periodCoachStatus === "error" && (
+                    <p className="mt-3 text-sm font-bold text-zinc-500">코칭을 받지 못했어요. 다시 시도해주세요.</p>
+                  )}
+
+                  {periodCoachStatus === "ready" && periodCoachResult && (
+                    <div className="mt-3 space-y-3">
+                      {periodCoachResult.summary && (
+                        <p className="text-sm font-bold leading-relaxed text-zinc-100">{periodCoachResult.summary}</p>
+                      )}
+                      <div className="space-y-2 border-t border-zinc-800 pt-3">
+                        {periodCoachResult.workout_good && (
+                          <div>
+                            <p className="text-xs font-black text-[var(--accent-secondary)]">🏋 운동 · 잘된 점</p>
+                            <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">
+                              {periodCoachResult.workout_good}
+                            </p>
+                          </div>
+                        )}
+                        {periodCoachResult.workout_improve && (
+                          <div>
+                            <p className="text-xs font-black text-[var(--accent-secondary)]">🏋 운동 · 보완할 점</p>
+                            <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">
+                              {periodCoachResult.workout_improve}
+                            </p>
+                          </div>
+                        )}
+                        {periodCoachResult.meal_praise && (
+                          <div>
+                            <p className="text-xs font-black text-yellow-400">🍱 식단 · 칭찬</p>
+                            <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">
+                              {periodCoachResult.meal_praise}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {view === "week" && (
                   <>
                     <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
