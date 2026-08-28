@@ -1375,8 +1375,8 @@ export default function Home() {
       <div className="mx-auto max-w-xl p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-baseline gap-2">
-            <h1 className="shrink-0 text-2xl font-black">🧤 GK21</h1>
-            <span className="truncate text-sm font-bold text-zinc-400">{todaySchedule.dayLabel}</span>
+            <h1 className="shrink-0 text-2xl font-bold">🧤 GK21</h1>
+            <span className="truncate text-sm font-medium text-zinc-400">{todaySchedule.dayLabel}</span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
@@ -1391,7 +1391,7 @@ export default function Home() {
               type="date"
               value={recordDate}
               onChange={(e) => setRecordDate(e.target.value)}
-              className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-bold text-zinc-100"
+              className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-100"
             />
           </div>
         </div>
@@ -1431,7 +1431,7 @@ export default function Home() {
         >
           <p
             className={[
-              "text-center text-sm font-black uppercase tracking-wide",
+              "text-center text-sm font-semibold uppercase tracking-wide",
               dataReady && (isSick || !hasAnyInput) ? "text-white/70" : "text-zinc-500",
             ].join(" ")}
           >
@@ -1439,13 +1439,13 @@ export default function Home() {
           </p>
 
           {!dataReady ? (
-            <p className="mt-2 text-center text-lg font-bold text-zinc-500">불러오는 중...</p>
+            <p className="mt-2 text-center text-lg font-normal text-zinc-500">불러오는 중...</p>
           ) : isSick || !hasAnyInput ? (
             <div className="text-center">
-              <p className="mt-2 text-4xl font-black">
+              <p className="mt-2 text-4xl font-bold">
                 {ready.level.icon} {ready.level.label}
               </p>
-              <p className="mt-2 font-bold text-white/90">{ready.level.text}</p>
+              <p className="mt-2 font-medium text-white/90">{ready.level.text}</p>
             </div>
           ) : (
             <div className="mt-3 flex flex-wrap justify-center gap-2">
@@ -1453,7 +1453,7 @@ export default function Home() {
                 <span
                   key={b.key}
                   className={[
-                    "inline-flex items-center gap-1.5 rounded-full border-2 px-3.5 py-2 text-sm font-bold transition-colors",
+                    "inline-flex items-center gap-1.5 rounded-full border-2 px-3.5 py-2 text-sm font-medium transition-colors",
                     b.good ? b.activeClass : "border-zinc-700 bg-zinc-800 text-zinc-400",
                   ].join(" ")}
                 >
@@ -1478,7 +1478,7 @@ export default function Home() {
               type="button"
               onClick={() => setView(tab.key)}
               className={[
-                "rounded-2xl border-2 py-2.5 text-sm font-black transition-colors",
+                "rounded-2xl border-2 py-2.5 text-sm font-semibold transition-colors",
                 view === tab.key ? DAY_BADGE_ACTIVE_CLASS : "border-zinc-800 bg-zinc-900 text-zinc-400",
               ].join(" ")}
             >
@@ -1491,55 +1491,55 @@ export default function Home() {
           <section className="mt-3 space-y-3">
             {statsLoading || !periodSummary ? (
               <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
-                <p className="text-sm font-bold text-zinc-500">불러오는 중...</p>
+                <p className="text-sm font-normal text-zinc-500">불러오는 중...</p>
               </div>
             ) : (
               <>
                 <div className="rounded-3xl border border-[var(--accent-ai)]/40 bg-zinc-900 p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-base font-black text-zinc-100">
+                    <h2 className="text-base font-semibold text-zinc-100">
                       🤖 AI 코치 · {view === "week" ? "이번 주" : "이번 달"}
                     </h2>
                     <button
                       type="button"
                       onClick={requestPeriodCoaching}
                       disabled={periodCoachStatus === "loading"}
-                      className="shrink-0 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs font-black text-zinc-100 disabled:opacity-50"
+                      className="shrink-0 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-zinc-100 disabled:opacity-50"
                     >
                       {periodCoachStatus === "loading" ? "코칭 받는 중..." : "AI 코칭 받기"}
                     </button>
                   </div>
 
                   {periodCoachStatus === "error" && (
-                    <p className="mt-3 text-sm font-bold text-zinc-500">코칭을 받지 못했어요. 다시 시도해주세요.</p>
+                    <p className="mt-3 text-sm font-normal text-zinc-500">코칭을 받지 못했어요. 다시 시도해주세요.</p>
                   )}
 
                   {periodCoachStatus === "ready" && periodCoachResult && (
                     <div className="mt-3 space-y-3">
                       {periodCoachResult.summary && (
-                        <p className="text-sm font-bold leading-relaxed text-zinc-100">{periodCoachResult.summary}</p>
+                        <p className="text-sm font-medium leading-relaxed text-zinc-100">{periodCoachResult.summary}</p>
                       )}
                       <div className="space-y-2 border-t border-zinc-800 pt-3">
                         {periodCoachResult.workout_good && (
                           <div>
-                            <p className="text-xs font-black text-[var(--accent-secondary)]">🏋 운동 · 잘된 점</p>
-                            <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">
+                            <p className="text-xs font-semibold text-[var(--accent-secondary)]">🏋 운동 · 잘된 점</p>
+                            <p className="mt-1 text-sm font-medium leading-relaxed text-zinc-300">
                               {periodCoachResult.workout_good}
                             </p>
                           </div>
                         )}
                         {periodCoachResult.workout_improve && (
                           <div>
-                            <p className="text-xs font-black text-[var(--accent-secondary)]">🏋 운동 · 보완할 점</p>
-                            <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">
+                            <p className="text-xs font-semibold text-[var(--accent-secondary)]">🏋 운동 · 보완할 점</p>
+                            <p className="mt-1 text-sm font-medium leading-relaxed text-zinc-300">
                               {periodCoachResult.workout_improve}
                             </p>
                           </div>
                         )}
                         {periodCoachResult.meal_praise && (
                           <div>
-                            <p className="text-xs font-black text-yellow-400">🍱 식단 · 칭찬</p>
-                            <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">
+                            <p className="text-xs font-semibold text-yellow-400">🍱 식단 · 칭찬</p>
+                            <p className="mt-1 text-sm font-medium leading-relaxed text-zinc-300">
                               {periodCoachResult.meal_praise}
                             </p>
                           </div>
@@ -1552,8 +1552,8 @@ export default function Home() {
                 {view === "week" && (
                   <>
                     <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4 shadow-sm">
-                      <h2 className="text-base font-black text-zinc-100">이번 주 요약</h2>
-                      <p className="mt-2 text-sm font-bold text-zinc-300">
+                      <h2 className="text-base font-semibold text-zinc-100">이번 주 요약</h2>
+                      <p className="mt-2 text-sm font-medium text-zinc-300">
                         7일간 총 섭취{" "}
                         <span className="text-[var(--accent-calorie)]">{periodSummary.totalKcal}kcal</span> / 목표{" "}
                         {periodSummary.budget}kcal
@@ -1581,7 +1581,7 @@ export default function Home() {
                             ) : null
                           )}
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-zinc-500">
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-normal text-zinc-500">
                         <span className="flex items-center gap-1">
                           <span className="h-2 w-2 rounded-full bg-rose-400" />
                           단백질 {periodSummary.macroTotals.protein}
@@ -1602,7 +1602,7 @@ export default function Home() {
                     </div>
 
                     <div className="rounded-3xl border border-yellow-500/40 bg-zinc-900 p-4 shadow-sm">
-                      <h2 className="text-base font-black text-zinc-100">🍱 식단 (요일별 합계)</h2>
+                      <h2 className="text-base font-semibold text-zinc-100">🍱 식단 (요일별 합계)</h2>
                       <div className="mt-3 space-y-2.5">
                         {periodSummary.days.map((d) => {
                           const dayRatio =
@@ -1611,9 +1611,9 @@ export default function Home() {
                           return (
                             <div key={d.recordDate}>
                               <div className="flex items-center justify-between text-sm">
-                                <span className="font-bold text-zinc-400">{shortDateLabel(d.recordDate)}</span>
+                                <span className="font-medium text-zinc-400">{shortDateLabel(d.recordDate)}</span>
                                 <span
-                                  className={["font-bold", over ? "text-[var(--accent-danger)]" : "text-zinc-100"].join(
+                                  className={["font-medium", over ? "text-[var(--accent-danger)]" : "text-zinc-100"].join(
                                     " "
                                   )}
                                 >
@@ -1639,9 +1639,9 @@ export default function Home() {
 
                 <div className="rounded-3xl border border-[var(--accent-secondary)]/40 bg-zinc-900 p-4 shadow-sm">
                   <div className="flex items-baseline justify-between gap-2">
-                    <h2 className="text-base font-black text-zinc-100">🏋 운동</h2>
+                    <h2 className="text-base font-semibold text-zinc-100">🏋 운동</h2>
                     {view === "month" && (
-                      <p className="text-xs font-bold text-zinc-500">
+                      <p className="text-xs font-normal text-zinc-500">
                         🏃 {periodSummary.coverage.cardioOnlyDays + periodSummary.coverage.bothDays}일 · 💪{" "}
                         {periodSummary.coverage.strengthOnlyDays + periodSummary.coverage.bothDays}일
                       </p>
@@ -1677,8 +1677,8 @@ export default function Home() {
                                 <span className="rounded-full ring-2 ring-zinc-900" style={dotStyle} />
                               </span>
                               <div className="flex-1">
-                                <p className="text-sm font-bold text-zinc-200">{shortDateLabel(d.recordDate)}</p>
-                                <p className="mt-0.5 text-xs font-bold text-zinc-500">
+                                <p className="text-sm font-medium text-zinc-200">{shortDateLabel(d.recordDate)}</p>
+                                <p className="mt-0.5 text-xs font-normal text-zinc-500">
                                   {hasCardio && `🏃 ${d.cardioLabels.join(", ")}`}
                                   {hasCardio && hasStrength && " · "}
                                   {hasStrength && `💪 ${d.strengthLabels.join(", ")}`}
@@ -1689,7 +1689,7 @@ export default function Home() {
                           );
                         })}
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-bold text-zinc-500">
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-normal text-zinc-500">
                         <span className="flex items-center gap-1">
                           <span className="h-2 w-2 rounded-full bg-violet-400" />
                           유산소 <span className="text-zinc-600">(클수록 오래 함)</span>
@@ -1724,12 +1724,12 @@ export default function Home() {
                           ) : null
                         )}
                       </div>
-                      <p className="mt-1.5 text-[11px] font-bold text-zinc-500">
+                      <p className="mt-1.5 text-[11px] font-normal text-zinc-500">
                         둘 다 {periodSummary.coverage.bothDays}일 · 유산소만 {periodSummary.coverage.cardioOnlyDays}일 ·
                         근력만 {periodSummary.coverage.strengthOnlyDays}일 · 기록 없음 {periodSummary.coverage.noneDays}일
                       </p>
 
-                      <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-zinc-600">
+                      <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] font-normal text-zinc-600">
                         {WEEKDAY_LABELS.map((w) => (
                           <div key={w}>{w}</div>
                         ))}
@@ -1759,7 +1759,7 @@ export default function Home() {
                                 dietSuccess ? "border-yellow-500/70 bg-yellow-500/10" : "border-transparent",
                               ].join(" ")}
                             >
-                              <span className="text-xs font-bold text-zinc-300">
+                              <span className="text-xs font-medium text-zinc-300">
                                 {Number(d.recordDate.slice(-2))}
                               </span>
                               <span className="flex items-center gap-1">
@@ -1784,7 +1784,7 @@ export default function Home() {
                           );
                         })}
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-bold text-zinc-500">
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-normal text-zinc-500">
                         <span className="flex items-center gap-1">
                           <span className="h-2 w-2 rounded-full bg-violet-400" />
                           유산소 <span className="text-zinc-600">(클수록 오래 함)</span>
@@ -1802,7 +1802,7 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="space-y-1.5 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 text-sm font-bold shadow-sm">
+                <div className="space-y-1.5 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 text-sm font-medium shadow-sm">
                   <p className="text-zinc-300">
                     😴 수면 평균{" "}
                     {stats?.avg_sleep_hours != null ? `${Number(stats.avg_sleep_hours).toFixed(1)}h` : "-"}
@@ -1850,7 +1850,7 @@ export default function Home() {
                     value={weightKg ?? ""}
                     onChange={(e) => setWeightKg(e.target.value === "" ? null : parseFloat(e.target.value))}
                     placeholder="체중 입력 (kg)"
-                    className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-lg font-black text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                    className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-lg font-bold tabular-nums text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
                   />
                 </CollapsibleBlock>
 
@@ -1901,14 +1901,14 @@ export default function Home() {
             >
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-2xl bg-zinc-800 p-3">
-                  <p className="text-xs font-bold text-zinc-500">섭취 칼로리</p>
-                  <p className="mt-1 text-lg font-black text-zinc-100">{totalDietKcal}kcal</p>
+                  <p className="text-xs font-normal text-zinc-500">섭취 칼로리</p>
+                  <p className="mt-1 text-lg font-bold tabular-nums text-zinc-100">{totalDietKcal}kcal</p>
                 </div>
                 <div className="rounded-2xl bg-zinc-800 p-3">
-                  <p className="text-xs font-bold text-zinc-500">잔여 칼로리 / 목표 {DAILY_CALORIE_BUDGET}kcal</p>
+                  <p className="text-xs font-normal text-zinc-500">잔여 칼로리 / 목표 {DAILY_CALORIE_BUDGET}kcal</p>
                   <p
                     className={[
-                      "mt-1 text-lg font-black",
+                      "mt-1 text-lg font-bold tabular-nums",
                       remainingKcal < 0 ? OVER_BUDGET_COLOR.text : "text-zinc-100",
                     ].join(" ")}
                   >
@@ -2014,15 +2014,15 @@ export default function Home() {
 
                     {foodHistory.length > 0 && (
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
-                        <p className="text-xs font-bold text-zinc-400">이전에 입력한 음식에서 선택</p>
+                        <p className="text-xs font-medium text-zinc-400">이전에 입력한 음식에서 선택</p>
                         <input
                           value={foodHistoryQuery}
                           onChange={(e) => setFoodHistoryQuery(e.target.value)}
                           placeholder="음식 이름 검색"
-                          className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                          className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
                         />
                         {filteredFoodHistory.length === 0 ? (
-                          <p className="mt-2 text-xs font-bold text-zinc-600">검색 결과가 없어요.</p>
+                          <p className="mt-2 text-xs font-normal text-zinc-600">검색 결과가 없어요.</p>
                         ) : (
                           <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto pr-1">
                             {filteredFoodHistory.map((item) => (
@@ -2032,8 +2032,8 @@ export default function Home() {
                                 onClick={() => addCustomMealItem(item)}
                                 className="flex w-full items-center justify-between rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-left"
                               >
-                                <span className="text-sm font-bold text-zinc-200">{item.name}</span>
-                                <span className="shrink-0 text-xs font-bold text-zinc-500">
+                                <span className="text-sm font-medium text-zinc-200">{item.name}</span>
+                                <span className="shrink-0 text-xs font-normal text-zinc-500">
                                   {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} · ` : ""}
                                   {item.totalCalorie}kcal
                                 </span>
@@ -2081,7 +2081,7 @@ export default function Home() {
                                 onClick={() => toggleWorkout(w.label, suggestion?.minutes ?? w.defaultMinutes)}
                                 className="min-w-0 flex-1 text-left"
                               >
-                                <p className="truncate font-bold text-zinc-100">
+                                <p className="truncate font-medium text-zinc-100">
                                   {isSelected ? "✓ " : suggestion ? "⭐ " : ""}
                                   {w.label}
                                 </p>
@@ -2103,7 +2103,7 @@ export default function Home() {
                                   <button
                                     type="button"
                                     onClick={() => toggleWorkout(w.label, selected.minutes)}
-                                    className={[WORKOUT_COLOR.bg, "h-8 w-8 shrink-0 rounded-full text-sm font-black text-zinc-950"].join(" ")}
+                                    className={[WORKOUT_COLOR.bg, "h-8 w-8 shrink-0 rounded-full text-sm font-semibold text-zinc-950"].join(" ")}
                                   >
                                     ✕
                                   </button>
@@ -2112,7 +2112,7 @@ export default function Home() {
                                 <button
                                   type="button"
                                   onClick={() => toggleWorkout(w.label, suggestion?.minutes ?? w.defaultMinutes)}
-                                  className="shrink-0 rounded-full border-2 border-zinc-700 bg-zinc-900 px-3.5 py-2 text-sm font-bold text-zinc-300"
+                                  className="shrink-0 rounded-full border-2 border-zinc-700 bg-zinc-900 px-3.5 py-2 text-sm font-medium text-zinc-300"
                                 >
                                   선택
                                 </button>
@@ -2127,7 +2127,7 @@ export default function Home() {
                                     type="button"
                                     onClick={() => toggleWorkoutDetail(w.label, exercise)}
                                     className={[
-                                      "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors",
+                                      "shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
                                       selected.details.has(exercise)
                                         ? [WORKOUT_COLOR.border, WORKOUT_COLOR.bg, "text-zinc-950"].join(" ")
                                         : "border-zinc-700 bg-zinc-900 text-zinc-400",
@@ -2170,12 +2170,12 @@ export default function Home() {
                   onChange={(e) => setWorkoutComment(e.target.value)}
                   placeholder="오늘 운동에 대한 코멘트를 남겨보세요"
                   rows={2}
-                  className="mt-4 w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                  className="mt-4 w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
                 />
               )}
             </Section>
 
-            <p className="mt-3 text-center text-xs font-bold text-zinc-600">
+            <p className="mt-3 text-center text-xs font-normal text-zinc-600">
               {autoSaveStatus === "saving" && "자동 저장 중..."}
               {autoSaveStatus === "saved" && "✓ 자동 저장됨"}
             </p>
@@ -2185,14 +2185,14 @@ export default function Home() {
                 type="button"
                 onClick={requestCoaching}
                 disabled={coachStatus === "loading"}
-                className="w-full rounded-xl border border-zinc-700 bg-zinc-800 py-2 text-xs font-black text-zinc-100 disabled:opacity-50"
+                className="w-full rounded-xl border border-zinc-700 bg-zinc-800 py-2 text-xs font-semibold text-zinc-100 disabled:opacity-50"
               >
                 {coachStatus === "loading" ? "코칭 받는 중..." : "🤖 AI 코칭 받기"}
               </button>
 
               {coachStatus !== "idle" && (
                 <div className="mt-4 border-t border-zinc-800 pt-4">
-                  <p className="font-bold leading-relaxed text-zinc-100">
+                  <p className="font-medium leading-relaxed text-zinc-100">
                     {coachStatus === "loading" && !coachText
                       ? "코치가 오늘 운동/식단을 분석하고 있습니다..."
                       : coachText}
@@ -2202,14 +2202,14 @@ export default function Home() {
                     <div className="mt-4 space-y-3 border-t border-zinc-800 pt-4">
                       {coachWorkoutText && (
                         <div>
-                          <p className="text-xs font-black text-blue-400">🏋 운동</p>
-                          <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">{coachWorkoutText}</p>
+                          <p className="text-xs font-semibold text-blue-400">🏋 운동</p>
+                          <p className="mt-1 text-sm font-medium leading-relaxed text-zinc-300">{coachWorkoutText}</p>
                           {coachRecommendedExercises.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {coachRecommendedExercises.map((label) => (
                                 <span
                                   key={label}
-                                  className="rounded-full border border-blue-400/40 bg-zinc-800 px-3 py-1 text-xs font-bold text-blue-300"
+                                  className="rounded-full border border-blue-400/40 bg-zinc-800 px-3 py-1 text-xs font-medium text-blue-300"
                                 >
                                   💡 {label}
                                 </span>
@@ -2220,8 +2220,8 @@ export default function Home() {
                       )}
                       {coachMealText && (
                         <div>
-                          <p className="text-xs font-black text-yellow-400">🍱 식단</p>
-                          <p className="mt-1 text-sm font-bold leading-relaxed text-zinc-300">{coachMealText}</p>
+                          <p className="text-xs font-semibold text-yellow-400">🍱 식단</p>
+                          <p className="mt-1 text-sm font-medium leading-relaxed text-zinc-300">{coachMealText}</p>
                         </div>
                       )}
                     </div>
@@ -2259,7 +2259,7 @@ function Section({
   const header = (
     <div className="flex items-center gap-2">
       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-zinc-800 text-base">{icon}</span>
-      <h2 className="text-base font-black text-zinc-100">{label}</h2>
+      <h2 className="text-base font-semibold text-zinc-100">{label}</h2>
     </div>
   );
 
@@ -2279,13 +2279,13 @@ function Section({
         )}
         <div className="flex items-center gap-2">
           {subtitle && (
-            <span className={[color ? color.text : "text-zinc-300", "text-lg font-black"].join(" ")}>{subtitle}</span>
+            <span className={[color ? color.text : "text-zinc-300", "text-lg font-bold tabular-nums"].join(" ")}>{subtitle}</span>
           )}
           {collapsible && (
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-zinc-800 text-xs font-bold text-zinc-400"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-zinc-800 text-xs font-medium text-zinc-400"
               aria-label={open ? "접기" : "펼치기"}
             >
               {open ? "▲" : "▼"}
@@ -2342,21 +2342,21 @@ const FoodSection = memo(function FoodSection({
               ].join(" ")}
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="font-bold text-zinc-100">{food.label}</p>
+                <p className="font-medium text-zinc-100">{food.label}</p>
                 <p className="text-xs text-zinc-500">
                   {food.mode === "gram" ? `100g당 ${food.kcalPer100g}kcal` : `1개당 ${food.kcalPerPiece}kcal`}
                 </p>
               </div>
               {amount > 0 && (
                 <div className="mt-1 flex items-center justify-between">
-                  <p className="text-sm font-bold text-zinc-100">
+                  <p className="text-sm font-medium text-zinc-100">
                     현재섭취 {amount}
                     {unitLabel} / {itemKcal}kcal
                   </p>
                   <button
                     type="button"
                     onClick={() => onChangeCount(food.label, 0)}
-                    className="text-xs font-bold text-zinc-500 underline"
+                    className="text-xs font-normal text-zinc-500 underline"
                   >
                     초기화
                   </button>
@@ -2429,7 +2429,7 @@ function CustomFoodFields({
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="음식 이름"
-        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
       />
 
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
@@ -2439,7 +2439,7 @@ function CustomFoodFields({
             type="button"
             onClick={() => setCategory(opt.value)}
             className={[
-              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold transition-colors",
+              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
               category === opt.value
                 ? [color.border, color.bg, "text-zinc-950"].join(" ")
                 : "border-zinc-700 bg-zinc-800 text-zinc-400",
@@ -2455,14 +2455,14 @@ function CustomFoodFields({
           <button
             type="button"
             onClick={() => setUnit("g")}
-            className={["flex-1 rounded-lg py-1.5 text-xs font-black transition-colors", unit === "g" ? [color.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
+            className={["flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors", unit === "g" ? [color.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
           >
             그램(g)
           </button>
           <button
             type="button"
             onClick={() => setUnit("count")}
-            className={["flex-1 rounded-lg py-1.5 text-xs font-black transition-colors", unit === "count" ? [color.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
+            className={["flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors", unit === "count" ? [color.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
           >
             개수(개)
           </button>
@@ -2475,7 +2475,7 @@ function CustomFoodFields({
           value={quantityInput}
           onChange={(e) => setQuantityInput(e.target.value)}
           placeholder={unit === "g" ? "g (선택)" : "개수 (선택)"}
-          className="w-24 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          className="w-24 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
         />
       </div>
 
@@ -2487,11 +2487,11 @@ function CustomFoodFields({
           value={calorieInput}
           onChange={(e) => setCalorieInput(e.target.value)}
           placeholder="총 칼로리 (kcal)"
-          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
         />
         <div className="shrink-0 rounded-xl bg-zinc-800 px-3 py-2 text-right">
-          <p className="text-[10px] font-bold text-zinc-500">100g당</p>
-          <p className="text-sm font-black text-zinc-100">{kcalPer100g !== null ? `${kcalPer100g}kcal` : "-"}</p>
+          <p className="text-[10px] font-normal text-zinc-500">100g당</p>
+          <p className="text-sm font-semibold text-zinc-100">{kcalPer100g !== null ? `${kcalPer100g}kcal` : "-"}</p>
         </div>
       </div>
     </>
@@ -2538,7 +2538,7 @@ function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) 
 
   return (
     <div className="rounded-2xl border border-dashed border-zinc-700 bg-zinc-900 p-3">
-      <p className="text-xs font-bold text-zinc-400">직접입력 (카탈로그에 없는 음식)</p>
+      <p className="text-xs font-medium text-zinc-400">직접입력 (카탈로그에 없는 음식)</p>
 
       <div className="mt-2 space-y-2">
         <CustomFoodFields
@@ -2555,7 +2555,7 @@ function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) 
           type="button"
           onClick={handleAdd}
           disabled={!f.canSubmit}
-          className={[DIET_COLOR.bg, "w-full rounded-xl py-2 text-sm font-black text-zinc-950 disabled:opacity-40"].join(" ")}
+          className={[DIET_COLOR.bg, "w-full rounded-xl py-2 text-sm font-semibold text-zinc-950 disabled:opacity-40"].join(" ")}
         >
           + 추가하기
         </button>
@@ -2600,7 +2600,7 @@ function CustomFoodRow({
         type="button"
         onClick={startEdit}
         className={[
-          "inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 bg-zinc-800 font-bold text-zinc-100",
+          "inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 bg-zinc-800 font-medium text-zinc-100",
           small ? "px-3 py-1.5 text-xs" : "px-4 py-2.5 text-sm",
           color.border,
         ].join(" ")}
@@ -2629,18 +2629,18 @@ function CustomFoodRow({
     return (
       <div className={["rounded-2xl border-2 bg-zinc-800 p-3", color.border].join(" ")}>
         <div className="flex items-center justify-between gap-2">
-          <p className="font-bold text-zinc-100">{item.name}</p>
+          <p className="font-medium text-zinc-100">{item.name}</p>
           <div className="flex shrink-0 gap-3">
-            <button type="button" onClick={startEdit} className="text-xs font-bold text-zinc-400 underline">
+            <button type="button" onClick={startEdit} className="text-xs font-medium text-zinc-400 underline">
               수정
             </button>
-            <button type="button" onClick={onRemove} className="text-xs font-bold text-zinc-500 underline">
+            <button type="button" onClick={onRemove} className="text-xs font-normal text-zinc-500 underline">
               삭제
             </button>
           </div>
         </div>
         {item.category === "general" && (
-          <p className="mt-1 text-sm font-bold text-zinc-100">
+          <p className="mt-1 text-sm font-medium text-zinc-100">
             {item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} / ` : ""}
             {item.totalCalorie}kcal
             {item.kcalPer100g !== null ? ` · 100g당 ${item.kcalPer100g}kcal` : ""}
@@ -2667,7 +2667,7 @@ function CustomFoodRow({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="flex-1 rounded-xl border border-zinc-700 py-2 text-sm font-black text-zinc-300"
+            className="flex-1 rounded-xl border border-zinc-700 py-2 text-sm font-semibold text-zinc-300"
           >
             취소
           </button>
@@ -2675,7 +2675,7 @@ function CustomFoodRow({
             type="button"
             onClick={handleSave}
             disabled={!f.canSubmit}
-            className={[color.bg, "flex-1 rounded-xl py-2 text-sm font-black text-zinc-950 disabled:opacity-40"].join(" ")}
+            className={[color.bg, "flex-1 rounded-xl py-2 text-sm font-semibold text-zinc-950 disabled:opacity-40"].join(" ")}
           >
             저장
           </button>
@@ -2707,7 +2707,7 @@ function CustomWorkoutFields({
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="운동 이름 (예: 수영, 조깅)"
-        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
       />
 
       <div className="flex items-center gap-2">
@@ -2718,7 +2718,7 @@ function CustomWorkoutFields({
           value={minutesInput}
           onChange={(e) => setMinutesInput(e.target.value)}
           placeholder="시간 (분)"
-          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
         />
         <input
           type="number"
@@ -2727,7 +2727,7 @@ function CustomWorkoutFields({
           value={calorieInput}
           onChange={(e) => setCalorieInput(e.target.value)}
           placeholder="소모 칼로리(kcal)"
-          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-bold text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
         />
       </div>
     </>
@@ -2766,7 +2766,7 @@ function CustomWorkoutForm({ onAdd }: { onAdd: (entry: CustomWorkoutEntry) => vo
 
   return (
     <div className="rounded-2xl border border-dashed border-zinc-700 bg-zinc-900 p-3">
-      <p className="text-xs font-bold text-zinc-400">직접입력 (목록에 없는 운동)</p>
+      <p className="text-xs font-medium text-zinc-400">직접입력 (목록에 없는 운동)</p>
 
       <div className="mt-2 space-y-2">
         <CustomWorkoutFields
@@ -2779,7 +2779,7 @@ function CustomWorkoutForm({ onAdd }: { onAdd: (entry: CustomWorkoutEntry) => vo
           type="button"
           onClick={handleAdd}
           disabled={!f.canSubmit}
-          className={[WORKOUT_COLOR.bg, "w-full rounded-xl py-2 text-sm font-black text-zinc-950 disabled:opacity-40"].join(" ")}
+          className={[WORKOUT_COLOR.bg, "w-full rounded-xl py-2 text-sm font-semibold text-zinc-950 disabled:opacity-40"].join(" ")}
         >
           + 추가하기
         </button>
@@ -2818,16 +2818,16 @@ function CustomWorkoutRow({
       <div className={["rounded-2xl border-2 bg-zinc-800 p-3", color.border].join(" ")}>
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="font-bold text-zinc-100">{item.name}</p>
+            <p className="font-medium text-zinc-100">{item.name}</p>
             <p className="text-xs text-zinc-500">
               {item.minutes}분 · {item.calorieEstimate}kcal
             </p>
           </div>
           <div className="flex shrink-0 gap-3">
-            <button type="button" onClick={startEdit} className="text-xs font-bold text-zinc-400 underline">
+            <button type="button" onClick={startEdit} className="text-xs font-medium text-zinc-400 underline">
               수정
             </button>
-            <button type="button" onClick={onRemove} className="text-xs font-bold text-zinc-500 underline">
+            <button type="button" onClick={onRemove} className="text-xs font-normal text-zinc-500 underline">
               삭제
             </button>
           </div>
@@ -2849,7 +2849,7 @@ function CustomWorkoutRow({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="flex-1 rounded-xl border border-zinc-700 py-2 text-sm font-black text-zinc-300"
+            className="flex-1 rounded-xl border border-zinc-700 py-2 text-sm font-semibold text-zinc-300"
           >
             취소
           </button>
@@ -2857,7 +2857,7 @@ function CustomWorkoutRow({
             type="button"
             onClick={handleSave}
             disabled={!f.canSubmit}
-            className={[color.bg, "flex-1 rounded-xl py-2 text-sm font-black text-zinc-950 disabled:opacity-40"].join(" ")}
+            className={[color.bg, "flex-1 rounded-xl py-2 text-sm font-semibold text-zinc-950 disabled:opacity-40"].join(" ")}
           >
             저장
           </button>
@@ -2877,8 +2877,8 @@ function CollapsibleBlock({ title, children }: { title: string; children: React.
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between text-left"
       >
-        <p className="text-sm font-bold text-zinc-300">{title}</p>
-        <span className="text-xs font-bold text-zinc-500">{open ? "▲ 접기" : "▼ 펼치기"}</span>
+        <p className="text-sm font-medium text-zinc-300">{title}</p>
+        <span className="text-xs font-normal text-zinc-500">{open ? "▲ 접기" : "▼ 펼치기"}</span>
       </button>
       {open && <div className="mt-2">{children}</div>}
     </div>
@@ -2903,7 +2903,7 @@ function Chip({
       type="button"
       onClick={onClick}
       className={[
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 px-4 py-2.5 text-sm font-bold transition-colors",
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 px-4 py-2.5 text-sm font-medium transition-colors",
         active
           ? tone === "warn"
             ? "border-red-600 bg-red-600 text-white"
@@ -2938,7 +2938,7 @@ function ScaleRow({
           type="button"
           onClick={() => onSelect(value)}
           className={[
-            "shrink-0 rounded-2xl border-2 px-4 py-2.5 text-sm font-black transition-colors",
+            "shrink-0 rounded-2xl border-2 px-4 py-2.5 text-sm font-semibold transition-colors",
             active === value
               ? [color.border, color.bg, "text-zinc-950"].join(" ")
               : "border-zinc-700 bg-zinc-800 text-zinc-300",
@@ -2996,7 +2996,7 @@ function GramRoller({
           {values.map((v) => (
             <div
               key={v}
-              className="flex snap-center items-center justify-center text-sm font-bold text-zinc-300"
+              className="flex snap-center items-center justify-center text-sm font-medium text-zinc-300"
               style={{ height: GRAM_ROLLER_ITEM_HEIGHT }}
             >
               {v}g
@@ -3013,7 +3013,7 @@ function GramRoller({
       <button
         type="button"
         onClick={() => onAdd(picked)}
-        className={[color.bg, "shrink-0 rounded-2xl px-4 py-2.5 text-sm font-black text-zinc-950"].join(" ")}
+        className={[color.bg, "shrink-0 rounded-2xl px-4 py-2.5 text-sm font-semibold text-zinc-950"].join(" ")}
       >
         +{picked}g 담기
       </button>
@@ -3037,18 +3037,18 @@ function Stepper({
       <button
         type="button"
         onClick={() => onChange(value - step)}
-        className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-base font-black text-zinc-100"
+        className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-base font-semibold text-zinc-100"
       >
         −
       </button>
-      <span className="w-14 text-center text-sm font-black text-zinc-100">
+      <span className="w-14 text-center text-sm font-semibold text-zinc-100">
         {value}
         {suffix}
       </span>
       <button
         type="button"
         onClick={() => onChange(value + step)}
-        className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-base font-black text-zinc-100"
+        className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-base font-semibold text-zinc-100"
       >
         +
       </button>
