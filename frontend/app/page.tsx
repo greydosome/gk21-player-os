@@ -133,6 +133,54 @@ function workoutDotSize(minutes: number) {
   return Math.max(5, Math.min(9, 5 + Math.round(minutes / 20)));
 }
 
+// 먼슬리 달력 아래 규칙 기반 코칭 요약 (LLM 호출 없이, 이미 계산된 커버리지/식단성공 수치로만 판단).
+function buildMonthlyInsight(
+  totalDays: number,
+  coverage: { bothDays: number; cardioOnlyDays: number; strengthOnlyDays: number; noneDays: number },
+  dietSuccessDays: number
+) {
+  const cardioDays = coverage.bothDays + coverage.cardioOnlyDays;
+  const strengthDays = coverage.bothDays + coverage.strengthOnlyDays;
+  const activeDays = totalDays - coverage.noneDays;
+  const activeRatio = totalDays > 0 ? activeDays / totalDays : 0;
+  const dietRatio = totalDays > 0 ? dietSuccessDays / totalDays : 0;
+
+  let activity: string;
+  if (activeRatio >= 0.7) {
+    activity = `이번 달 정말 꾸준했어요 — 운동 기록이 ${activeDays}/${totalDays}일이에요.`;
+  } else if (activeRatio >= 0.4) {
+    activity = `이번 달 ${activeDays}/${totalDays}일 운동했어요. 나쁘지 않은 페이스예요.`;
+  } else {
+    activity = `이번 달 운동 기록이 ${activeDays}/${totalDays}일로 좀 적어요. 다음 달엔 조금 더 늘려봐요.`;
+  }
+
+  let balance: string | null = null;
+  if (activeDays > 0) {
+    if (cardioDays > 0 && strengthDays > 0 && cardioDays > strengthDays * 1.8) {
+      balance = `유산소(${cardioDays}일) 위주였어요 · 근력(${strengthDays}일)을 좀 더 섞어보세요.`;
+    } else if (cardioDays > 0 && strengthDays > 0 && strengthDays > cardioDays * 1.8) {
+      balance = `근력(${strengthDays}일) 위주였어요 · 유산소(${cardioDays}일)도 챙겨보세요.`;
+    } else if (strengthDays === 0 && cardioDays > 0) {
+      balance = `유산소만 ${cardioDays}일 했어요 · 근력 운동도 조금 넣어보면 좋겠어요.`;
+    } else if (cardioDays === 0 && strengthDays > 0) {
+      balance = `근력만 ${strengthDays}일 했어요 · 유산소도 챙겨보면 좋겠어요.`;
+    } else {
+      balance = `유산소(${cardioDays}일)·근력(${strengthDays}일) 균형이 좋아요.`;
+    }
+  }
+
+  let diet: string;
+  if (dietRatio >= 0.6) {
+    diet = `식단관리 성공한 날이 ${dietSuccessDays}/${totalDays}일로 아주 좋아요.`;
+  } else if (dietRatio >= 0.3) {
+    diet = `식단관리 성공 ${dietSuccessDays}/${totalDays}일. 조금씩 늘려가 봐요.`;
+  } else {
+    diet = `식단관리 성공한 날이 ${dietSuccessDays}/${totalDays}일로 적은 편이에요. 기록부터 꾸준히 해봐요.`;
+  }
+
+  return { activity, balance, diet };
+}
+
 type BlockColor = { border: string; borderSoft: string; bg: string; text: string };
 
 // 세 섹션(데일리체크/식단/운동)을 한눈에 구분할 수 있도록 각자 고유 색을 준다.
@@ -1328,7 +1376,10 @@ export default function Home() {
     const noneDays = days.length - bothDays - cardioOnlyDays - strengthOnlyDays;
     const coverage = { bothDays, cardioOnlyDays, strengthOnlyDays, noneDays };
 
-    return { days, totalKcal, budget, ratio, macroTotals, coverage };
+    // 식단관리 성공한 날 (기록이 있고 1200kcal 예산 이내) — 먼슬리 달력의 노란 테두리와 동일한 기준.
+    const dietSuccessDays = days.filter((d) => d.dietKcal > 0 && d.dietKcal <= DAILY_CALORIE_BUDGET).length;
+
+    return { days, totalKcal, budget, ratio, macroTotals, coverage, dietSuccessDays };
   }, [history, periodDetail]);
 
   async function requestPeriodCoaching() {
@@ -1801,6 +1852,23 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+
+                {view === "month" &&
+                  (() => {
+                    const insight = buildMonthlyInsight(
+                      periodSummary.days.length,
+                      periodSummary.coverage,
+                      periodSummary.dietSuccessDays
+                    );
+                    return (
+                      <div className="space-y-2 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 text-sm font-medium shadow-sm">
+                        <h2 className="text-base font-semibold text-zinc-100">💡 이번 달 총평</h2>
+                        <p className="text-zinc-300">🏋 {insight.activity}</p>
+                        {insight.balance && <p className="text-zinc-300">⚖️ {insight.balance}</p>}
+                        <p className="text-zinc-300">🍱 {insight.diet}</p>
+                      </div>
+                    );
+                  })()}
 
                 <div className="space-y-1.5 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 text-sm font-medium shadow-sm">
                   <p className="text-zinc-300">
