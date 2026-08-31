@@ -78,16 +78,8 @@ const WORKOUT_TYPES: WorkoutType[] = [
   },
   { label: "자전거", category: "cardio", kcalPerMin: 7, defaultMinutes: 30 },
   { label: "계단 오르기", category: "cardio", kcalPerMin: 10, defaultMinutes: 20 },
-  // 30분 기준 200kcal/180kcal로 거의 매일 하는 기본 유산소라 매일 기본 선택되도록 한다
-  // (DEFAULT_SELECTED_WORKOUTS 참고).
   { label: "인클라인 워킹", category: "cardio", kcalPerMin: 200 / 30, defaultMinutes: 30 },
   { label: "스텝퍼", category: "cardio", kcalPerMin: 180 / 30, defaultMinutes: 30 },
-];
-
-// 기록이 하나도 없는 새 날짜를 열었을 때 기본으로 체크되어 있을 운동들.
-const DEFAULT_SELECTED_WORKOUTS: { label: string; minutes: number }[] = [
-  { label: "인클라인 워킹", minutes: 30 },
-  { label: "스텝퍼", minutes: 30 },
 ];
 
 // 0=일 1=월 2=화 3=수 4=목 5=금 6=토 (Bible 주간 일정 기준)
@@ -1107,17 +1099,6 @@ export default function Home() {
             }
           }
         );
-
-        // "운동 기록이 없다(workout_items.length===0)"만으로는 오늘 처음 여는 완전히
-        // 새 날짜인지, 이미 저장은 했지만 유산소를 의도적으로 다 지운 날인지 구분할 수
-        // 없다. 그 상태로 판단하면 지웠다가 다시 열 때마다 기본값이 되살아나 버린다.
-        // day_record 자체가 아직 없는(=이 날짜로 한 번도 저장한 적 없는) 경우에만
-        // 기본 유산소(인클라인 워킹/스텝퍼)를 기본 선택 상태로 미리 체크해둔다.
-        if (!d) {
-          DEFAULT_SELECTED_WORKOUTS.forEach((w) => {
-            workoutMap.set(w.label, { minutes: w.minutes, details: new Set() });
-          });
-        }
 
         const proteinMap = parseFoodItems(detail?.protein_items ?? []);
         const carbMap = parseFoodItems(detail?.carb_items ?? []);
