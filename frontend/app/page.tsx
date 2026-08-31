@@ -1501,18 +1501,24 @@ export default function Home() {
               <p className="mt-2 font-medium text-white/90">{ready.level.text}</p>
             </div>
           ) : (
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
+            // 5개 체크 항목을 하나로 이어진 여정처럼 보여준다: 원 사이를 가로지르는 선 위에
+            // 완료=진한 원(DAY_BADGE_ACTIVE_CLASS), 미완료=옅은 원으로 도장을 찍듯 배치한다.
+            <div className="relative mt-4 flex justify-between px-1">
+              <div className="absolute left-5 right-5 top-5 h-0.5 bg-zinc-800" />
               {dayBadges.map((b) => (
-                <span
-                  key={b.key}
-                  className={[
-                    "inline-flex items-center gap-1.5 rounded-full border-2 px-3.5 py-2 text-sm font-medium transition-colors",
-                    b.good ? b.activeClass : "border-zinc-700 bg-zinc-800 text-zinc-400",
-                  ].join(" ")}
-                >
-                  {b.good && "✓ "}
-                  {b.icon} {b.label}
-                </span>
+                <div key={b.key} className="relative z-10 flex flex-1 flex-col items-center gap-1.5">
+                  <span
+                    className={[
+                      "flex h-10 w-10 items-center justify-center rounded-full border-2 text-base transition-colors",
+                      b.good ? b.activeClass : "border-zinc-700 bg-zinc-800 text-zinc-400",
+                    ].join(" ")}
+                  >
+                    {b.icon}
+                  </span>
+                  <span className={["text-xs font-medium", b.good ? "text-zinc-100" : "text-zinc-500"].join(" ")}>
+                    {b.label}
+                  </span>
+                </div>
               ))}
             </div>
           )}
