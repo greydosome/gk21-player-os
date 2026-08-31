@@ -258,10 +258,19 @@ const FOOD_CATEGORY_OPTIONS: { value: FoodCategory; label: string }[] = [
   { value: "supplement", label: "보충음식" },
 ];
 
-function caloriesPer100g(unit: "g" | "count", quantity: number | null, totalCalorie: number | null) {
-  if (unit !== "g" || quantity === null || quantity <= 0) return null;
+// 직접입력 폼: "100g당/1개당 몇 kcal"인지(rate)와 "얼마나 먹었는지"(quantity)를 각각 입력받아
+// 총 칼로리를 자동으로 곱해서 계산한다 — 3개 먹었다고 rate*3을 사용자가 직접 계산할 필요가 없게 한다.
+function totalFromRate(unit: "g" | "count", rate: number | null, quantity: number | null) {
+  if (rate === null || Number.isNaN(rate) || quantity === null || Number.isNaN(quantity)) return null;
+  return Math.round(unit === "g" ? (quantity / 100) * rate : quantity * rate);
+}
+
+// 이미 저장된 항목(quantity+총칼로리만 있고 rate는 없음)을 수정 화면에 다시 채울 때, rate를 역산한다.
+// quantity가 없던 옛날(5-part) 항목은 g=100/개=1을 먹은 것으로 가정하고 역산한다.
+function rateFromTotal(unit: "g" | "count", quantity: number | null, totalCalorie: number | null) {
   if (totalCalorie === null || Number.isNaN(totalCalorie)) return null;
-  return Math.round(((totalCalorie / quantity) * 100) * 10) / 10;
+  const q = quantity !== null && quantity > 0 ? quantity : unit === "g" ? 100 : 1;
+  return Math.round((unit === "g" ? (totalCalorie / q) * 100 : totalCalorie / q) * 10) / 10;
 }
 
 function encodeCustomFoodItem(entry: CustomFoodEntry) {
@@ -292,7 +301,7 @@ function decodeCustomFoodItem(raw: string): CustomFoodEntry | null {
     unit,
     quantity: quantity === null || Number.isNaN(quantity) ? null : quantity,
     totalCalorie,
-    kcalPer100g: caloriesPer100g(unit, quantity ?? null, totalCalorie),
+    kcalPer100g: unit === "g" ? rateFromTotal(unit, quantity ?? null, totalCalorie) : null,
     category,
   };
 }
@@ -2452,9 +2461,9 @@ function CustomFoodFields({
   setUnit,
   quantityInput,
   setQuantityInput,
-  calorieInput,
-  setCalorieInput,
-  kcalPer100g,
+  rateInput,
+  setRateInput,
+  totalCalorie,
   color,
 }: {
   name: string;
@@ -2465,9 +2474,9 @@ function CustomFoodFields({
   setUnit: (v: "g" | "count") => void;
   quantityInput: string;
   setQuantityInput: (v: string) => void;
-  calorieInput: string;
-  setCalorieInput: (v: string) => void;
-  kcalPer100g: number | null;
+  rateInput: string;
+  setRateInput: (v: string) => void;
+  totalCalorie: number | null;
   color: BlockColor;
 }) {
   return (
@@ -2497,80 +2506,89 @@ function CustomFoodFields({
         ))}
       </div>
 
-      <div className="flex gap-2">
-        <div className="flex flex-1 rounded-xl border border-zinc-700 bg-zinc-800 p-1">
-          <button
-            type="button"
-            onClick={() => setUnit("g")}
-            className={["flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors", unit === "g" ? [color.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
-          >
-            그램(g)
-          </button>
-          <button
-            type="button"
-            onClick={() => setUnit("count")}
-            className={["flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors", unit === "count" ? [color.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
-          >
-            개수(개)
-          </button>
-        </div>
+      <div className="flex flex-1 rounded-xl border border-zinc-700 bg-zinc-800 p-1">
+        <button
+          type="button"
+          onClick={() => setUnit("g")}
+          className={["flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors", unit === "g" ? [color.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
+        >
+          그램(g)
+        </button>
+        <button
+          type="button"
+          onClick={() => setUnit("count")}
+          className={["flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors", unit === "count" ? [color.bg, "text-zinc-950"].join(" ") : "text-zinc-400"].join(" ")}
+        >
+          개수(개)
+        </button>
+      </div>
 
+      {/* 총 칼로리를 직접 곱셈해서 넣지 않아도 되도록, "단위당 몇 kcal"와 "얼마나 먹었는지"를
+          따로 입력받아 총 칼로리를 자동으로 계산한다(예: 1개당 70kcal × 3개 = 210kcal). */}
+      <div className="flex gap-2">
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          value={rateInput}
+          onChange={(e) => setRateInput(e.target.value)}
+          placeholder={unit === "g" ? "100g당 kcal" : "1개당 kcal"}
+          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        />
         <input
           type="number"
           inputMode="decimal"
           min={0}
           value={quantityInput}
           onChange={(e) => setQuantityInput(e.target.value)}
-          placeholder={unit === "g" ? "g (선택)" : "개수 (선택)"}
-          className="w-24 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          placeholder={unit === "g" ? "먹은 양(g)" : "먹은 개수"}
+          className="w-28 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
         />
       </div>
-
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          inputMode="decimal"
-          min={0}
-          value={calorieInput}
-          onChange={(e) => setCalorieInput(e.target.value)}
-          placeholder="총 칼로리 (kcal)"
-          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
-        />
-        <div className="shrink-0 rounded-xl bg-zinc-800 px-3 py-2 text-right">
-          <p className="text-[10px] font-normal text-zinc-500">100g당</p>
-          <p className="text-sm font-semibold text-zinc-100">{kcalPer100g !== null ? `${kcalPer100g}kcal` : "-"}</p>
-        </div>
+      <div className="flex items-center justify-between rounded-xl bg-zinc-800 px-3 py-2">
+        <p className="text-xs font-normal text-zinc-500">총 칼로리 (자동 계산)</p>
+        <p className="text-sm font-semibold text-zinc-100">{totalCalorie !== null ? `${totalCalorie}kcal` : "-"}</p>
       </div>
     </>
   );
+}
+
+// 이미 저장된 항목을 수정할 때 quantity가 없던(레거시) 경우의 기본값 — g는 100g, 개수는 1개로 가정한다.
+function defaultQuantityInput(entry?: CustomFoodEntry) {
+  if (!entry) return "";
+  if (entry.quantity != null) return String(entry.quantity);
+  return entry.unit === "g" ? "100" : "1";
 }
 
 function useCustomFoodFormState(initial?: CustomFoodEntry) {
   const [name, setName] = useState(initial?.name ?? "");
   const [category, setCategory] = useState<FoodCategory>(initial?.category ?? "general");
   const [unit, setUnit] = useState<"g" | "count">(initial?.unit ?? "g");
-  const [quantityInput, setQuantityInput] = useState(initial?.quantity != null ? String(initial.quantity) : "");
-  const [calorieInput, setCalorieInput] = useState(initial ? String(initial.totalCalorie) : "");
+  const [quantityInput, setQuantityInput] = useState(defaultQuantityInput(initial));
+  const [rateInput, setRateInput] = useState(
+    initial ? String(rateFromTotal(initial.unit, initial.quantity, initial.totalCalorie) ?? "") : ""
+  );
 
   const quantity = quantityInput.trim() === "" ? null : Number(quantityInput);
-  const totalCalorie = calorieInput.trim() === "" ? null : Number(calorieInput);
-  const kcalPer100g = caloriesPer100g(unit, quantity, totalCalorie);
+  const rate = rateInput.trim() === "" ? null : Number(rateInput);
+  const totalCalorie = totalFromRate(unit, rate, quantity);
+  const kcalPer100g = unit === "g" ? rate : null;
 
-  const quantityValid = quantity === null || !Number.isNaN(quantity);
-  const calorieValid = totalCalorie !== null && !Number.isNaN(totalCalorie);
-  const canSubmit = name.trim() !== "" && calorieValid && quantityValid;
+  const quantityValid = quantity !== null && !Number.isNaN(quantity) && quantity > 0;
+  const rateValid = rate !== null && !Number.isNaN(rate) && rate >= 0;
+  const canSubmit = name.trim() !== "" && quantityValid && rateValid;
 
   function reset(entry?: CustomFoodEntry) {
     setName(entry?.name ?? "");
     setCategory(entry?.category ?? "general");
     setUnit(entry?.unit ?? "g");
-    setQuantityInput(entry?.quantity != null ? String(entry.quantity) : "");
-    setCalorieInput(entry ? String(entry.totalCalorie) : "");
+    setQuantityInput(defaultQuantityInput(entry));
+    setRateInput(entry ? String(rateFromTotal(entry.unit, entry.quantity, entry.totalCalorie) ?? "") : "");
   }
 
   return {
-    name, setName, category, setCategory, unit, setUnit, quantityInput, setQuantityInput, calorieInput, setCalorieInput,
-    quantity, totalCalorie, kcalPer100g, canSubmit, reset,
+    name, setName, category, setCategory, unit, setUnit, quantityInput, setQuantityInput, rateInput, setRateInput,
+    quantity, rate, totalCalorie, kcalPer100g, canSubmit, reset,
   };
 }
 
@@ -2593,8 +2611,8 @@ function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) 
           category={f.category} setCategory={f.setCategory}
           unit={f.unit} setUnit={f.setUnit}
           quantityInput={f.quantityInput} setQuantityInput={f.setQuantityInput}
-          calorieInput={f.calorieInput} setCalorieInput={f.setCalorieInput}
-          kcalPer100g={f.kcalPer100g}
+          rateInput={f.rateInput} setRateInput={f.setRateInput}
+          totalCalorie={f.totalCalorie}
           color={DIET_COLOR}
         />
 
@@ -2705,8 +2723,8 @@ function CustomFoodRow({
           category={f.category} setCategory={f.setCategory}
           unit={f.unit} setUnit={f.setUnit}
           quantityInput={f.quantityInput} setQuantityInput={f.setQuantityInput}
-          calorieInput={f.calorieInput} setCalorieInput={f.setCalorieInput}
-          kcalPer100g={f.kcalPer100g}
+          rateInput={f.rateInput} setRateInput={f.setRateInput}
+          totalCalorie={f.totalCalorie}
           color={color}
         />
 
