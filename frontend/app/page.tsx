@@ -689,6 +689,8 @@ export default function Home() {
   const [coachMealText, setCoachMealText] = useState("");
   // 오늘 운동 기록이 없을 때, workout_type_history 기반으로 추천된 운동 종목명 목록.
   const [coachRecommendedExercises, setCoachRecommendedExercises] = useState<string[]>([]);
+  // 식단에 여유가 있을 때, food_history(실제로 먹어본 음식) 기반으로 추천된 음식명 목록.
+  const [coachRecommendedFoods, setCoachRecommendedFoods] = useState<string[]>([]);
 
   const [view, setView] = useState<"today" | "week" | "month">("today");
   const [stats, setStats] = useState<PeriodStats | null>(null);
@@ -1013,6 +1015,7 @@ export default function Home() {
       if (ai?.comments?.workout) setCoachWorkoutText(ai.comments.workout);
       if (ai?.comments?.meal) setCoachMealText(ai.comments.meal);
       if (Array.isArray(ai?.recommendations?.exercise)) setCoachRecommendedExercises(ai.recommendations.exercise);
+      if (Array.isArray(ai?.recommendations?.food)) setCoachRecommendedFoods(ai.recommendations.food);
 
       if (ai?.overview?.status === "COMPLETED" || attemptsLeft <= 0) {
         setCoachStatus("ready");
@@ -1056,6 +1059,7 @@ export default function Home() {
     setCoachWorkoutText("");
     setCoachMealText("");
     setCoachRecommendedExercises([]);
+    setCoachRecommendedFoods([]);
     setAutoSaveStatus("idle");
     // 날짜를 바꾸면 이전 날짜에 대해 돌고 있던 AI 코칭 폴링 체인을 무효화한다.
     coachPollGenRef.current += 1;
@@ -1244,6 +1248,7 @@ export default function Home() {
     setCoachWorkoutText("");
     setCoachMealText("");
     setCoachRecommendedExercises([]);
+    setCoachRecommendedFoods([]);
     // 이전에 돌고 있던 폴링 체인(있다면)을 무효화하고 이번 요청만의 세대를 새로 만든다.
     const myGeneration = ++coachPollGenRef.current;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -2111,7 +2116,7 @@ export default function Home() {
                                 onClick={() => toggleWorkout(w.label, suggestion?.minutes ?? w.defaultMinutes)}
                                 className="min-w-0 flex-1 text-left"
                               >
-                                <p className="truncate font-medium text-zinc-100">
+                                <p className="truncate text-sm font-medium text-zinc-100">
                                   {isSelected ? "✓ " : suggestion ? "⭐ " : ""}
                                   {w.label}
                                 </p>
@@ -2252,6 +2257,18 @@ export default function Home() {
                         <div>
                           <p className="text-xs font-semibold text-yellow-400">🍱 식단</p>
                           <p className="mt-1 text-sm font-medium leading-relaxed text-zinc-300">{coachMealText}</p>
+                          {coachRecommendedFoods.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {coachRecommendedFoods.map((label) => (
+                                <span
+                                  key={label}
+                                  className="rounded-full border border-yellow-400/40 bg-zinc-800 px-3 py-1 text-xs font-medium text-yellow-300"
+                                >
+                                  🍽 {label}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2372,7 +2389,7 @@ const FoodSection = memo(function FoodSection({
               ].join(" ")}
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="font-medium text-zinc-100">{food.label}</p>
+                <p className="text-sm font-medium text-zinc-100">{food.label}</p>
                 <p className="text-xs text-zinc-500">
                   {food.mode === "gram" ? `100g당 ${food.kcalPer100g}kcal` : `1개당 ${food.kcalPerPiece}kcal`}
                 </p>
@@ -2659,7 +2676,7 @@ function CustomFoodRow({
     return (
       <div className={["rounded-2xl border-2 bg-zinc-800 p-3", color.border].join(" ")}>
         <div className="flex items-center justify-between gap-2">
-          <p className="font-medium text-zinc-100">{item.name}</p>
+          <p className="text-sm font-medium text-zinc-100">{item.name}</p>
           <div className="flex shrink-0 gap-3">
             <button type="button" onClick={startEdit} className="text-xs font-medium text-zinc-400 underline">
               수정
@@ -2848,7 +2865,7 @@ function CustomWorkoutRow({
       <div className={["rounded-2xl border-2 bg-zinc-800 p-3", color.border].join(" ")}>
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="font-medium text-zinc-100">{item.name}</p>
+            <p className="text-sm font-medium text-zinc-100">{item.name}</p>
             <p className="text-xs text-zinc-500">
               {item.minutes}분 · {item.calorieEstimate}kcal
             </p>

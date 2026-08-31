@@ -1,4 +1,6 @@
 
+from collections import Counter
+
 from contextlib import nullcontext
 
 from datetime import date
@@ -7,7 +9,33 @@ from sqlalchemy import text
 
 from app.ai.progress import calculate_goal_progress
 
+from app.crud.food_history import get_general_food_history
+
 from app.db.session import engine
+
+
+def _summarize_food_history(limit=40):
+    # get_general_food_history()는 "CUSTOM|이름|수량|단위|칼로리(|분류)" 원본 문자열을 그대로 준다.
+    # 프롬프트에 그대로 넣기엔 형식이 프론트 전용이라, 이름/분류만 뽑아 자주 먹은 순으로 추린다.
+    # 이렇게 하면 AI가 실존하지 않는 음식명을 지어내지 않고, 사용자가 실제로 먹어본 음식 중에서
+    # 추천할 수 있다.
+    counter = Counter()
+    category_by_name = {}
+    for raw in get_general_food_history():
+        parts = raw.split("|")
+        if len(parts) < 2:
+            continue
+        name = parts[1].strip()
+        if not name:
+            continue
+        category = parts[5] if len(parts) >= 6 and parts[5] else "general"
+        counter[name] += 1
+        category_by_name.setdefault(name, category)
+
+    return [
+        {"name": name, "category": category_by_name.get(name, "general"), "count": count}
+        for name, count in counter.most_common(limit)
+    ]
 
 def get_ai_context(target_date: date, conn=None):
 
@@ -192,15 +220,41 @@ def get_ai_context(target_date: date, conn=None):
 
         ).mappings().all()
 
+        # today.workout_done_yn은 "했다/안 했다"만 알려줘서, "근력만 하고 유산소는
+        # 안 했다" 같은 종목 단위 판단을 하려면 오늘 실제로 기록된 운동 목록이 필요하다.
+        today_workout_items = conn.execute(
+
+            text("""
+
+                SELECT wi.workout_type, wi.minutes, wi.detail
+
+                FROM workout_item wi
+
+                JOIN day_record dr ON dr.day_record_id = wi.day_record_id
+
+                WHERE dr.record_date = :record_date
+
+                ORDER BY wi.workout_item_id
+
+            """),
+
+            {"record_date": target_date}
+
+        ).mappings().all()
+
     context = {
 
         "target_date": str(target_date),
 
         "today": dict(today) if today else {},
 
+        "today_workout_items": [dict(row) for row in today_workout_items],
+
         "history": [dict(row) for row in history],
 
         "workout_type_history": [dict(row) for row in workout_type_history],
+
+        "food_history": _summarize_food_history(),
 
         "profile": dict(profile) if profile else {},
 

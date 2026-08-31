@@ -77,6 +77,8 @@ def _build_ai_response(row):
 
             "exercise": detail.get("recommended_exercises") or [],
 
+            "food": detail.get("recommended_foods") or [],
+
             "nutrition": detail.get("nutrition_focus") or [],
 
         },

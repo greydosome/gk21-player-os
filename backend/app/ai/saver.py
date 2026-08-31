@@ -39,6 +39,8 @@ DETAIL_ANALYSIS_KEYS = {
 
     "recommended_exercises",
 
+    "recommended_foods",
+
     "nutrition_focus",
 
     "risk_factors",
