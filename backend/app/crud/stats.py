@@ -12,13 +12,14 @@ def get_period_stats(end_date, days):
         SELECT
             COUNT(*) AS days_logged,
             AVG(weight_kg) AS avg_weight_kg,
-            -- sleep_hours/water_liter는 프론트에서 미입력 시 0으로 저장되므로(NULL이 아님),
-            -- 0을 "기록 없음"으로 보고 NULLIF로 평균 계산에서 제외한다.
+            -- sleep_hours/water_liter/protein_kcal/carb_kcal/fat_kcal는 그날 해당 항목을
+            -- 전혀 기록하지 않아도 0으로 저장되므로(NULL이 아님), 0을 "기록 없음"으로 보고
+            -- NULLIF로 평균 계산에서 제외한다.
             AVG(NULLIF(sleep_hours, 0)) AS avg_sleep_hours,
             AVG(NULLIF(water_liter, 0)) AS avg_water_liter,
-            AVG(protein_kcal) AS avg_protein_kcal,
-            AVG(carb_kcal) AS avg_carb_kcal,
-            AVG(fat_kcal) AS avg_fat_kcal,
+            AVG(NULLIF(protein_kcal, 0)) AS avg_protein_kcal,
+            AVG(NULLIF(carb_kcal, 0)) AS avg_carb_kcal,
+            AVG(NULLIF(fat_kcal, 0)) AS avg_fat_kcal,
             AVG(mood_score) AS avg_mood_score,
             COALESCE(SUM(CASE WHEN workout_done_yn THEN 1 ELSE 0 END), 0) AS workout_days,
             COALESCE(SUM(CASE WHEN morning_med_taken AND evening_med_taken THEN 1 ELSE 0 END), 0) AS full_medication_days,

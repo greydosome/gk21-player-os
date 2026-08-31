@@ -120,7 +120,7 @@ function shortDateLabel(dateStr: string) {
   return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_LABELS[d.getDay()]})`;
 }
 
-// 위클리/먼슬리 운동 점 크기: 그날 수행 분량이 많을수록 점을 살짝 키운다 (5~9px).
+// 위클리 운동 타임라인 점 크기: 그날 수행 분량이 많을수록 점을 살짝 키운다 (5~9px).
 function workoutDotSize(minutes: number) {
   return Math.max(5, Math.min(9, 5 + Math.round(minutes / 20)));
 }
@@ -1065,6 +1065,17 @@ export default function Home() {
       .then((data) => {
         if (cancelled) return;
 
+        // 프록시(app/api/dashboard/route.ts)는 백엔드 오류도 HTTP 200 + {success:false}로
+        // 감싸서 내려보낸다. 이걸 그냥 통과시키면 "이 날짜엔 기록이 없다"로 오해해서
+        // 폼 전체가 빈 값으로 초기화되고, 그 빈 상태가 곧 자동저장 스냅샷 기준이 되어
+        // 몇 초 후 실제 저장된 기록 위에 빈 값을 덮어써버릴 수 있다(데이터 유실).
+        // 로딩 상태를 계속 유지해서(=dataReady를 true로 만들지 않아서) 자동저장도
+        // 함께 막아두는 편이 안전하다.
+        if (data?.success === false) {
+          console.error("대시보드 로드 실패:", data?.error ?? data?.raw ?? data);
+          return;
+        }
+
         const d = data?.dashboard;
         const detail = data?.detail;
 
@@ -1135,24 +1146,28 @@ export default function Home() {
         setCustomMealItems(generalFoodList);
         setSupplementItems(supplementSet);
 
-        if (data?.goal?.target_protein_kcal) {
+        if (data?.goal?.target_protein_kcal != null) {
           setProteinTarget(data.goal.target_protein_kcal);
         }
-        if (data?.goal?.target_carb_kcal) {
+        if (data?.goal?.target_carb_kcal != null) {
           setCarbTarget(data.goal.target_carb_kcal);
         }
-        if (data?.goal?.target_fat_kcal) {
+        if (data?.goal?.target_fat_kcal != null) {
           setFatTarget(data.goal.target_fat_kcal);
         }
-        if (data?.goal?.target_water_liter) {
+        if (data?.goal?.target_water_liter != null) {
           setWaterTarget(data.goal.target_water_liter);
         }
-        if (data?.goal?.target_weight_kg) {
+        if (data?.goal?.target_weight_kg != null) {
           setWeightTarget(data.goal.target_weight_kg);
         }
 
         loadedDateRef.current = recordDate;
         setDataReady(true);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("대시보드 로드 실패:", err);
       });
 
     return () => {
@@ -1326,29 +1341,16 @@ export default function Home() {
       return {
         recordDate: h.record_date,
         dietKcal,
-        proteinKcal: h.protein_kcal ?? 0,
-        carbKcal: h.carb_kcal ?? 0,
-        fatKcal: h.fat_kcal ?? 0,
-        extraKcal,
         cardioLabels,
         strengthLabels,
         cardioMinutes,
         strengthMinutes,
-        hasData: h.protein_kcal !== null || h.workout_done_yn !== null,
       };
     });
 
     const totalKcal = days.reduce((sum, d) => sum + d.dietKcal, 0);
     const budget = DAILY_CALORIE_BUDGET * days.length;
     const ratio = budget > 0 ? Math.round((totalKcal / budget) * 100) : 0;
-
-    // 주간 매크로 합계 (단백질/탄수화물/지방/보충·일반식) — 위클리 예산 바를 구간별로 나눠 보여줄 때 쓴다.
-    const macroTotals = {
-      protein: days.reduce((sum, d) => sum + d.proteinKcal, 0),
-      carb: days.reduce((sum, d) => sum + d.carbKcal, 0),
-      fat: days.reduce((sum, d) => sum + d.fatKcal, 0),
-      extra: days.reduce((sum, d) => sum + d.extraKcal, 0),
-    };
 
     // 이번 달 운동 커버리지: 유산소/근력을 모두 한 날 · 유산소만 · 근력만 · 기록 없는 날
     const bothDays = days.filter((d) => d.cardioLabels.length > 0 && d.strengthLabels.length > 0).length;
@@ -1360,7 +1362,7 @@ export default function Home() {
     // 식단관리 성공한 날 (기록이 있고 1200kcal 예산 이내) — 먼슬리 달력의 노란 테두리와 동일한 기준.
     const dietSuccessDays = days.filter((d) => d.dietKcal > 0 && d.dietKcal <= DAILY_CALORIE_BUDGET).length;
 
-    return { days, totalKcal, budget, ratio, macroTotals, coverage, dietSuccessDays };
+    return { days, totalKcal, budget, ratio, coverage, dietSuccessDays };
   }, [history, periodDetail]);
 
   async function requestPeriodCoaching() {
@@ -1422,7 +1424,12 @@ export default function Home() {
             <input
               type="date"
               value={recordDate}
-              onChange={(e) => setRecordDate(e.target.value)}
+              onChange={(e) => {
+                // 네이티브 날짜 입력의 지우기(clear) 동작은 빈 문자열로 onChange를 발생시킬 수 있는데,
+                // recordDate가 ""가 되면 scheduleFor()가 Invalid Date를 만들어 화면 전체가 깨진다.
+                // 값이 있을 때만 반영한다.
+                if (e.target.value) setRecordDate(e.target.value);
+              }}
               className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-100"
             />
           </div>
@@ -1745,7 +1752,9 @@ export default function Home() {
                       </div>
                       <div className="mt-1 grid grid-cols-7 gap-1">
                         {Array.from({
-                          length: new Date(`${periodSummary.days[0]?.recordDate}T00:00:00`).getDay(),
+                          length: periodSummary.days[0]
+                            ? new Date(`${periodSummary.days[0].recordDate}T00:00:00`).getDay()
+                            : 0,
                         }).map((_, i) => (
                           <div key={`blank-${i}`} />
                         ))}
