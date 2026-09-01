@@ -682,6 +682,9 @@ export default function Home() {
   const [customMealItems, setCustomMealItems] = useState<CustomFoodEntry[]>([]);
   const [foodHistory, setFoodHistory] = useState<CustomFoodEntry[]>([]);
   const [foodHistoryQuery, setFoodHistoryQuery] = useState("");
+  // 식단 섹션의 단백질/탄수화물/지방/보충음식/일반식 5개 접이식 블럭을 한 번에 접기 위한 세대 값.
+  // 값을 올리면 각 CollapsibleBlock을 key로 리마운트시켜 전부 닫힌 상태(기본값)로 되돌린다.
+  const [foodCollapseGen, setFoodCollapseGen] = useState(0);
   const [weightKg, setWeightKg] = useState<number | null>(null);
   const [weightTarget, setWeightTarget] = useState<number | null>(null);
   const [waterLiter, setWaterLiter] = useState(0);
@@ -1978,8 +1981,18 @@ export default function Home() {
             </Section>
 
             <Section title="🍱 식단" color={DIET_COLOR} subtitle={`${totalDietKcal}kcal`}>
+              <div className="mb-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setFoodCollapseGen((g) => g + 1)}
+                  className="text-xs font-medium text-zinc-500 underline"
+                >
+                  모두 접기
+                </button>
+              </div>
               <div className="space-y-4">
                 <FoodSection
+                  key={`protein-${foodCollapseGen}`}
                   title="🥩 단백질"
                   kcal={proteinKcal}
                   target={proteinTarget}
@@ -1993,6 +2006,7 @@ export default function Home() {
                 />
 
                 <FoodSection
+                  key={`carb-${foodCollapseGen}`}
                   title="🍚 탄수화물"
                   kcal={carbKcal}
                   target={carbTarget}
@@ -2006,6 +2020,7 @@ export default function Home() {
                 />
 
                 <FoodSection
+                  key={`fat-${foodCollapseGen}`}
                   title="🥑 지방"
                   kcal={fatKcal}
                   target={fatTarget}
@@ -2019,6 +2034,7 @@ export default function Home() {
                 />
 
                 <CollapsibleBlock
+                  key={`supplement-${foodCollapseGen}`}
                   title={supplementCustomKcal > 0 ? `🫐 보충음식 · ${supplementCustomKcal}kcal` : "🫐 보충음식"}
                 >
                   <div className="space-y-3">
@@ -2046,7 +2062,7 @@ export default function Home() {
                   </div>
                 </CollapsibleBlock>
 
-                <CollapsibleBlock title={`🍽 일반식 · ${generalFoodKcal}kcal`}>
+                <CollapsibleBlock key={`general-${foodCollapseGen}`} title={`🍽 일반식 · ${generalFoodKcal}kcal`}>
                   <div className="space-y-3">
                     <div className="flex flex-wrap gap-2">
                       {customEntriesByCategory(customMealItems, "general").map(({ item, index }) => (
