@@ -682,6 +682,8 @@ export default function Home() {
   const [customMealItems, setCustomMealItems] = useState<CustomFoodEntry[]>([]);
   const [foodHistory, setFoodHistory] = useState<CustomFoodEntry[]>([]);
   const [foodHistoryQuery, setFoodHistoryQuery] = useState("");
+  // 일반식 검색창에서 찾는 음식이 없을 때, 검색어를 이어받아 직접입력 폼으로 전환하기 위한 상태.
+  const [showCustomFoodForm, setShowCustomFoodForm] = useState(false);
   // 식단 섹션의 단백질/탄수화물/지방/보충음식/일반식 5개 접이식 블럭을 한 번에 접기 위한 세대 값.
   // 값을 올리면 각 CollapsibleBlock을 key로 리마운트시켜 전부 닫힌 상태(기본값)로 되돌린다.
   const [foodCollapseGen, setFoodCollapseGen] = useState(0);
@@ -2078,18 +2080,35 @@ export default function Home() {
                       ))}
                     </div>
 
-                    {foodHistory.length > 0 && (
-                      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
-                        <p className="text-xs font-medium text-zinc-400">이전에 입력한 음식에서 선택</p>
-                        <input
-                          value={foodHistoryQuery}
-                          onChange={(e) => setFoodHistoryQuery(e.target.value)}
-                          placeholder="음식 이름 검색"
-                          className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
-                        />
-                        {filteredFoodHistory.length === 0 ? (
-                          <p className="mt-2 text-xs font-normal text-zinc-600">검색 결과가 없어요.</p>
-                        ) : (
+                    {/* 검색 통합형: 검색과 직접입력을 한 흐름으로 잇는다 — 찾는 음식이 있으면
+                        목록에서 바로 추가하고, 없으면 같은 자리에서 그 이름 그대로 새로 등록한다. */}
+                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+                      {showCustomFoodForm ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomFoodForm(false)}
+                            className="mb-2 text-xs font-medium text-zinc-500 underline"
+                          >
+                            ← 검색으로 돌아가기
+                          </button>
+                          <CustomFoodForm
+                            initialName={foodHistoryQuery.trim()}
+                            onAdd={(entry) => {
+                              addCustomMealItem(entry);
+                              setShowCustomFoodForm(false);
+                              setFoodHistoryQuery("");
+                            }}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            value={foodHistoryQuery}
+                            onChange={(e) => setFoodHistoryQuery(e.target.value)}
+                            placeholder="음식 이름 검색 또는 새로 입력"
+                            className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                          />
                           <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto pr-1">
                             {filteredFoodHistory.map((item) => (
                               <button
@@ -2105,12 +2124,29 @@ export default function Home() {
                                 </span>
                               </button>
                             ))}
+                            {foodHistoryQuery.trim() !== "" && (
+                              <button
+                                type="button"
+                                onClick={() => setShowCustomFoodForm(true)}
+                                className="flex w-full items-center gap-2 rounded-xl border border-dashed border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-left"
+                              >
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-zinc-950">
+                                  +
+                                </span>
+                                <span className="text-sm font-medium text-yellow-300">
+                                  {`'${foodHistoryQuery.trim()}'로 새로 추가`}
+                                </span>
+                              </button>
+                            )}
+                            {filteredFoodHistory.length === 0 && foodHistoryQuery.trim() === "" && (
+                              <p className="text-xs font-normal text-zinc-600">
+                                최근 입력한 음식이 없어요. 검색창에 이름을 입력해 새로 추가해보세요.
+                              </p>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    )}
-
-                    <CustomFoodForm onAdd={addCustomMealItem} />
+                        </>
+                      )}
+                    </div>
                   </div>
                 </CollapsibleBlock>
               </div>
@@ -2582,8 +2618,8 @@ function defaultQuantityInput(entry?: CustomFoodEntry) {
   return entry.unit === "g" ? "100" : "1";
 }
 
-function useCustomFoodFormState(initial?: CustomFoodEntry) {
-  const [name, setName] = useState(initial?.name ?? "");
+function useCustomFoodFormState(initial?: CustomFoodEntry, initialName?: string) {
+  const [name, setName] = useState(initial?.name ?? initialName ?? "");
   const [category, setCategory] = useState<FoodCategory>(initial?.category ?? "general");
   const [unit, setUnit] = useState<"g" | "count">(initial?.unit ?? "g");
   const [quantityInput, setQuantityInput] = useState(defaultQuantityInput(initial));
@@ -2614,8 +2650,14 @@ function useCustomFoodFormState(initial?: CustomFoodEntry) {
   };
 }
 
-function CustomFoodForm({ onAdd }: { onAdd: (entry: CustomFoodEntry) => void }) {
-  const f = useCustomFoodFormState();
+function CustomFoodForm({
+  onAdd,
+  initialName,
+}: {
+  onAdd: (entry: CustomFoodEntry) => void;
+  initialName?: string;
+}) {
+  const f = useCustomFoodFormState(undefined, initialName);
 
   function handleAdd() {
     if (!f.canSubmit || f.totalCalorie === null) return;
