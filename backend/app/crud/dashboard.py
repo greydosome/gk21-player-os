@@ -40,6 +40,8 @@ def get_day_detail(record_date: date, conn=None):
                 "supplement_items": [],
                 "general_food_items": [],
                 "is_sick": False,
+                "is_injured": False,
+                "medication_items": [],
             }
 
         workout_items = conn.execute(
@@ -62,7 +64,7 @@ def get_day_detail(record_date: date, conn=None):
         ).mappings().first()
 
         day_row = conn.execute(
-            text("SELECT is_sick FROM day_record WHERE day_record_id = :day_record_id"),
+            text("SELECT is_sick, is_injured, medication_items FROM day_record WHERE day_record_id = :day_record_id"),
             {"day_record_id": day_record_id}
         ).mappings().first()
 
@@ -74,6 +76,8 @@ def get_day_detail(record_date: date, conn=None):
         "supplement_items": (food_items["supplement_items"] if food_items else None) or [],
         "general_food_items": (food_items["general_food_items"] if food_items else None) or [],
         "is_sick": day_row["is_sick"] if day_row else False,
+        "is_injured": day_row["is_injured"] if day_row else False,
+        "medication_items": (day_row["medication_items"] if day_row else None) or [],
     }
 
 

@@ -1,3 +1,4 @@
+import json
 from datetime import date
 
 from sqlalchemy import text
@@ -46,9 +47,11 @@ def save_day_record(conn, req):
         "mood_score": req.mood_score,
         "memo": req.memo,
         "is_sick": req.is_sick,
+        "is_injured": req.is_injured,
         "morning_med_taken": req.morning_med_taken,
         "evening_med_taken": req.evening_med_taken,
         "medication_note": req.medication_note,
+        "medication_items": json.dumps(req.medication_items or [], ensure_ascii=False),
     }
 
     if existing:
@@ -63,9 +66,11 @@ def save_day_record(conn, req):
                     mood_score = :mood_score,
                     memo = :memo,
                     is_sick = :is_sick,
+                    is_injured = :is_injured,
                     morning_med_taken = :morning_med_taken,
                     evening_med_taken = :evening_med_taken,
                     medication_note = :medication_note,
+                    medication_items = CAST(:medication_items AS jsonb),
                     updated_at = now()
                 WHERE day_record_id = :day_record_id
             """),
@@ -84,9 +89,11 @@ def save_day_record(conn, req):
                 mood_score,
                 memo,
                 is_sick,
+                is_injured,
                 morning_med_taken,
                 evening_med_taken,
-                medication_note
+                medication_note,
+                medication_items
             )
             VALUES
             (
@@ -96,9 +103,11 @@ def save_day_record(conn, req):
                 :mood_score,
                 :memo,
                 :is_sick,
+                :is_injured,
                 :morning_med_taken,
                 :evening_med_taken,
-                :medication_note
+                :medication_note,
+                CAST(:medication_items AS jsonb)
             )
             RETURNING day_record_id
         """),

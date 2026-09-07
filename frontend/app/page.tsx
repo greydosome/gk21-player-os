@@ -396,6 +396,14 @@ const SICK_LEVEL = {
   bg: "bg-violet-600",
 };
 
+const INJURED_LEVEL = {
+  min: -1,
+  label: "INJURED DAY",
+  icon: "🤕",
+  text: "오늘은 다친 날이에요. 무리한 운동은 피하고 회복에 집중하세요.",
+  bg: "bg-rose-700",
+};
+
 const DEFAULT_PROTEIN_TARGET = 430;
 const DEFAULT_CARB_TARGET = 700;
 const DEFAULT_FAT_TARGET = 160;
@@ -591,6 +599,7 @@ function snapshotFormState(state: {
   sleepHours: number;
   binge: boolean;
   isSick: boolean;
+  isInjured: boolean;
   moodScore: number | null;
   workoutComment: string;
   selectedWorkouts: Map<string, SelectedWorkout>;
@@ -600,6 +609,7 @@ function snapshotFormState(state: {
   fatCounts: Map<string, number>;
   customMealItems: CustomFoodEntry[];
   supplementItems: Set<string>;
+  medicationItems: string[];
 }) {
   return JSON.stringify({
     morningMed: state.morningMed,
@@ -609,6 +619,7 @@ function snapshotFormState(state: {
     sleepHours: state.sleepHours,
     binge: state.binge,
     isSick: state.isSick,
+    isInjured: state.isInjured,
     moodScore: state.moodScore,
     workoutComment: state.workoutComment,
     workouts: Array.from(state.selectedWorkouts.entries())
@@ -626,6 +637,7 @@ function snapshotFormState(state: {
       .sort(([a], [b]) => a.localeCompare(b)),
     generalFood: state.customMealItems.map(encodeCustomFoodItem),
     supplement: Array.from(state.supplementItems).sort(),
+    medications: state.medicationItems,
   });
 }
 
@@ -687,6 +699,10 @@ export default function Home() {
   // 식단 섹션의 단백질/탄수화물/지방/보충음식/일반식 5개 접이식 블럭을 한 번에 접기 위한 세대 값.
   // 값을 올리면 각 CollapsibleBlock을 key로 리마운트시켜 전부 닫힌 상태(기본값)로 되돌린다.
   const [foodCollapseGen, setFoodCollapseGen] = useState(0);
+  // 오늘 복용한 약 이름 목록(자유 입력) — 일반식과 같은 검색+새로입력 방식.
+  const [medicationItems, setMedicationItems] = useState<string[]>([]);
+  const [medicationHistory, setMedicationHistory] = useState<string[]>([]);
+  const [medicationQuery, setMedicationQuery] = useState("");
   const [weightKg, setWeightKg] = useState<number | null>(null);
   const [weightTarget, setWeightTarget] = useState<number | null>(null);
   const [waterLiter, setWaterLiter] = useState(0);
@@ -694,6 +710,7 @@ export default function Home() {
   const [sleepHours, setSleepHours] = useState(0);
   const [binge, setBinge] = useState(false);
   const [isSick, setIsSick] = useState(false);
+  const [isInjured, setIsInjured] = useState(false);
   const [moodScore, setMoodScore] = useState<number | null>(null);
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -744,6 +761,12 @@ export default function Home() {
     return foodHistory.filter((item) => item.name.includes(query));
   }, [foodHistory, foodHistoryQuery]);
 
+  const filteredMedicationHistory = useMemo(() => {
+    const query = medicationQuery.trim();
+    if (!query) return medicationHistory;
+    return medicationHistory.filter((name) => name.includes(query));
+  }, [medicationHistory, medicationQuery]);
+
   const workoutDone = selectedWorkouts.size > 0 || customCardioWorkouts.length > 0;
   // 근력/유산소 분류별 합계를 한 번만 계산해서 Section 부제목과 운동 섹션 렌더링에서 같이 쓴다
   // (예전엔 같은 값을 useMemo 밖에서 JSX 중에 한 번 더 계산했음).
@@ -777,7 +800,9 @@ export default function Home() {
       sleepHours > 0 ||
       binge ||
       moodScore !== null ||
-      isSick
+      isSick ||
+      isInjured ||
+      medicationItems.length > 0
     );
   }, [
     morningMed,
@@ -789,16 +814,19 @@ export default function Home() {
     fatCounts,
     customMealItems,
     supplementItems,
+    medicationItems,
     weightKg,
     waterLiter,
     sleepHours,
     binge,
     moodScore,
     isSick,
+    isInjured,
   ]);
 
   const ready = useMemo(() => {
     if (isSick) return { score: 0, level: SICK_LEVEL };
+    if (isInjured) return { score: 0, level: INJURED_LEVEL };
     if (!hasAnyInput) return { score: 0, level: BLACK_LEVEL };
 
     return computeReady({
@@ -814,6 +842,7 @@ export default function Home() {
   }, [
     hasAnyInput,
     isSick,
+    isInjured,
     sleepHours,
     waterLiter,
     waterTarget,
@@ -930,6 +959,17 @@ export default function Home() {
     setCustomMealItems((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  function addMedicationItem(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setMedicationItems((prev) => [...prev, trimmed]);
+    setMedicationQuery("");
+  }
+
+  function removeMedicationItem(index: number) {
+    setMedicationItems((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function buildPayload(triggerAiCoaching: boolean) {
     const bikeMinutes = selectedWorkouts.get("자전거")?.minutes ?? 0;
 
@@ -956,9 +996,11 @@ export default function Home() {
       mood_score: moodScore,
       memo: workoutDone ? workoutComment || null : null,
       is_sick: isSick,
+      is_injured: isInjured,
       morning_med_taken: morningMed,
       evening_med_taken: eveningMed,
       medication_note: buildMedicationNote(morningMed, eveningMed),
+      medication_items: medicationItems,
       body: {
         weight_kg: weightKg,
         water_liter: waterLiter,
@@ -1064,6 +1106,26 @@ export default function Home() {
     };
   }, [recordDate]);
 
+  // 복약 히스토리(약 이름 검색해서 선택하기용)도 일반식 히스토리와 같은 이유로 날짜마다 다시 불러온다.
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/medication-history", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        const names: string[] = Array.isArray(data?.items) ? data.items : [];
+        setMedicationHistory(Array.from(new Set(names)));
+      })
+      .catch(() => {
+        if (!cancelled) setMedicationHistory([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [recordDate]);
+
   // 날짜가 바뀌면 그 날짜의 기존 기록을 불러와서 폼을 채운다 (없으면 기본값으로 초기화).
   useEffect(() => {
     let cancelled = false;
@@ -1105,8 +1167,10 @@ export default function Home() {
           sleepHours: d?.sleep_hours ?? 0,
           binge: d?.binge_yn ?? false,
           isSick: detail?.is_sick ?? false,
+          isInjured: detail?.is_injured ?? false,
           moodScore: d?.mood_score ?? null,
           workoutComment: d?.memo ?? "",
+          medicationItems: (detail?.medication_items ?? []) as string[],
         };
 
         const workoutMap = new Map<string, SelectedWorkout>();
@@ -1154,8 +1218,10 @@ export default function Home() {
         setSleepHours(loaded.sleepHours);
         setBinge(loaded.binge);
         setIsSick(loaded.isSick);
+        setIsInjured(loaded.isInjured);
         setMoodScore(loaded.moodScore);
         setWorkoutComment(loaded.workoutComment);
+        setMedicationItems(loaded.medicationItems);
         setSelectedWorkouts(workoutMap);
         setCustomCardioWorkouts(customCardioList);
         setProteinCounts(proteinMap);
@@ -1206,6 +1272,7 @@ export default function Home() {
       sleepHours,
       binge,
       isSick,
+      isInjured,
       moodScore,
       workoutComment,
       selectedWorkouts,
@@ -1215,6 +1282,7 @@ export default function Home() {
       fatCounts,
       customMealItems,
       supplementItems,
+      medicationItems,
     });
 
     if (currentSnapshot === lastLoadedSnapshotRef.current) return;
@@ -1247,11 +1315,13 @@ export default function Home() {
     fatCounts,
     customMealItems,
     supplementItems,
+    medicationItems,
     weightKg,
     waterLiter,
     sleepHours,
     binge,
     isSick,
+    isInjured,
     moodScore,
     workoutComment,
   ]);
@@ -1278,6 +1348,7 @@ export default function Home() {
         sleepHours,
         binge,
         isSick,
+        isInjured,
         moodScore,
         workoutComment,
         selectedWorkouts,
@@ -1287,6 +1358,7 @@ export default function Home() {
         fatCounts,
         customMealItems,
         supplementItems,
+        medicationItems,
       });
       setAutoSaveStatus("saved");
       pollCoachFeedback(recordDate, 8, myGeneration);
@@ -1482,7 +1554,7 @@ export default function Home() {
             "mt-3 rounded-3xl p-6 shadow-lg transition-colors duration-300",
             !dataReady
               ? "border border-zinc-800 bg-zinc-900 text-zinc-100"
-              : isSick || !hasAnyInput
+              : isSick || isInjured || !hasAnyInput
                 ? ["text-white", ready.level.bg].join(" ")
                 : "border border-zinc-800 bg-zinc-900 text-zinc-100",
           ].join(" ")}
@@ -1490,7 +1562,7 @@ export default function Home() {
           <p
             className={[
               "text-center text-sm font-semibold uppercase tracking-wide",
-              dataReady && (isSick || !hasAnyInput) ? "text-white/70" : "text-zinc-500",
+              dataReady && (isSick || isInjured || !hasAnyInput) ? "text-white/70" : "text-zinc-500",
             ].join(" ")}
           >
             {recordDate === today() ? "오늘 기록" : `${recordDate} 기록`}
@@ -1498,7 +1570,7 @@ export default function Home() {
 
           {!dataReady ? (
             <p className="mt-2 text-center text-lg font-normal text-zinc-500">불러오는 중...</p>
-          ) : isSick || !hasAnyInput ? (
+          ) : isSick || isInjured || !hasAnyInput ? (
             <div className="text-center">
               <p className="mt-2 text-4xl font-bold">
                 {ready.level.icon} {ready.level.label}
@@ -1892,6 +1964,73 @@ export default function Home() {
                     />
                     <Chip label="🍽 폭식함" active={binge} onClick={() => setBinge(!binge)} tone="warn" />
                     <Chip label="🤒 아픈 날" active={isSick} onClick={() => setIsSick(!isSick)} tone="warn" />
+                    <Chip label="🤕 다친 날" active={isInjured} onClick={() => setIsInjured(!isInjured)} tone="warn" />
+                  </div>
+                </CollapsibleBlock>
+
+                <CollapsibleBlock title={`💊 먹은 약${medicationItems.length > 0 ? ` · ${medicationItems.length}개` : ""}`}>
+                  <div className="space-y-3">
+                    {medicationItems.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {medicationItems.map((name, index) => (
+                          <span
+                            key={`${name}-${index}`}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-100"
+                          >
+                            {name}
+                            <span
+                              role="button"
+                              tabIndex={-1}
+                              onClick={() => removeMedicationItem(index)}
+                              className="text-zinc-400"
+                            >
+                              ✕
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 일반식과 같은 검색 통합형: 이전에 먹은 약에서 고르거나, 없으면 그 이름 그대로 바로 추가한다. */}
+                    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+                      <input
+                        value={medicationQuery}
+                        onChange={(e) => setMedicationQuery(e.target.value)}
+                        placeholder="약 이름 검색 또는 새로 입력"
+                        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                      />
+                      <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                        {filteredMedicationHistory.map((name) => (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => addMedicationItem(name)}
+                            className="flex w-full items-center rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-left text-sm font-medium text-zinc-200"
+                          >
+                            {name}
+                          </button>
+                        ))}
+                        {medicationQuery.trim() !== "" && (
+                          <button
+                            type="button"
+                            onClick={() => addMedicationItem(medicationQuery)}
+                            className="flex w-full items-center gap-2 rounded-xl border border-dashed border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-left"
+                          >
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-zinc-950">
+                              +
+                            </span>
+                            <span className="text-sm font-medium text-yellow-300">
+                              {`'${medicationQuery.trim()}' 추가`}
+                            </span>
+                          </button>
+                        )}
+                        {filteredMedicationHistory.length === 0 && medicationQuery.trim() === "" && (
+                          <p className="text-xs font-normal text-zinc-600">
+                            최근 먹은 약 기록이 없어요. 검색창에 이름을 입력해 추가해보세요.
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </CollapsibleBlock>
 

@@ -66,10 +66,12 @@ class DayRecordRequest(BaseModel):
     mood_score: int | None = None
     memo: str | None = None
     is_sick: bool = False
+    is_injured: bool = False
 
     morning_med_taken: bool | None = False
     evening_med_taken: bool | None = False
     medication_note: str | None = None
+    medication_items: list[str] | None = None
 
     body: BodyRecord | None = None
     workout: WorkoutRecord | None = None
