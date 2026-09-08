@@ -56,6 +56,12 @@ class GkRecord(BaseModel):
     gk_memo: str | None = None
 
 
+class MedicationEntry(BaseModel):
+    name: str
+    # 진료과 분류(psychiatry/family_medicine/otc). 프론트의 MEDICATION_CATEGORY_OPTIONS와 값을 맞춘다.
+    category: str = "otc"
+
+
 class DayRecordRequest(BaseModel):
     record_date: date
     # True일 때만 백그라운드 LLM 코칭 분석을 트리거한다("AI 코칭 받기" 클릭 시).
@@ -71,7 +77,7 @@ class DayRecordRequest(BaseModel):
     morning_med_taken: bool | None = False
     evening_med_taken: bool | None = False
     medication_note: str | None = None
-    medication_items: list[str] | None = None
+    medication_items: list[MedicationEntry] | None = None
 
     body: BodyRecord | None = None
     workout: WorkoutRecord | None = None

@@ -256,6 +256,68 @@ const FOOD_CATEGORY_OPTIONS: { value: FoodCategory; label: string }[] = [
   { value: "supplement", label: "보충음식" },
 ];
 
+// 약은 처방받는 진료과가 곧 자연스러운 분류라서, 음식 카테고리와 달리 진료과 기준으로 묶는다.
+type MedicationCategory = "psychiatry" | "family_medicine" | "otc";
+
+type MedicationEntry = {
+  name: string;
+  category: MedicationCategory;
+};
+
+const MEDICATION_CATEGORY_OPTIONS: { value: MedicationCategory; label: string }[] = [
+  { value: "psychiatry", label: "정신의학과" },
+  { value: "family_medicine", label: "가정의학과" },
+  { value: "otc", label: "상비약" },
+];
+
+// 상비약은 매번 새로 기록하기 전에도 손이 자주 가는 약들이라, 실제로 먹은 기록이 없어도
+// 항상 먼저 보이도록 기본값으로 깔아둔다.
+const DEFAULT_OTC_MEDICATIONS = ["타이레놀", "지사제", "이지엔"];
+
+// 옛 기록(문자열 배열)과 새 기록({name, category})을 모두 안전하게 읽어온다.
+// 알 수 없는 category거나 과거 문자열 항목은 "상비약"으로 취급한다.
+function normalizeMedicationEntry(raw: unknown): MedicationEntry | null {
+  if (typeof raw === "string") {
+    const name = raw.trim();
+    return name ? { name, category: "otc" } : null;
+  }
+  if (raw && typeof raw === "object" && "name" in raw) {
+    const obj = raw as { name?: unknown; category?: unknown };
+    const name = typeof obj.name === "string" ? obj.name.trim() : "";
+    if (!name) return null;
+    const category = MEDICATION_CATEGORY_OPTIONS.some((o) => o.value === obj.category)
+      ? (obj.category as MedicationCategory)
+      : "otc";
+    return { name, category };
+  }
+  return null;
+}
+
+function normalizeMedicationEntries(raw: unknown): MedicationEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeMedicationEntry).filter((m): m is MedicationEntry => m !== null);
+}
+
+// 히스토리에 상비약 기본값이 아직 없으면(과거에 한 번도 기록한 적 없으면) 채워 넣는다.
+function withDefaultOtcMedications(history: MedicationEntry[]): MedicationEntry[] {
+  const existingNames = new Set(history.map((m) => m.name));
+  const defaults = DEFAULT_OTC_MEDICATIONS.filter((name) => !existingNames.has(name)).map(
+    (name): MedicationEntry => ({ name, category: "otc" })
+  );
+  return [...history, ...defaults];
+}
+
+// 진료과별로 묶어서 보여주기 위한 그룹핑. MEDICATION_CATEGORY_OPTIONS 순서를 그대로 따른다.
+function groupMedicationsByCategory(items: MedicationEntry[]) {
+  const groups = new Map<MedicationCategory, MedicationEntry[]>(
+    MEDICATION_CATEGORY_OPTIONS.map((opt) => [opt.value, []])
+  );
+  for (const item of items) {
+    groups.get(item.category)?.push(item);
+  }
+  return groups;
+}
+
 // 직접입력 폼: "100g당/1개당 몇 kcal"인지(rate)와 "얼마나 먹었는지"(quantity)를 각각 입력받아
 // 총 칼로리를 자동으로 곱해서 계산한다 — 3개 먹었다고 rate*3을 사용자가 직접 계산할 필요가 없게 한다.
 function totalFromRate(unit: "g" | "count", rate: number | null, quantity: number | null) {
@@ -617,7 +679,7 @@ function snapshotFormState(state: {
   fatCounts: Map<string, number>;
   customMealItems: CustomFoodEntry[];
   supplementItems: Set<string>;
-  medicationItems: string[];
+  medicationItems: MedicationEntry[];
 }) {
   return JSON.stringify({
     morningMed: state.morningMed,
@@ -708,9 +770,10 @@ export default function Home() {
   // 값을 올리면 각 CollapsibleBlock을 key로 리마운트시켜 전부 닫힌 상태(기본값)로 되돌린다.
   const [foodCollapseGen, setFoodCollapseGen] = useState(0);
   // 오늘 복용한 약 이름 목록(자유 입력) — 일반식과 같은 검색+새로입력 방식.
-  const [medicationItems, setMedicationItems] = useState<string[]>([]);
-  const [medicationHistory, setMedicationHistory] = useState<string[]>([]);
+  const [medicationItems, setMedicationItems] = useState<MedicationEntry[]>([]);
+  const [medicationHistory, setMedicationHistory] = useState<MedicationEntry[]>([]);
   const [medicationQuery, setMedicationQuery] = useState("");
+  const [medicationNewCategory, setMedicationNewCategory] = useState<MedicationCategory>("otc");
   // 이름별 AI 약 정보(효능/부작용) 조회 결과 캐시. 같은 세션에서 같은 약을 다시 눌러도 재조회하지 않는다.
   const [medicationInfoCache, setMedicationInfoCache] = useState<
     Record<string, "loading" | "error" | { known: boolean; efficacy: string | null; side_effects: string | null; caution: string | null }>
@@ -809,8 +872,14 @@ export default function Home() {
   const filteredMedicationHistory = useMemo(() => {
     const query = medicationQuery.trim();
     if (!query) return medicationHistory;
-    return medicationHistory.filter((name) => name.includes(query));
+    return medicationHistory.filter((m) => m.name.includes(query));
   }, [medicationHistory, medicationQuery]);
+
+  // 진료과(정신의학과/가정의학과/상비약)별로 묶은 히스토리. 검색 중이 아닐 때만 그룹 UI를 보여준다.
+  const groupedMedicationHistory = useMemo(
+    () => groupMedicationsByCategory(filteredMedicationHistory),
+    [filteredMedicationHistory]
+  );
 
   const workoutDone = selectedWorkouts.size > 0 || customCardioWorkouts.length > 0;
   // 근력/유산소 분류별 합계를 한 번만 계산해서 Section 부제목과 운동 섹션 렌더링에서 같이 쓴다
@@ -1004,10 +1073,10 @@ export default function Home() {
     setCustomMealItems((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  function addMedicationItem(name: string) {
+  function addMedicationItem(name: string, category: MedicationCategory) {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setMedicationItems((prev) => [...prev, trimmed]);
+    setMedicationItems((prev) => [...prev, { name: trimmed, category }]);
     setMedicationQuery("");
   }
 
@@ -1159,11 +1228,18 @@ export default function Home() {
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
-        const names: string[] = Array.isArray(data?.items) ? data.items : [];
-        setMedicationHistory(Array.from(new Set(names)));
+        const entries = normalizeMedicationEntries(data?.items);
+        const deduped: MedicationEntry[] = [];
+        const seen = new Set<string>();
+        for (const entry of entries) {
+          if (seen.has(entry.name)) continue;
+          seen.add(entry.name);
+          deduped.push(entry);
+        }
+        setMedicationHistory(withDefaultOtcMedications(deduped));
       })
       .catch(() => {
-        if (!cancelled) setMedicationHistory([]);
+        if (!cancelled) setMedicationHistory(withDefaultOtcMedications([]));
       });
 
     return () => {
@@ -1215,7 +1291,7 @@ export default function Home() {
           isInjured: detail?.is_injured ?? false,
           moodScore: d?.mood_score ?? null,
           workoutComment: d?.memo ?? "",
-          medicationItems: (detail?.medication_items ?? []) as string[],
+          medicationItems: normalizeMedicationEntries(detail?.medication_items),
         };
 
         const workoutMap = new Map<string, SelectedWorkout>();
@@ -2017,17 +2093,17 @@ export default function Home() {
                   <div className="space-y-3">
                     {medicationItems.length > 0 && (
                       <div className="flex flex-wrap gap-2">
-                        {medicationItems.map((name, index) => (
+                        {medicationItems.map((item, index) => (
                           <span
-                            key={`${name}-${index}`}
+                            key={`${item.name}-${index}`}
                             className="inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-100"
                           >
-                            {name}
+                            {item.name}
                             <span
                               role="button"
                               tabIndex={-1}
-                              onClick={() => toggleMedicationInfo(name)}
-                              className={expandedMedicationInfo === name ? "text-yellow-400" : "text-zinc-500"}
+                              onClick={() => toggleMedicationInfo(item.name)}
+                              className={expandedMedicationInfo === item.name ? "text-yellow-400" : "text-zinc-500"}
                               title="효능/부작용 보기"
                             >
                               ℹ️
@@ -2115,39 +2191,67 @@ export default function Home() {
                         placeholder="약 이름 검색 또는 새로 입력"
                         className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
                       />
-                      <div className="mt-2 max-h-48 overflow-y-auto pr-1">
-                        {/* 자주 먹는 약은 거의 바뀌지 않는 고정 목록에 가까우므로, 세로 리스트 대신
-                            한눈에 훑을 수 있는 칩 그리드로 보여준다. */}
+                      <div className="mt-2 max-h-64 overflow-y-auto pr-1">
+                        {/* 진료과별로 묶어서 보여주고, 그룹 안에서는 세로로 늘어지지 않도록
+                            가로 스크롤로 훑을 수 있게 한다. */}
                         {filteredMedicationHistory.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {filteredMedicationHistory.map((name) => (
-                              <button
-                                key={name}
-                                type="button"
-                                onClick={() => addMedicationItem(name)}
-                                className="inline-flex shrink-0 items-center rounded-full border-2 border-zinc-700 bg-zinc-800 px-3.5 py-2 text-xs font-medium text-zinc-200"
-                              >
-                                {name}
-                              </button>
-                            ))}
+                          <div className="space-y-2.5">
+                            {MEDICATION_CATEGORY_OPTIONS.map((opt) => {
+                              const group = groupedMedicationHistory.get(opt.value) ?? [];
+                              if (group.length === 0) return null;
+                              return (
+                                <div key={opt.value}>
+                                  <p className="mb-1 text-[11px] font-semibold text-zinc-500">{opt.label}</p>
+                                  <div className="flex gap-2 overflow-x-auto pb-1">
+                                    {group.map((item) => (
+                                      <button
+                                        key={item.name}
+                                        type="button"
+                                        onClick={() => addMedicationItem(item.name, item.category)}
+                                        className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border-2 border-zinc-700 bg-zinc-800 px-3.5 py-2 text-xs font-medium text-zinc-200"
+                                      >
+                                        {item.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                         {medicationQuery.trim() !== "" && (
-                          <button
-                            type="button"
-                            onClick={() => addMedicationItem(medicationQuery)}
-                            className={[
-                              "flex w-full items-center gap-2 rounded-xl border border-dashed border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-left",
-                              filteredMedicationHistory.length > 0 ? "mt-2" : "",
-                            ].join(" ")}
-                          >
-                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-zinc-950">
-                              +
-                            </span>
-                            <span className="text-sm font-medium text-yellow-300">
-                              {`'${medicationQuery.trim()}' 추가`}
-                            </span>
-                          </button>
+                          <div className={filteredMedicationHistory.length > 0 ? "mt-3" : ""}>
+                            <p className="mb-1 text-[11px] font-semibold text-zinc-500">새 약의 진료과</p>
+                            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                              {MEDICATION_CATEGORY_OPTIONS.map((opt) => (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={() => setMedicationNewCategory(opt.value)}
+                                  className={[
+                                    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                                    medicationNewCategory === opt.value
+                                      ? "border-yellow-500 bg-yellow-500 text-zinc-950"
+                                      : "border-zinc-700 bg-zinc-800 text-zinc-400",
+                                  ].join(" ")}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => addMedicationItem(medicationQuery, medicationNewCategory)}
+                              className="mt-1.5 flex w-full items-center gap-2 rounded-xl border border-dashed border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-left"
+                            >
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-zinc-950">
+                                +
+                              </span>
+                              <span className="text-sm font-medium text-yellow-300">
+                                {`'${medicationQuery.trim()}' 추가`}
+                              </span>
+                            </button>
+                          </div>
                         )}
                         {filteredMedicationHistory.length === 0 && medicationQuery.trim() === "" && (
                           <p className="text-xs font-normal text-zinc-600">

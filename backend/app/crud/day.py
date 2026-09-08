@@ -51,7 +51,9 @@ def save_day_record(conn, req):
         "morning_med_taken": req.morning_med_taken,
         "evening_med_taken": req.evening_med_taken,
         "medication_note": req.medication_note,
-        "medication_items": json.dumps(req.medication_items or [], ensure_ascii=False),
+        "medication_items": json.dumps(
+            [m.model_dump() for m in (req.medication_items or [])], ensure_ascii=False
+        ),
     }
 
     if existing:
