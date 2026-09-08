@@ -273,6 +273,16 @@ function rateFromTotal(unit: "g" | "count", quantity: number | null, totalCalori
   return Math.round((unit === "g" ? (totalCalorie / q) * 100 : totalCalorie / q) * 10) / 10;
 }
 
+// 히스토리에서 음식을 다시 담을 때, 지난번에 먹은 양(예: 2개)을 그대로 이어받지 않고
+// 항상 기본 단위(g는 100g, 개수는 1개)로 되돌려서 담는다 — 어제 2개 먹었다고 오늘도
+// 자동으로 2개가 잡히면 안 되기 때문. 100g당/1개당 kcal(rate)은 그대로 유지한다.
+function toDefaultQuantityEntry(item: CustomFoodEntry): CustomFoodEntry {
+  const rate = rateFromTotal(item.unit, item.quantity, item.totalCalorie);
+  const quantity = item.unit === "g" ? 100 : 1;
+  const totalCalorie = totalFromRate(item.unit, rate, quantity) ?? item.totalCalorie;
+  return { ...item, quantity, totalCalorie, kcalPer100g: item.unit === "g" ? rate : item.kcalPer100g };
+}
+
 function encodeCustomFoodItem(entry: CustomFoodEntry) {
   return [
     CUSTOM_FOOD_PREFIX.slice(0, -1),
@@ -1095,7 +1105,7 @@ export default function Home() {
       .then((data) => {
         if (cancelled) return;
         const decoded = parseGeneralFoodItems(data?.items ?? []);
-        setFoodHistory(dedupeFoodHistoryByName(decoded));
+        setFoodHistory(dedupeFoodHistoryByName(decoded).map(toDefaultQuantityEntry));
       })
       .catch(() => {
         if (!cancelled) setFoodHistory([]);
