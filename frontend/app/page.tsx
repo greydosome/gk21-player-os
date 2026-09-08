@@ -2183,15 +2183,10 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* 일반식과 같은 검색 통합형: 이전에 먹은 약에서 고르거나, 없으면 그 이름 그대로 바로 추가한다. */}
+                    {/* 일반식과 같은 검색 통합형이지만, 약은 검색창보다 진료과별 목록을 먼저 훑는 게
+                        더 자연스러워서(11개를 그냥 나열하는 건 무의미) 그룹 목록을 위, 검색창을 아래에 둔다. */}
                     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
-                      <input
-                        value={medicationQuery}
-                        onChange={(e) => setMedicationQuery(e.target.value)}
-                        placeholder="약 이름 검색 또는 새로 입력"
-                        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
-                      />
-                      <div className="mt-2 max-h-64 overflow-y-auto pr-1">
+                      <div className="max-h-56 overflow-y-auto pr-1">
                         {/* 진료과별로 묶어서 보여주고, 그룹 안에서는 세로로 늘어지지 않도록
                             가로 스크롤로 훑을 수 있게 한다. */}
                         {filteredMedicationHistory.length > 0 && (
@@ -2219,46 +2214,54 @@ export default function Home() {
                             })}
                           </div>
                         )}
-                        {medicationQuery.trim() !== "" && (
-                          <div className={filteredMedicationHistory.length > 0 ? "mt-3" : ""}>
-                            <p className="mb-1 text-[11px] font-semibold text-zinc-500">새 약의 진료과</p>
-                            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-                              {MEDICATION_CATEGORY_OPTIONS.map((opt) => (
-                                <button
-                                  key={opt.value}
-                                  type="button"
-                                  onClick={() => setMedicationNewCategory(opt.value)}
-                                  className={[
-                                    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                                    medicationNewCategory === opt.value
-                                      ? "border-yellow-500 bg-yellow-500 text-zinc-950"
-                                      : "border-zinc-700 bg-zinc-800 text-zinc-400",
-                                  ].join(" ")}
-                                >
-                                  {opt.label}
-                                </button>
-                              ))}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => addMedicationItem(medicationQuery, medicationNewCategory)}
-                              className="mt-1.5 flex w-full items-center gap-2 rounded-xl border border-dashed border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-left"
-                            >
-                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-zinc-950">
-                                +
-                              </span>
-                              <span className="text-sm font-medium text-yellow-300">
-                                {`'${medicationQuery.trim()}' 추가`}
-                              </span>
-                            </button>
-                          </div>
-                        )}
                         {filteredMedicationHistory.length === 0 && medicationQuery.trim() === "" && (
                           <p className="text-xs font-normal text-zinc-600">
                             최근 먹은 약 기록이 없어요. 검색창에 이름을 입력해 추가해보세요.
                           </p>
                         )}
                       </div>
+
+                      <input
+                        value={medicationQuery}
+                        onChange={(e) => setMedicationQuery(e.target.value)}
+                        placeholder="약 이름 검색 또는 새로 입력"
+                        className="mt-3 w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                      />
+
+                      {medicationQuery.trim() !== "" && (
+                        <div className="mt-2">
+                          <p className="mb-1 text-[11px] font-semibold text-zinc-500">새 약의 진료과</p>
+                          <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                            {MEDICATION_CATEGORY_OPTIONS.map((opt) => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setMedicationNewCategory(opt.value)}
+                                className={[
+                                  "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                                  medicationNewCategory === opt.value
+                                    ? "border-yellow-500 bg-yellow-500 text-zinc-950"
+                                    : "border-zinc-700 bg-zinc-800 text-zinc-400",
+                                ].join(" ")}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => addMedicationItem(medicationQuery, medicationNewCategory)}
+                            className="mt-1.5 flex w-full items-center gap-2 rounded-xl border border-dashed border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-left"
+                          >
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-zinc-950">
+                              +
+                            </span>
+                            <span className="text-sm font-medium text-yellow-300">
+                              {`'${medicationQuery.trim()}' 추가`}
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CollapsibleBlock>
