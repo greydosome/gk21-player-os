@@ -231,8 +231,6 @@ type FoodItem =
   | { label: string; mode: "gram"; kcalPer100g: number }
   | { label: string; mode: "piece"; unit: string; kcalPerPiece: number };
 
-const GRAM_STEPS = Array.from({ length: 100 }, (_, i) => (i + 1) * 10);
-
 // 카탈로그 밖에서 이름+g또는개수(선택)+총칼로리로 직접 기록하는 항목. 단백질/탄수화물/지방/보충음식
 // 중 하나로 분류하거나(그 매크로의 kcal에 합산되고 해당 섹션에 표시됨), 미분류(일반식)로 남길 수 있다.
 // 100g당kcal은 총칼로리로부터 역산한 값(그램 단위일 때만 계산 가능)이며, 문자열로 인코딩해
@@ -713,6 +711,43 @@ export default function Home() {
   const [medicationItems, setMedicationItems] = useState<string[]>([]);
   const [medicationHistory, setMedicationHistory] = useState<string[]>([]);
   const [medicationQuery, setMedicationQuery] = useState("");
+  // 이름별 AI 약 정보(효능/부작용) 조회 결과 캐시. 같은 세션에서 같은 약을 다시 눌러도 재조회하지 않는다.
+  const [medicationInfoCache, setMedicationInfoCache] = useState<
+    Record<string, "loading" | "error" | { known: boolean; efficacy: string | null; side_effects: string | null; caution: string | null }>
+  >({});
+  // 지금 정보 패널이 펼쳐져 있는 약 이름(한 번에 하나만).
+  const [expandedMedicationInfo, setExpandedMedicationInfo] = useState<string | null>(null);
+
+  function toggleMedicationInfo(name: string) {
+    if (expandedMedicationInfo === name) {
+      setExpandedMedicationInfo(null);
+      return;
+    }
+    setExpandedMedicationInfo(name);
+    if (medicationInfoCache[name] && medicationInfoCache[name] !== "error") return;
+
+    setMedicationInfoCache((prev) => ({ ...prev, [name]: "loading" }));
+    fetch(`/api/medication-info?name=${encodeURIComponent(name)}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success === false) {
+          setMedicationInfoCache((prev) => ({ ...prev, [name]: "error" }));
+          return;
+        }
+        setMedicationInfoCache((prev) => ({
+          ...prev,
+          [name]: {
+            known: Boolean(data?.known),
+            efficacy: data?.efficacy ?? null,
+            side_effects: data?.side_effects ?? null,
+            caution: data?.caution ?? null,
+          },
+        }));
+      })
+      .catch(() => {
+        setMedicationInfoCache((prev) => ({ ...prev, [name]: "error" }));
+      });
+  }
   const [weightKg, setWeightKg] = useState<number | null>(null);
   const [weightTarget, setWeightTarget] = useState<number | null>(null);
   const [waterLiter, setWaterLiter] = useState(0);
@@ -1991,6 +2026,15 @@ export default function Home() {
                             <span
                               role="button"
                               tabIndex={-1}
+                              onClick={() => toggleMedicationInfo(name)}
+                              className={expandedMedicationInfo === name ? "text-yellow-400" : "text-zinc-500"}
+                              title="효능/부작용 보기"
+                            >
+                              ℹ️
+                            </span>
+                            <span
+                              role="button"
+                              tabIndex={-1}
                               onClick={() => removeMedicationItem(index)}
                               className="text-zinc-400"
                             >
@@ -1998,6 +2042,68 @@ export default function Home() {
                             </span>
                           </span>
                         ))}
+                      </div>
+                    )}
+
+                    {expandedMedicationInfo && (
+                      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+                        <p className="text-xs font-semibold text-zinc-300">💊 {expandedMedicationInfo}</p>
+                        {medicationInfoCache[expandedMedicationInfo] === "loading" && (
+                          <p className="mt-2 text-xs font-normal text-zinc-500">AI가 정보를 찾고 있어요...</p>
+                        )}
+                        {medicationInfoCache[expandedMedicationInfo] === "error" && (
+                          <p className="mt-2 text-xs font-normal text-zinc-500">
+                            정보를 불러오지 못했어요.{" "}
+                            <button
+                              type="button"
+                              onClick={() => toggleMedicationInfo(expandedMedicationInfo)}
+                              className="underline"
+                            >
+                              다시 시도
+                            </button>
+                          </p>
+                        )}
+                        {medicationInfoCache[expandedMedicationInfo] !== "loading" &&
+                          medicationInfoCache[expandedMedicationInfo] !== "error" &&
+                          medicationInfoCache[expandedMedicationInfo] !== undefined &&
+                          (() => {
+                            const info = medicationInfoCache[expandedMedicationInfo] as {
+                              known: boolean;
+                              efficacy: string | null;
+                              side_effects: string | null;
+                              caution: string | null;
+                            };
+                            if (!info.known) {
+                              return (
+                                <p className="mt-2 text-xs font-normal text-zinc-500">
+                                  정확한 정보를 찾지 못했어요. 처방받으신 약이라면 약 봉투나 약사님께 확인해보세요.
+                                </p>
+                              );
+                            }
+                            return (
+                              <div className="mt-2 space-y-2">
+                                {info.efficacy && (
+                                  <div>
+                                    <p className="text-[11px] font-semibold text-zinc-500">효능</p>
+                                    <p className="mt-0.5 text-xs font-normal leading-relaxed text-zinc-300">
+                                      {info.efficacy}
+                                    </p>
+                                  </div>
+                                )}
+                                {info.side_effects && (
+                                  <div>
+                                    <p className="text-[11px] font-semibold text-zinc-500">부작용</p>
+                                    <p className="mt-0.5 text-xs font-normal leading-relaxed text-zinc-300">
+                                      {info.side_effects}
+                                    </p>
+                                  </div>
+                                )}
+                                {info.caution && (
+                                  <p className="text-[11px] font-normal italic text-zinc-600">{info.caution}</p>
+                                )}
+                              </div>
+                            );
+                          })()}
                       </div>
                     )}
 
@@ -2627,7 +2733,7 @@ const FoodSection = memo(function FoodSection({
               )}
               <div className="mt-2">
                 {food.mode === "gram" ? (
-                  <GramRoller
+                  <GramStepper
                     onAdd={(v) => onChangeCount(food.label, amount + v)}
                     color={DIET_COLOR}
                   />
@@ -3229,64 +3335,46 @@ function ScaleRow({
   );
 }
 
-const GRAM_ROLLER_ITEM_HEIGHT = 36;
-
-function GramRoller({
+// 휠 스크롤 대신 +/- 스텝퍼로 담을 양(g)을 정한 뒤 "담기"를 눌러 현재 섭취량에 더한다.
+// (개수 항목의 Stepper와 달리, 여기서는 picked가 "지금 고르고 있는 양"이고 onAdd가
+// 실제 섭취량에 누적으로 더해준다 — 하루에 여러 번 나눠 먹었을 때 반복해서 담을 수 있게.)
+function GramStepper({
   onAdd,
   color,
-  values = GRAM_STEPS,
+  step = 10,
+  min = 10,
+  max = 1000,
 }: {
   onAdd: (amount: number) => void;
   color: BlockColor;
-  values?: number[];
+  step?: number;
+  min?: number;
+  max?: number;
 }) {
-  const [picked, setPicked] = useState(values[9] ?? values[0]);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [picked, setPicked] = useState(100);
 
-  useEffect(() => {
-    const idx = values.indexOf(picked);
-    if (containerRef.current && idx >= 0) {
-      containerRef.current.scrollTop = idx * GRAM_ROLLER_ITEM_HEIGHT;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function handleScroll() {
-    if (scrollTimer.current) clearTimeout(scrollTimer.current);
-    scrollTimer.current = setTimeout(() => {
-      if (!containerRef.current) return;
-      const idx = Math.round(containerRef.current.scrollTop / GRAM_ROLLER_ITEM_HEIGHT);
-      const v = values[Math.min(Math.max(idx, 0), values.length - 1)];
-      if (v !== undefined) setPicked(v);
-    }, 80);
+  function clamp(v: number) {
+    return Math.min(max, Math.max(min, v));
   }
 
   return (
     <div className="flex items-center gap-3">
-      <div className="relative h-[108px] w-24 shrink-0 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900">
-        <div
-          ref={containerRef}
-          onScroll={handleScroll}
-          className="h-full snap-y snap-mandatory overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      <div className="flex flex-1 items-center justify-center gap-4 rounded-xl border border-zinc-700 bg-zinc-900 py-2.5">
+        <button
+          type="button"
+          onClick={() => setPicked((v) => clamp(v - step))}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-base font-semibold text-zinc-100"
         >
-          <div style={{ height: GRAM_ROLLER_ITEM_HEIGHT }} />
-          {values.map((v) => (
-            <div
-              key={v}
-              className="flex snap-center items-center justify-center text-sm font-medium text-zinc-300"
-              style={{ height: GRAM_ROLLER_ITEM_HEIGHT }}
-            >
-              {v}g
-            </div>
-          ))}
-          <div style={{ height: GRAM_ROLLER_ITEM_HEIGHT }} />
-        </div>
-        <div
-          className={["pointer-events-none absolute inset-x-0 top-1/2 h-9 -translate-y-1/2 border-y-2", color.border].join(
-            " "
-          )}
-        />
+          −
+        </button>
+        <span className="min-w-[64px] text-center text-lg font-bold tabular-nums text-zinc-100">{picked}g</span>
+        <button
+          type="button"
+          onClick={() => setPicked((v) => clamp(v + step))}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-base font-semibold text-zinc-100"
+        >
+          +
+        </button>
       </div>
       <button
         type="button"

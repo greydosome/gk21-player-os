@@ -7,6 +7,7 @@ from app.api import db
 from app.api import food_history
 from app.api import health
 from app.api import medication_history
+from app.api import medication_info
 from app.api import period_coaching
 from app.api import stats
 
@@ -23,4 +24,5 @@ app.include_router(dashboard.router)
 app.include_router(stats.router)
 app.include_router(food_history.router)
 app.include_router(medication_history.router)
+app.include_router(medication_info.router)
 app.include_router(period_coaching.router)
