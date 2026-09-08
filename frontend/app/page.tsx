@@ -2115,22 +2115,31 @@ export default function Home() {
                         placeholder="약 이름 검색 또는 새로 입력"
                         className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
                       />
-                      <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto pr-1">
-                        {filteredMedicationHistory.map((name) => (
-                          <button
-                            key={name}
-                            type="button"
-                            onClick={() => addMedicationItem(name)}
-                            className="flex w-full items-center rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-left text-sm font-medium text-zinc-200"
-                          >
-                            {name}
-                          </button>
-                        ))}
+                      <div className="mt-2 max-h-48 overflow-y-auto pr-1">
+                        {/* 자주 먹는 약은 거의 바뀌지 않는 고정 목록에 가까우므로, 세로 리스트 대신
+                            한눈에 훑을 수 있는 칩 그리드로 보여준다. */}
+                        {filteredMedicationHistory.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {filteredMedicationHistory.map((name) => (
+                              <button
+                                key={name}
+                                type="button"
+                                onClick={() => addMedicationItem(name)}
+                                className="inline-flex shrink-0 items-center rounded-full border-2 border-zinc-700 bg-zinc-800 px-3.5 py-2 text-xs font-medium text-zinc-200"
+                              >
+                                {name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                         {medicationQuery.trim() !== "" && (
                           <button
                             type="button"
                             onClick={() => addMedicationItem(medicationQuery)}
-                            className="flex w-full items-center gap-2 rounded-xl border border-dashed border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-left"
+                            className={[
+                              "flex w-full items-center gap-2 rounded-xl border border-dashed border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-left",
+                              filteredMedicationHistory.length > 0 ? "mt-2" : "",
+                            ].join(" ")}
                           >
                             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-zinc-950">
                               +
