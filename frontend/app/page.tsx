@@ -228,7 +228,7 @@ const DARK_PALETTES: { key: string; label: string; emoji: string; swatch: string
 const DAY_BADGE_ACTIVE_CLASS = "border-[var(--pop-bg)] bg-[var(--pop-bg)] text-[var(--pop-fg)]";
 
 type FoodItem =
-  | { label: string; mode: "gram"; kcalPer100g: number }
+  | { label: string; mode: "gram"; kcalPer100g: number; defaultAmount?: number }
   | { label: string; mode: "piece"; unit: string; kcalPerPiece: number };
 
 // 카탈로그 밖에서 이름+g또는개수(선택)+총칼로리로 직접 기록하는 항목. 단백질/탄수화물/지방/보충음식
@@ -378,13 +378,13 @@ function decodeCustomFoodItem(raw: string): CustomFoodEntry | null {
 
 const PROTEIN_FOODS: FoodItem[] = [
   { label: "달걀", mode: "piece", unit: "1개", kcalPerPiece: 100 },
-  { label: "참치 마일드", mode: "gram", kcalPer100g: 126 },
+  { label: "참치 마일드", mode: "gram", kcalPer100g: 126, defaultAmount: 90 },
   { label: "닭가슴살", mode: "gram", kcalPer100g: 100 },
   { label: "닭가슴살스팸", mode: "gram", kcalPer100g: 170 },
 ];
 
 const CARB_FOODS: FoodItem[] = [
-  { label: "햇반", mode: "gram", kcalPer100g: 150 },
+  { label: "햇반", mode: "gram", kcalPer100g: 150, defaultAmount: 130 },
   { label: "생고구마", mode: "gram", kcalPer100g: 120 },
   { label: "감자", mode: "gram", kcalPer100g: 80 },
 ];
@@ -2852,6 +2852,7 @@ const FoodSection = memo(function FoodSection({
                   <GramStepper
                     onAdd={(v) => onChangeCount(food.label, amount + v)}
                     color={DIET_COLOR}
+                    defaultAmount={food.defaultAmount ?? 100}
                   />
                 ) : (
                   <Stepper
@@ -3460,14 +3461,16 @@ function GramStepper({
   step = 10,
   min = 10,
   max = 1000,
+  defaultAmount = 100,
 }: {
   onAdd: (amount: number) => void;
   color: BlockColor;
   step?: number;
   min?: number;
   max?: number;
+  defaultAmount?: number;
 }) {
-  const [picked, setPicked] = useState(100);
+  const [picked, setPicked] = useState(defaultAmount);
 
   function clamp(v: number) {
     return Math.min(max, Math.max(min, v));
@@ -3483,7 +3486,7 @@ function GramStepper({
         >
           −
         </button>
-        <span className="min-w-[64px] text-center text-lg font-bold tabular-nums text-zinc-100">{picked}g</span>
+        <span className="min-w-[64px] text-center text-base font-bold tabular-nums text-zinc-100">{picked}g</span>
         <button
           type="button"
           onClick={() => setPicked((v) => clamp(v + step))}
