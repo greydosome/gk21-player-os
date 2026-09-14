@@ -3,7 +3,23 @@ import json
 
 SYSTEM_PROMPT = """
 당신은 GK21 AI 건강 코치입니다. 코칭의 핵심 주제는 딱 두 가지, "운동"과 "식단"입니다.
-물/수면/복약 같은 나머지 데일리 체크 항목은 참고만 하고 코칭의 중심 내용으로 다루지 않습니다.
+물/수면 같은 나머지 데일리 체크 항목은 참고만 하고 코칭의 중심 내용으로 다루지 않습니다.
+
+컨디션(아픈 날 / 다친 날) 반영 (workout_comment에 반영)
+- today_condition.is_injured가 true면, injury_note(다친 부위)가 있다면 그 부위를 고려해서
+  운동을 추천한다. 다친 부위를 직접 쓰는 운동(예: 발목을 다쳤는데 계단 오르기·러닝 추천)은
+  피하고, 그 부위에 부담이 적은 가벼운 활동이나 완전한 휴식을 권한다. injury_note가 비어
+  있다면 어디를 다쳤는지 모르니 전반적으로 무리하지 말라고만 말한다.
+- today_condition.is_sick가 true면(sick_note가 있으면 어떤 증상인지 참고해서), 강도 높은
+  운동 추천은 하지 않고 휴식과 회복을 우선하라고 말한다.
+- 다치거나 아픈 날에는 무리한 운동 추천 대신 회복에 초점을 맞춘 조언을 하고, 그런데도
+  운동을 하고 싶어한다면 부담이 적은 가벼운 활동 정도만 제안한다.
+
+복약 참고 (필요한 경우 workout_comment나 body_comment에 짧게 반영, 별도 항목으로 만들지 않음)
+- today_medications(오늘 기록된 약 이름 목록)를 참고해서, 복용 중인 약과 관련해 컨디션에
+  참고할 만한 점이 있다면 한 문장 정도로만 짧게 언급한다. 특정 약의 효능/부작용을 길게
+  설명하거나, 복용량·복용 중단·복용 변경 같은 의학적 판단은 절대 하지 않는다 — 그건
+  처방한 병원/약사의 영역이다. 특별히 짚을 점이 없다면 언급하지 않아도 된다.
 
 운동 코칭 (workout_comment에 반영)
 - workout_type_history(최근 30일, 종목별 총 분수/횟수/마지막 수행일)를 근거로 판단한다.
@@ -107,12 +123,24 @@ def build_prompt(context, metrics):
         trend["workout_done"].append(row.get("workout_done_yn"))
         trend["workout_minutes"].append(row.get("bike_minutes"))
 
+    today = context.get("today") or {}
     payload = {
         "profile": context.get("profile"),
         "goal": context.get("goal"),
         "setting": context.get("setting"),
-        "today": context.get("today"),
+        "today": today,
         "today_workout_items": context.get("today_workout_items"),
+        # v_day_record_summary에 이미 포함돼 있지만(today.is_sick 등), 프롬프트에서
+        # 놓치지 않도록 따로 눈에 띄게 뽑아둔다 — 다친 날/아픈 날/복약을 코칭에 반영하기 위함.
+        "today_condition": {
+            "is_sick": bool(today.get("is_sick")),
+            "sick_note": today.get("sick_note"),
+            "is_injured": bool(today.get("is_injured")),
+            "injury_note": today.get("injury_note"),
+        },
+        "today_medications": [
+            item.get("name") for item in (today.get("medication_items") or []) if isinstance(item, dict)
+        ],
         "history_trend": trend,
         "workout_type_history": context.get("workout_type_history"),
         "food_history": context.get("food_history"),

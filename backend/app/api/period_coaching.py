@@ -32,6 +32,9 @@ def api_period_coaching(req: PeriodCoachingRequest):
         "strength_by_day": [
             {"record_date": d.record_date, "items": d.strength_labels} for d in req.days if d.strength_labels
         ],
+        "sick_days": [d.record_date for d in req.days if d.is_sick],
+        "injured_days": [d.record_date for d in req.days if d.is_injured],
+        "medications": req.medications,
     }
 
     try:

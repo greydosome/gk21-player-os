@@ -525,6 +525,9 @@ type PeriodDetailRow = {
   record_date: string;
   general_food_items: string[];
   workout_items: { workout_type: string; minutes: number; calorie_estimate: number | null; detail: string | null }[];
+  is_sick: boolean;
+  is_injured: boolean;
+  medication_items: { name: string; category: string }[];
 };
 
 
@@ -1575,6 +1578,9 @@ export default function Home() {
         strengthLabels,
         cardioMinutes,
         strengthMinutes,
+        isSick: detail?.is_sick ?? false,
+        isInjured: detail?.is_injured ?? false,
+        medicationNames: (detail?.medication_items ?? []).map((m) => m.name),
       };
     });
 
@@ -1591,8 +1597,11 @@ export default function Home() {
 
     // 식단관리 성공한 날 (기록이 있고 1200kcal 예산 이내) — 먼슬리 달력의 노란 테두리와 동일한 기준.
     const dietSuccessDays = days.filter((d) => d.dietKcal > 0 && d.dietKcal <= DAILY_CALORIE_BUDGET).length;
+    const sickDays = days.filter((d) => d.isSick).length;
+    const injuredDays = days.filter((d) => d.isInjured).length;
+    const medications = Array.from(new Set(days.flatMap((d) => d.medicationNames)));
 
-    return { days, totalKcal, budget, ratio, coverage, dietSuccessDays };
+    return { days, totalKcal, budget, ratio, coverage, dietSuccessDays, sickDays, injuredDays, medications };
   }, [history, periodDetail]);
 
   async function requestPeriodCoaching() {
@@ -1612,6 +1621,8 @@ export default function Home() {
             diet_kcal: d.dietKcal,
             cardio_labels: d.cardioLabels,
             strength_labels: d.strengthLabels,
+            is_sick: d.isSick,
+            is_injured: d.isInjured,
           })),
           total_kcal: periodSummary.totalKcal,
           budget_kcal: periodSummary.budget,
@@ -1619,6 +1630,7 @@ export default function Home() {
           avg_sleep_hours: stats?.avg_sleep_hours ?? null,
           avg_water_liter: stats?.avg_water_liter ?? null,
           avg_weight_kg: stats?.avg_weight_kg ?? null,
+          medications: periodSummary.medications,
         }),
       });
       const data = await res.json();
@@ -1849,12 +1861,21 @@ export default function Home() {
                         const r = size / 2 - 2.5;
                         const c = 2 * Math.PI * r;
                         const ringColor = over ? "var(--accent-danger)" : "#eab308";
+                        const conditionBadge = d.isInjured ? "🤕" : d.isSick ? "🤒" : null;
+                        const titleParts = [`${shortDateLabel(d.recordDate)} · ${d.dietKcal}kcal`];
+                        if (d.isInjured) titleParts.push("다친 날");
+                        if (d.isSick) titleParts.push("아픈 날");
                         return (
                           <div
                             key={d.recordDate}
-                            title={`${shortDateLabel(d.recordDate)} · ${d.dietKcal}kcal`}
-                            className="flex flex-col items-center gap-1 rounded-xl bg-zinc-800 py-2"
+                            title={titleParts.join(" · ")}
+                            className="relative flex flex-col items-center gap-1 rounded-xl bg-zinc-800 py-2"
                           >
+                            {conditionBadge && (
+                              <span className="absolute right-1 top-1 text-[9px] leading-none">
+                                {conditionBadge}
+                              </span>
+                            )}
                             <span className="text-[10px] font-semibold text-zinc-500">
                               {WEEKDAY_LABELS[new Date(`${d.recordDate}T00:00:00`).getDay()]}
                             </span>
@@ -2005,19 +2026,27 @@ export default function Home() {
                           const hasStrength = d.strengthLabels.length > 0;
                           const totalMinutes = d.cardioMinutes + d.strengthMinutes;
                           const dietSuccess = d.dietKcal > 0 && d.dietKcal <= DAILY_CALORIE_BUDGET;
+                          const conditionBadge = d.isInjured ? "🤕" : d.isSick ? "🤒" : null;
                           const titleParts = [shortDateLabel(d.recordDate)];
                           if (hasCardio) titleParts.push(`유산소: ${d.cardioLabels.join(", ")} (${d.cardioMinutes}분)`);
                           if (hasStrength) titleParts.push(`무산소: ${d.strengthLabels.join(", ")} (${d.strengthMinutes}분)`);
                           titleParts.push(dietSuccess ? "식단관리 성공" : `${d.dietKcal}kcal`);
+                          if (d.isInjured) titleParts.push("다친 날");
+                          if (d.isSick) titleParts.push("아픈 날");
                           return (
                             <div
                               key={d.recordDate}
                               title={titleParts.join(" · ")}
                               className={[
-                                "flex flex-col items-center gap-1.5 rounded-lg border py-1.5",
+                                "relative flex flex-col items-center gap-1.5 rounded-lg border py-1.5",
                                 dietSuccess ? "border-yellow-500/70 bg-yellow-500/10" : "border-transparent",
                               ].join(" ")}
                             >
+                              {conditionBadge && (
+                                <span className="absolute right-0.5 top-0.5 text-[8px] leading-none">
+                                  {conditionBadge}
+                                </span>
+                              )}
                               <span className="text-xs font-medium text-zinc-300">
                                 {Number(d.recordDate.slice(-2))}
                               </span>
@@ -2052,6 +2081,11 @@ export default function Home() {
                           <span className="h-2 w-2 rounded-full border border-yellow-500 bg-yellow-500/20" />
                           식단관리 성공
                         </span>
+                        {(periodSummary.sickDays > 0 || periodSummary.injuredDays > 0) && (
+                          <span className="flex items-center gap-1">
+                            🤒 아픈 날 {periodSummary.sickDays}일 · 🤕 다친 날 {periodSummary.injuredDays}일
+                          </span>
+                        )}
                       </div>
                     </div>
                   )}

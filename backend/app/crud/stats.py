@@ -77,6 +77,9 @@ def get_period_detail(end_date, days):
         SELECT
             gs.day::date AS record_date,
             d.day_record_id,
+            d.is_sick,
+            d.is_injured,
+            d.medication_items,
             b.general_food_items
         FROM generate_series(:start_date, :end_date, interval '1 day') AS gs(day)
         LEFT JOIN day_record d ON d.record_date = gs.day::date
@@ -118,6 +121,9 @@ def get_period_detail(end_date, days):
             "record_date": key,
             "general_food_items": row["general_food_items"] or [],
             "workout_items": workouts_by_date.get(key, []),
+            "is_sick": bool(row["is_sick"]),
+            "is_injured": bool(row["is_injured"]),
+            "medication_items": row["medication_items"] or [],
         })
 
     return result
