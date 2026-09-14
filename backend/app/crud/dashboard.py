@@ -40,6 +40,7 @@ def get_day_detail(record_date: date, conn=None):
                 "supplement_items": [],
                 "general_food_items": [],
                 "is_sick": False,
+                "sick_note": None,
                 "is_injured": False,
                 "injury_note": None,
                 "medication_items": [],
@@ -66,7 +67,7 @@ def get_day_detail(record_date: date, conn=None):
 
         day_row = conn.execute(
             text(
-                "SELECT is_sick, is_injured, injury_note, medication_items "
+                "SELECT is_sick, sick_note, is_injured, injury_note, medication_items "
                 "FROM day_record WHERE day_record_id = :day_record_id"
             ),
             {"day_record_id": day_record_id}
@@ -80,6 +81,7 @@ def get_day_detail(record_date: date, conn=None):
         "supplement_items": (food_items["supplement_items"] if food_items else None) or [],
         "general_food_items": (food_items["general_food_items"] if food_items else None) or [],
         "is_sick": day_row["is_sick"] if day_row else False,
+        "sick_note": (day_row["sick_note"] if day_row else None),
         "is_injured": day_row["is_injured"] if day_row else False,
         "injury_note": (day_row["injury_note"] if day_row else None),
         "medication_items": (day_row["medication_items"] if day_row else None) or [],

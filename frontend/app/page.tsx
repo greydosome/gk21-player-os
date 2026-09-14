@@ -669,6 +669,7 @@ function snapshotFormState(state: {
   sleepHours: number;
   binge: boolean;
   isSick: boolean;
+  sickNote: string;
   isInjured: boolean;
   injuryNote: string;
   moodScore: number | null;
@@ -690,6 +691,7 @@ function snapshotFormState(state: {
     sleepHours: state.sleepHours,
     binge: state.binge,
     isSick: state.isSick,
+    sickNote: state.sickNote,
     isInjured: state.isInjured,
     injuryNote: state.injuryNote,
     moodScore: state.moodScore,
@@ -820,6 +822,7 @@ export default function Home() {
   const [sleepHours, setSleepHours] = useState(0);
   const [binge, setBinge] = useState(false);
   const [isSick, setIsSick] = useState(false);
+  const [sickNote, setSickNote] = useState("");
   const [isInjured, setIsInjured] = useState(false);
   const [injuryNote, setInjuryNote] = useState("");
   const [moodScore, setMoodScore] = useState<number | null>(null);
@@ -1113,6 +1116,7 @@ export default function Home() {
       mood_score: moodScore,
       memo: workoutDone ? workoutComment || null : null,
       is_sick: isSick,
+      sick_note: isSick ? sickNote || null : null,
       is_injured: isInjured,
       injury_note: isInjured ? injuryNote || null : null,
       morning_med_taken: morningMed,
@@ -1292,6 +1296,7 @@ export default function Home() {
           sleepHours: d?.sleep_hours ?? 0,
           binge: d?.binge_yn ?? false,
           isSick: detail?.is_sick ?? false,
+          sickNote: detail?.sick_note ?? "",
           isInjured: detail?.is_injured ?? false,
           injuryNote: detail?.injury_note ?? "",
           moodScore: d?.mood_score ?? null,
@@ -1344,6 +1349,7 @@ export default function Home() {
         setSleepHours(loaded.sleepHours);
         setBinge(loaded.binge);
         setIsSick(loaded.isSick);
+        setSickNote(loaded.sickNote);
         setIsInjured(loaded.isInjured);
         setInjuryNote(loaded.injuryNote);
         setMoodScore(loaded.moodScore);
@@ -1399,6 +1405,7 @@ export default function Home() {
       sleepHours,
       binge,
       isSick,
+      sickNote,
       isInjured,
       injuryNote,
       moodScore,
@@ -1449,6 +1456,7 @@ export default function Home() {
     sleepHours,
     binge,
     isSick,
+    sickNote,
     isInjured,
     injuryNote,
     moodScore,
@@ -1477,6 +1485,7 @@ export default function Home() {
         sleepHours,
         binge,
         isSick,
+        sickNote,
         isInjured,
         injuryNote,
         moodScore,
@@ -1706,6 +1715,9 @@ export default function Home() {
                 {ready.level.icon} {ready.level.label}
               </p>
               <p className="mt-2 font-medium text-white/90">{ready.level.text}</p>
+              {isSick && sickNote.trim() !== "" && (
+                <p className="mt-1 text-sm font-normal text-white/70">🤒 {sickNote}</p>
+              )}
               {isInjured && injuryNote.trim() !== "" && (
                 <p className="mt-1 text-sm font-normal text-white/70">🤕 {injuryNote}</p>
               )}
@@ -2099,6 +2111,14 @@ export default function Home() {
                     <Chip label="🤒 아픈 날" active={isSick} onClick={() => setIsSick(!isSick)} tone="warn" />
                     <Chip label="🤕 다친 날" active={isInjured} onClick={() => setIsInjured(!isInjured)} tone="warn" />
                   </div>
+                  {isSick && (
+                    <input
+                      value={sickNote}
+                      onChange={(e) => setSickNote(e.target.value)}
+                      placeholder="어디가 아픈지 적어두기 (예: 목감기, 두통)"
+                      className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                    />
+                  )}
                   {isInjured && (
                     <input
                       value={injuryNote}
@@ -2109,7 +2129,7 @@ export default function Home() {
                   )}
                 </CollapsibleBlock>
 
-                <CollapsibleBlock title={`💊 먹은 약${medicationItems.length > 0 ? ` · ${medicationItems.length}개` : ""}`}>
+                <CollapsibleBlock title={`💊 먹는 약${medicationItems.length > 0 ? ` · ${medicationItems.length}개` : ""}`}>
                   <div className="space-y-3">
                     {medicationItems.length > 0 && (
                       <div className="flex flex-wrap gap-2">
@@ -2236,7 +2256,7 @@ export default function Home() {
                         )}
                         {filteredMedicationHistory.length === 0 && medicationQuery.trim() === "" && (
                           <p className="text-xs font-normal text-zinc-600">
-                            최근 먹은 약 기록이 없어요. 검색창에 이름을 입력해 추가해보세요.
+                            최근 먹는 약 기록이 없어요. 검색창에 이름을 입력해 추가해보세요.
                           </p>
                         )}
                       </div>

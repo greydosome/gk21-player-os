@@ -72,6 +72,7 @@ class DayRecordRequest(BaseModel):
     mood_score: int | None = None
     memo: str | None = None
     is_sick: bool = False
+    sick_note: str | None = None
     is_injured: bool = False
     injury_note: str | None = None
 
