@@ -73,6 +73,7 @@ class DayRecordRequest(BaseModel):
     memo: str | None = None
     is_sick: bool = False
     is_injured: bool = False
+    injury_note: str | None = None
 
     morning_med_taken: bool | None = False
     evening_med_taken: bool | None = False

@@ -670,6 +670,7 @@ function snapshotFormState(state: {
   binge: boolean;
   isSick: boolean;
   isInjured: boolean;
+  injuryNote: string;
   moodScore: number | null;
   workoutComment: string;
   selectedWorkouts: Map<string, SelectedWorkout>;
@@ -690,6 +691,7 @@ function snapshotFormState(state: {
     binge: state.binge,
     isSick: state.isSick,
     isInjured: state.isInjured,
+    injuryNote: state.injuryNote,
     moodScore: state.moodScore,
     workoutComment: state.workoutComment,
     workouts: Array.from(state.selectedWorkouts.entries())
@@ -819,6 +821,7 @@ export default function Home() {
   const [binge, setBinge] = useState(false);
   const [isSick, setIsSick] = useState(false);
   const [isInjured, setIsInjured] = useState(false);
+  const [injuryNote, setInjuryNote] = useState("");
   const [moodScore, setMoodScore] = useState<number | null>(null);
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -1111,6 +1114,7 @@ export default function Home() {
       memo: workoutDone ? workoutComment || null : null,
       is_sick: isSick,
       is_injured: isInjured,
+      injury_note: isInjured ? injuryNote || null : null,
       morning_med_taken: morningMed,
       evening_med_taken: eveningMed,
       medication_note: buildMedicationNote(morningMed, eveningMed),
@@ -1289,6 +1293,7 @@ export default function Home() {
           binge: d?.binge_yn ?? false,
           isSick: detail?.is_sick ?? false,
           isInjured: detail?.is_injured ?? false,
+          injuryNote: detail?.injury_note ?? "",
           moodScore: d?.mood_score ?? null,
           workoutComment: d?.memo ?? "",
           medicationItems: normalizeMedicationEntries(detail?.medication_items),
@@ -1340,6 +1345,7 @@ export default function Home() {
         setBinge(loaded.binge);
         setIsSick(loaded.isSick);
         setIsInjured(loaded.isInjured);
+        setInjuryNote(loaded.injuryNote);
         setMoodScore(loaded.moodScore);
         setWorkoutComment(loaded.workoutComment);
         setMedicationItems(loaded.medicationItems);
@@ -1394,6 +1400,7 @@ export default function Home() {
       binge,
       isSick,
       isInjured,
+      injuryNote,
       moodScore,
       workoutComment,
       selectedWorkouts,
@@ -1443,6 +1450,7 @@ export default function Home() {
     binge,
     isSick,
     isInjured,
+    injuryNote,
     moodScore,
     workoutComment,
   ]);
@@ -1470,6 +1478,7 @@ export default function Home() {
         binge,
         isSick,
         isInjured,
+        injuryNote,
         moodScore,
         workoutComment,
         selectedWorkouts,
@@ -1697,6 +1706,9 @@ export default function Home() {
                 {ready.level.icon} {ready.level.label}
               </p>
               <p className="mt-2 font-medium text-white/90">{ready.level.text}</p>
+              {isInjured && injuryNote.trim() !== "" && (
+                <p className="mt-1 text-sm font-normal text-white/70">🤕 {injuryNote}</p>
+              )}
             </div>
           ) : (
             // 5개 체크 항목을 하나로 이어진 여정처럼 보여준다: 원 사이를 가로지르는 선 위에
@@ -2087,6 +2099,14 @@ export default function Home() {
                     <Chip label="🤒 아픈 날" active={isSick} onClick={() => setIsSick(!isSick)} tone="warn" />
                     <Chip label="🤕 다친 날" active={isInjured} onClick={() => setIsInjured(!isInjured)} tone="warn" />
                   </div>
+                  {isInjured && (
+                    <input
+                      value={injuryNote}
+                      onChange={(e) => setInjuryNote(e.target.value)}
+                      placeholder="어디를 다쳤는지 적어두기 (예: 왼쪽 무릎)"
+                      className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                    />
+                  )}
                 </CollapsibleBlock>
 
                 <CollapsibleBlock title={`💊 먹은 약${medicationItems.length > 0 ? ` · ${medicationItems.length}개` : ""}`}>
