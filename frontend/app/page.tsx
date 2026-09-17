@@ -2451,8 +2451,12 @@ export default function Home() {
                     ))}
                   </div>
                 </CollapsibleBlock>
+              </div>
+            </Section>
 
-                <CollapsibleBlock title="🖐 GK 체크">
+            <Section title="🖐 GK 체크" color={DAILY_COLOR} collapsible defaultOpen={false}>
+              <div className="space-y-4">
+                <CollapsibleBlock title="🖐 오늘의 GK 체크">
                   <div className="grid grid-cols-2 gap-3">
                     {(
                       [
