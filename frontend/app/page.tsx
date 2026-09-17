@@ -2223,6 +2223,65 @@ export default function Home() {
                   )}
                 </CollapsibleBlock>
 
+                <CollapsibleBlock
+                  title={`⚖️ 체중 · ${weightKg !== null ? `${weightKg}kg` : "-"}${weightTarget !== null ? ` / 목표 ${weightTarget}kg` : ""}`}
+                >
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step={0.1}
+                    value={weightKg ?? ""}
+                    onChange={(e) => setWeightKg(e.target.value === "" ? null : parseFloat(e.target.value))}
+                    placeholder="체중 입력 (kg)"
+                    className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-lg font-bold tabular-nums text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                  />
+                </CollapsibleBlock>
+
+                <CollapsibleBlock title={`💧 물 · ${waterLiter.toFixed(1)}L / 목표 ${waterTarget.toFixed(1)}L`}>
+                  <ScaleRow
+                    values={WATER_PRESETS}
+                    active={waterLiter}
+                    onSelect={setWaterLiter}
+                    format={(v) => `${v.toFixed(1)}L`}
+                  />
+                </CollapsibleBlock>
+
+                <CollapsibleBlock title={`😴 수면 · ${sleepHours}시간 / 목표 ${SLEEP_TARGET}시간`}>
+                  <ScaleRow
+                    values={SLEEP_HOURS}
+                    active={sleepHours}
+                    onSelect={setSleepHours}
+                    format={(v) => `${v}h`}
+                  />
+                </CollapsibleBlock>
+
+              </div>
+            </Section>
+
+            {/* 컨디션(기분)과 먹는 약은 체중/물/수면 같은 몸 상태 지표가 아니라 마음/정신 건강
+                쪽에 더 가까워서, 데일리 체크의 나머지 몸 지표와 분리해 따로 묶었다. */}
+            <Section title="🙂 마음 상태" color={DAILY_COLOR} collapsible defaultOpen={false}>
+              <div className="space-y-4">
+                <CollapsibleBlock title="🙂 컨디션">
+                  <div className="grid grid-cols-5 gap-2">
+                    {MOOD_OPTIONS.map((mood) => (
+                      <button
+                        key={mood.score}
+                        type="button"
+                        onClick={() => setMoodScore(moodScore === mood.score ? null : mood.score)}
+                        className={[
+                          "rounded-2xl border-2 py-3 text-3xl transition-colors",
+                          moodScore === mood.score
+                            ? [DAILY_COLOR.border, "bg-zinc-800"].join(" ")
+                            : "border-zinc-700 bg-zinc-800",
+                        ].join(" ")}
+                      >
+                        {mood.icon}
+                      </button>
+                    ))}
+                  </div>
+                </CollapsibleBlock>
+
                 <CollapsibleBlock title={`💊 먹는 약${medicationItems.length > 0 ? ` · ${medicationItems.length}개` : ""}`}>
                   <div className="space-y-3">
                     {medicationItems.length > 0 && (
@@ -2399,58 +2458,6 @@ export default function Home() {
                     </div>
                   </div>
                 </CollapsibleBlock>
-
-                <CollapsibleBlock
-                  title={`⚖️ 체중 · ${weightKg !== null ? `${weightKg}kg` : "-"}${weightTarget !== null ? ` / 목표 ${weightTarget}kg` : ""}`}
-                >
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step={0.1}
-                    value={weightKg ?? ""}
-                    onChange={(e) => setWeightKg(e.target.value === "" ? null : parseFloat(e.target.value))}
-                    placeholder="체중 입력 (kg)"
-                    className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-lg font-bold tabular-nums text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
-                  />
-                </CollapsibleBlock>
-
-                <CollapsibleBlock title={`💧 물 · ${waterLiter.toFixed(1)}L / 목표 ${waterTarget.toFixed(1)}L`}>
-                  <ScaleRow
-                    values={WATER_PRESETS}
-                    active={waterLiter}
-                    onSelect={setWaterLiter}
-                    format={(v) => `${v.toFixed(1)}L`}
-                  />
-                </CollapsibleBlock>
-
-                <CollapsibleBlock title={`😴 수면 · ${sleepHours}시간 / 목표 ${SLEEP_TARGET}시간`}>
-                  <ScaleRow
-                    values={SLEEP_HOURS}
-                    active={sleepHours}
-                    onSelect={setSleepHours}
-                    format={(v) => `${v}h`}
-                  />
-                </CollapsibleBlock>
-
-                <CollapsibleBlock title="🙂 컨디션">
-                  <div className="grid grid-cols-5 gap-2">
-                    {MOOD_OPTIONS.map((mood) => (
-                      <button
-                        key={mood.score}
-                        type="button"
-                        onClick={() => setMoodScore(moodScore === mood.score ? null : mood.score)}
-                        className={[
-                          "rounded-2xl border-2 py-3 text-3xl transition-colors",
-                          moodScore === mood.score
-                            ? [DAILY_COLOR.border, "bg-zinc-800"].join(" ")
-                            : "border-zinc-700 bg-zinc-800",
-                        ].join(" ")}
-                      >
-                        {mood.icon}
-                      </button>
-                    ))}
-                  </div>
-                </CollapsibleBlock>
               </div>
             </Section>
 
@@ -2499,7 +2506,7 @@ export default function Home() {
                       <textarea
                         value={praiseNote}
                         onChange={(e) => setPraiseNote(e.target.value)}
-                        placeholder="예: 자전거 하기 싫었는데 10분 탔다. 비워도 됨."
+                        placeholder="예: 오늘 다이빙 반응속도가 빨랐다. 비워도 됨."
                         rows={2}
                         className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
                       />
@@ -2509,7 +2516,7 @@ export default function Home() {
                       <textarea
                         value={hardNote}
                         onChange={(e) => setHardNote(e.target.value)}
-                        placeholder="예: 약 먹고 식욕이 올라왔다."
+                        placeholder="예: 사이드 이동할 때 무릎이 좀 불편했다."
                         rows={2}
                         className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
                       />
