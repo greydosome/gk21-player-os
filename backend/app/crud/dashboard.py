@@ -44,6 +44,13 @@ def get_day_detail(record_date: date, conn=None):
                 "is_injured": False,
                 "injury_note": None,
                 "medication_items": [],
+                "praise_note": None,
+                "hard_note": None,
+                "coach_feedback": None,
+                "lightness_score": None,
+                "reaction_score": None,
+                "side_score": None,
+                "shoulder_score": None,
             }
 
         workout_items = conn.execute(
@@ -67,8 +74,17 @@ def get_day_detail(record_date: date, conn=None):
 
         day_row = conn.execute(
             text(
-                "SELECT is_sick, sick_note, is_injured, injury_note, medication_items "
+                "SELECT is_sick, sick_note, is_injured, injury_note, medication_items, "
+                "praise_note, hard_note, coach_feedback "
                 "FROM day_record WHERE day_record_id = :day_record_id"
+            ),
+            {"day_record_id": day_record_id}
+        ).mappings().first()
+
+        gk_row = conn.execute(
+            text(
+                "SELECT lightness_score, reaction_score, side_score, shoulder_score "
+                "FROM gk_record WHERE day_record_id = :day_record_id"
             ),
             {"day_record_id": day_record_id}
         ).mappings().first()
@@ -85,6 +101,13 @@ def get_day_detail(record_date: date, conn=None):
         "is_injured": day_row["is_injured"] if day_row else False,
         "injury_note": (day_row["injury_note"] if day_row else None),
         "medication_items": (day_row["medication_items"] if day_row else None) or [],
+        "praise_note": (day_row["praise_note"] if day_row else None),
+        "hard_note": (day_row["hard_note"] if day_row else None),
+        "coach_feedback": (day_row["coach_feedback"] if day_row else None),
+        "lightness_score": (gk_row["lightness_score"] if gk_row else None),
+        "reaction_score": (gk_row["reaction_score"] if gk_row else None),
+        "side_score": (gk_row["side_score"] if gk_row else None),
+        "shoulder_score": (gk_row["shoulder_score"] if gk_row else None),
     }
 
 

@@ -685,6 +685,13 @@ function snapshotFormState(state: {
   customMealItems: CustomFoodEntry[];
   supplementItems: Set<string>;
   medicationItems: MedicationEntry[];
+  lightnessScore: number | null;
+  reactionScore: number | null;
+  sideScore: number | null;
+  shoulderScore: number | null;
+  praiseNote: string;
+  hardNote: string;
+  coachFeedback: string;
 }) {
   return JSON.stringify({
     morningMed: state.morningMed,
@@ -715,6 +722,13 @@ function snapshotFormState(state: {
     generalFood: state.customMealItems.map(encodeCustomFoodItem),
     supplement: Array.from(state.supplementItems).sort(),
     medications: state.medicationItems,
+    lightnessScore: state.lightnessScore,
+    reactionScore: state.reactionScore,
+    sideScore: state.sideScore,
+    shoulderScore: state.shoulderScore,
+    praiseNote: state.praiseNote,
+    hardNote: state.hardNote,
+    coachFeedback: state.coachFeedback,
   });
 }
 
@@ -829,6 +843,15 @@ export default function Home() {
   const [isInjured, setIsInjured] = useState(false);
   const [injuryNote, setInjuryNote] = useState("");
   const [moodScore, setMoodScore] = useState<number | null>(null);
+  // GK 체크: gk_record에 이미 있던 필드지만 프론트 UI가 없어서 한 번도 쓰인 적 없었다.
+  // 점수(등급)엔 반영하지 않는 참고용 코칭 데이터라 hasAnyInput/ready 계산에서는 제외한다.
+  const [lightnessScore, setLightnessScore] = useState<number | null>(null);
+  const [reactionScore, setReactionScore] = useState<number | null>(null);
+  const [sideScore, setSideScore] = useState<number | null>(null);
+  const [shoulderScore, setShoulderScore] = useState<number | null>(null);
+  const [praiseNote, setPraiseNote] = useState("");
+  const [hardNote, setHardNote] = useState("");
+  const [coachFeedback, setCoachFeedback] = useState("");
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [coachStatus, setCoachStatus] = useState<"idle" | "loading" | "ready">("idle");
@@ -1126,6 +1149,15 @@ export default function Home() {
       evening_med_taken: eveningMed,
       medication_note: buildMedicationNote(morningMed, eveningMed),
       medication_items: medicationItems,
+      praise_note: praiseNote || null,
+      hard_note: hardNote || null,
+      coach_feedback: coachFeedback || null,
+      gk: {
+        lightness_score: lightnessScore,
+        reaction_score: reactionScore,
+        side_score: sideScore,
+        shoulder_score: shoulderScore,
+      },
       body: {
         weight_kg: weightKg,
         water_liter: waterLiter,
@@ -1305,6 +1337,13 @@ export default function Home() {
           moodScore: d?.mood_score ?? null,
           workoutComment: d?.memo ?? "",
           medicationItems: normalizeMedicationEntries(detail?.medication_items),
+          lightnessScore: detail?.lightness_score ?? null,
+          reactionScore: detail?.reaction_score ?? null,
+          sideScore: detail?.side_score ?? null,
+          shoulderScore: detail?.shoulder_score ?? null,
+          praiseNote: detail?.praise_note ?? "",
+          hardNote: detail?.hard_note ?? "",
+          coachFeedback: detail?.coach_feedback ?? "",
         };
 
         const workoutMap = new Map<string, SelectedWorkout>();
@@ -1358,6 +1397,13 @@ export default function Home() {
         setMoodScore(loaded.moodScore);
         setWorkoutComment(loaded.workoutComment);
         setMedicationItems(loaded.medicationItems);
+        setLightnessScore(loaded.lightnessScore);
+        setReactionScore(loaded.reactionScore);
+        setSideScore(loaded.sideScore);
+        setShoulderScore(loaded.shoulderScore);
+        setPraiseNote(loaded.praiseNote);
+        setHardNote(loaded.hardNote);
+        setCoachFeedback(loaded.coachFeedback);
         setSelectedWorkouts(workoutMap);
         setCustomCardioWorkouts(customCardioList);
         setProteinCounts(proteinMap);
@@ -1421,6 +1467,13 @@ export default function Home() {
       customMealItems,
       supplementItems,
       medicationItems,
+      lightnessScore,
+      reactionScore,
+      sideScore,
+      shoulderScore,
+      praiseNote,
+      hardNote,
+      coachFeedback,
     });
 
     if (currentSnapshot === lastLoadedSnapshotRef.current) return;
@@ -1464,6 +1517,13 @@ export default function Home() {
     injuryNote,
     moodScore,
     workoutComment,
+    lightnessScore,
+    reactionScore,
+    sideScore,
+    shoulderScore,
+    praiseNote,
+    hardNote,
+    coachFeedback,
   ]);
 
   async function requestCoaching() {
@@ -1501,6 +1561,13 @@ export default function Home() {
         customMealItems,
         supplementItems,
         medicationItems,
+        lightnessScore,
+        reactionScore,
+        sideScore,
+        shoulderScore,
+        praiseNote,
+        hardNote,
+        coachFeedback,
       });
       setAutoSaveStatus("saved");
       pollCoachFeedback(recordDate, 8, myGeneration);
@@ -2390,6 +2457,79 @@ export default function Home() {
                       </button>
                     ))}
                   </div>
+                </CollapsibleBlock>
+
+                <CollapsibleBlock title="🖐 GK 체크">
+                  <div className="grid grid-cols-2 gap-3">
+                    {(
+                      [
+                        { label: "몸이 가벼움 1~5", value: lightnessScore, setValue: setLightnessScore },
+                        { label: "반응속도 1~5", value: reactionScore, setValue: setReactionScore },
+                        { label: "사이드 이동 1~5", value: sideScore, setValue: setSideScore },
+                        { label: "어깨 상태 1~5", value: shoulderScore, setValue: setShoulderScore },
+                      ] as const
+                    ).map((field) => (
+                      <div key={field.label}>
+                        <p className="mb-1 text-xs font-normal text-zinc-500">{field.label}</p>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          max={5}
+                          step={1}
+                          value={field.value ?? ""}
+                          onChange={(e) => {
+                            if (e.target.value === "") {
+                              field.setValue(null);
+                              return;
+                            }
+                            const parsed = parseInt(e.target.value, 10);
+                            field.setValue(Number.isNaN(parsed) ? null : Math.min(5, Math.max(1, parsed)));
+                          }}
+                          placeholder="-"
+                          className="w-full rounded-xl border border-zinc-700 bg-zinc-800 p-2.5 text-base font-bold tabular-nums text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs font-normal text-zinc-600">
+                    풋살 없는 날은 비워도 됩니다. 점수 반영 X, 코칭 데이터입니다.
+                  </p>
+                </CollapsibleBlock>
+
+                <CollapsibleBlock title="📝 오늘 회고">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="mb-1 text-xs font-normal text-zinc-500">오늘 칭찬 포인트 / MVP 후보</p>
+                      <textarea
+                        value={praiseNote}
+                        onChange={(e) => setPraiseNote(e.target.value)}
+                        placeholder="예: 자전거 하기 싫었는데 10분 탔다. 비워도 됨."
+                        rows={2}
+                        className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                      />
+                    </div>
+                    <div>
+                      <p className="mb-1 text-xs font-normal text-zinc-500">오늘 힘들었던 것</p>
+                      <textarea
+                        value={hardNote}
+                        onChange={(e) => setHardNote(e.target.value)}
+                        placeholder="예: 약 먹고 식욕이 올라왔다."
+                        rows={2}
+                        className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                      />
+                    </div>
+                  </div>
+                </CollapsibleBlock>
+
+                <CollapsibleBlock title="🗣 코치 피드백">
+                  <textarea
+                    value={coachFeedback}
+                    onChange={(e) => setCoachFeedback(e.target.value)}
+                    placeholder="코치나 ChatGPT 피드백을 여기에 붙여넣으면 오늘 기록과 함께 저장됩니다."
+                    rows={4}
+                    className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+                  />
                 </CollapsibleBlock>
               </div>
             </Section>

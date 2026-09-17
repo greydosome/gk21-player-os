@@ -81,6 +81,10 @@ class DayRecordRequest(BaseModel):
     medication_note: str | None = None
     medication_items: list[MedicationEntry] | None = None
 
+    praise_note: str | None = None
+    hard_note: str | None = None
+    coach_feedback: str | None = None
+
     body: BodyRecord | None = None
     workout: WorkoutRecord | None = None
     workout_items: list[WorkoutItem] = []

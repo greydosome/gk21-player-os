@@ -56,6 +56,9 @@ def save_day_record(conn, req):
         "medication_items": json.dumps(
             [m.model_dump() for m in (req.medication_items or [])], ensure_ascii=False
         ),
+        "praise_note": req.praise_note,
+        "hard_note": req.hard_note,
+        "coach_feedback": req.coach_feedback,
     }
 
     if existing:
@@ -77,6 +80,9 @@ def save_day_record(conn, req):
                     evening_med_taken = :evening_med_taken,
                     medication_note = :medication_note,
                     medication_items = CAST(:medication_items AS jsonb),
+                    praise_note = :praise_note,
+                    hard_note = :hard_note,
+                    coach_feedback = :coach_feedback,
                     updated_at = now()
                 WHERE day_record_id = :day_record_id
             """),
@@ -101,7 +107,10 @@ def save_day_record(conn, req):
                 morning_med_taken,
                 evening_med_taken,
                 medication_note,
-                medication_items
+                medication_items,
+                praise_note,
+                hard_note,
+                coach_feedback
             )
             VALUES
             (
@@ -117,7 +126,10 @@ def save_day_record(conn, req):
                 :morning_med_taken,
                 :evening_med_taken,
                 :medication_note,
-                CAST(:medication_items AS jsonb)
+                CAST(:medication_items AS jsonb),
+                :praise_note,
+                :hard_note,
+                :coach_feedback
             )
             RETURNING day_record_id
         """),
