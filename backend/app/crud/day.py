@@ -58,7 +58,6 @@ def save_day_record(conn, req):
         ),
         "praise_note": req.praise_note,
         "hard_note": req.hard_note,
-        "coach_feedback": req.coach_feedback,
     }
 
     if existing:
@@ -82,7 +81,6 @@ def save_day_record(conn, req):
                     medication_items = CAST(:medication_items AS jsonb),
                     praise_note = :praise_note,
                     hard_note = :hard_note,
-                    coach_feedback = :coach_feedback,
                     updated_at = now()
                 WHERE day_record_id = :day_record_id
             """),
@@ -109,8 +107,7 @@ def save_day_record(conn, req):
                 medication_note,
                 medication_items,
                 praise_note,
-                hard_note,
-                coach_feedback
+                hard_note
             )
             VALUES
             (
@@ -128,8 +125,7 @@ def save_day_record(conn, req):
                 :medication_note,
                 CAST(:medication_items AS jsonb),
                 :praise_note,
-                :hard_note,
-                :coach_feedback
+                :hard_note
             )
             RETURNING day_record_id
         """),

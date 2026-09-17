@@ -83,7 +83,6 @@ class DayRecordRequest(BaseModel):
 
     praise_note: str | None = None
     hard_note: str | None = None
-    coach_feedback: str | None = None
 
     body: BodyRecord | None = None
     workout: WorkoutRecord | None = None

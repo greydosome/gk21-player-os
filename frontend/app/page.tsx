@@ -691,7 +691,6 @@ function snapshotFormState(state: {
   shoulderScore: number | null;
   praiseNote: string;
   hardNote: string;
-  coachFeedback: string;
 }) {
   return JSON.stringify({
     morningMed: state.morningMed,
@@ -728,7 +727,6 @@ function snapshotFormState(state: {
     shoulderScore: state.shoulderScore,
     praiseNote: state.praiseNote,
     hardNote: state.hardNote,
-    coachFeedback: state.coachFeedback,
   });
 }
 
@@ -851,7 +849,6 @@ export default function Home() {
   const [shoulderScore, setShoulderScore] = useState<number | null>(null);
   const [praiseNote, setPraiseNote] = useState("");
   const [hardNote, setHardNote] = useState("");
-  const [coachFeedback, setCoachFeedback] = useState("");
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [coachStatus, setCoachStatus] = useState<"idle" | "loading" | "ready">("idle");
@@ -1151,7 +1148,6 @@ export default function Home() {
       medication_items: medicationItems,
       praise_note: praiseNote || null,
       hard_note: hardNote || null,
-      coach_feedback: coachFeedback || null,
       gk: {
         lightness_score: lightnessScore,
         reaction_score: reactionScore,
@@ -1343,7 +1339,6 @@ export default function Home() {
           shoulderScore: detail?.shoulder_score ?? null,
           praiseNote: detail?.praise_note ?? "",
           hardNote: detail?.hard_note ?? "",
-          coachFeedback: detail?.coach_feedback ?? "",
         };
 
         const workoutMap = new Map<string, SelectedWorkout>();
@@ -1403,7 +1398,6 @@ export default function Home() {
         setShoulderScore(loaded.shoulderScore);
         setPraiseNote(loaded.praiseNote);
         setHardNote(loaded.hardNote);
-        setCoachFeedback(loaded.coachFeedback);
         setSelectedWorkouts(workoutMap);
         setCustomCardioWorkouts(customCardioList);
         setProteinCounts(proteinMap);
@@ -1473,7 +1467,6 @@ export default function Home() {
       shoulderScore,
       praiseNote,
       hardNote,
-      coachFeedback,
     });
 
     if (currentSnapshot === lastLoadedSnapshotRef.current) return;
@@ -1523,7 +1516,6 @@ export default function Home() {
     shoulderScore,
     praiseNote,
     hardNote,
-    coachFeedback,
   ]);
 
   async function requestCoaching() {
@@ -1567,7 +1559,6 @@ export default function Home() {
         shoulderScore,
         praiseNote,
         hardNote,
-        coachFeedback,
       });
       setAutoSaveStatus("saved");
       pollCoachFeedback(recordDate, 8, myGeneration);
@@ -2520,16 +2511,6 @@ export default function Home() {
                       />
                     </div>
                   </div>
-                </CollapsibleBlock>
-
-                <CollapsibleBlock title="🗣 코치 피드백">
-                  <textarea
-                    value={coachFeedback}
-                    onChange={(e) => setCoachFeedback(e.target.value)}
-                    placeholder="코치나 ChatGPT 피드백을 여기에 붙여넣으면 오늘 기록과 함께 저장됩니다."
-                    rows={4}
-                    className="w-full rounded-2xl border border-zinc-700 bg-zinc-800 p-3 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
-                  />
                 </CollapsibleBlock>
               </div>
             </Section>
