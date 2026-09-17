@@ -788,6 +788,8 @@ export default function Home() {
   // 식단 섹션의 단백질/탄수화물/지방/보충음식/일반식 5개 접이식 블럭을 한 번에 접기 위한 세대 값.
   // 값을 올리면 각 CollapsibleBlock을 key로 리마운트시켜 전부 닫힌 상태(기본값)로 되돌린다.
   const [foodCollapseGen, setFoodCollapseGen] = useState(0);
+  // 운동 섹션의 근력/유산소 2개 접이식 블럭을 한 번에 접기 위한 세대 값. foodCollapseGen과 같은 방식.
+  const [workoutCollapseGen, setWorkoutCollapseGen] = useState(0);
   // 오늘 복용한 약 이름 목록(자유 입력) — 일반식과 같은 검색+새로입력 방식.
   const [medicationItems, setMedicationItems] = useState<MedicationEntry[]>([]);
   const [medicationHistory, setMedicationHistory] = useState<MedicationEntry[]>([]);
@@ -2719,6 +2721,15 @@ export default function Home() {
             </Section>
 
             <Section title="🏋 운동" color={WORKOUT_COLOR} subtitle={`${totalWorkoutKcal}kcal`}>
+              <div className="mb-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setWorkoutCollapseGen((g) => g + 1)}
+                  className="text-xs font-medium text-zinc-500 underline"
+                >
+                  모두 접기
+                </button>
+              </div>
               <div className="space-y-4">
                 {(
                   [
@@ -2728,7 +2739,10 @@ export default function Home() {
                 ).map((group) => {
                   const totals = workoutBreakdown[group.key];
                   return (
-                  <CollapsibleBlock key={group.key} title={`${group.title} · ${totals.minutes}분 · ${totals.kcal}kcal`}>
+                  <CollapsibleBlock
+                    key={`${group.key}-${workoutCollapseGen}`}
+                    title={`${group.title} · ${totals.minutes}분 · ${totals.kcal}kcal`}
+                  >
                     <div className="space-y-2">
                       {WORKOUT_TYPES.filter((w) => w.category === group.key).map((w) => {
                         const suggestion = todaySchedule.suggestions.find((s) => s.type === w.label);
