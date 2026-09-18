@@ -2264,28 +2264,34 @@ export default function Home() {
               <div className="space-y-4">
                 <CollapsibleBlock title="🙂 컨디션">
                   <div className="pt-7">
-                    <div
-                      className="relative flex h-9 overflow-hidden rounded-2xl"
-                      style={{ background: "linear-gradient(90deg, #f87171, #fb923c, #facc15, #a3e635, #4ade80)" }}
-                    >
-                      {MOOD_OPTIONS.map((mood) => (
-                        <button
-                          key={mood.score}
-                          type="button"
-                          aria-label={`컨디션 ${mood.score}점`}
-                          onClick={() => setMoodScore(moodScore === mood.score ? null : mood.score)}
-                          className="relative flex-1"
-                        >
-                          {moodScore === mood.score && (
-                            <>
-                              <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-2xl leading-none">
-                                {mood.icon}
-                              </span>
-                              <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-zinc-50" />
-                            </>
-                          )}
-                        </button>
-                      ))}
+                    <div className="relative h-9">
+                      {/* 그라데이션 배경은 별도 레이어로 분리해서 overflow-hidden을 걸어야
+                          모서리가 둥글게 잘린다. 이모지 표시는 이 레이어 밖(형제 요소)에
+                          둬야 막대 위로 튀어나오는 부분이 같이 잘리지 않는다. */}
+                      <div
+                        className="absolute inset-0 overflow-hidden rounded-2xl"
+                        style={{ background: "linear-gradient(90deg, #f87171, #fb923c, #facc15, #a3e635, #4ade80)" }}
+                      />
+                      <div className="absolute inset-0 flex">
+                        {MOOD_OPTIONS.map((mood) => (
+                          <button
+                            key={mood.score}
+                            type="button"
+                            aria-label={`컨디션 ${mood.score}점`}
+                            onClick={() => setMoodScore(moodScore === mood.score ? null : mood.score)}
+                            className="relative flex-1"
+                          >
+                            {moodScore === mood.score && (
+                              <>
+                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-2xl leading-none">
+                                  {mood.icon}
+                                </span>
+                                <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-zinc-50" />
+                              </>
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </CollapsibleBlock>
