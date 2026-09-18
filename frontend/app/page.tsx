@@ -2263,22 +2263,30 @@ export default function Home() {
             <Section title="🙂 마음 상태" color={DAILY_COLOR} collapsible defaultOpen={false}>
               <div className="space-y-4">
                 <CollapsibleBlock title="🙂 컨디션">
-                  <div className="grid grid-cols-5 gap-2">
-                    {MOOD_OPTIONS.map((mood) => (
-                      <button
-                        key={mood.score}
-                        type="button"
-                        onClick={() => setMoodScore(moodScore === mood.score ? null : mood.score)}
-                        className={[
-                          "rounded-2xl border-2 py-3 text-3xl transition-colors",
-                          moodScore === mood.score
-                            ? [DAILY_COLOR.border, "bg-zinc-800"].join(" ")
-                            : "border-zinc-700 bg-zinc-800",
-                        ].join(" ")}
-                      >
-                        {mood.icon}
-                      </button>
-                    ))}
+                  <div className="pt-7">
+                    <div
+                      className="relative flex h-9 overflow-hidden rounded-2xl"
+                      style={{ background: "linear-gradient(90deg, #f87171, #fb923c, #facc15, #a3e635, #4ade80)" }}
+                    >
+                      {MOOD_OPTIONS.map((mood) => (
+                        <button
+                          key={mood.score}
+                          type="button"
+                          aria-label={`컨디션 ${mood.score}점`}
+                          onClick={() => setMoodScore(moodScore === mood.score ? null : mood.score)}
+                          className="relative flex-1"
+                        >
+                          {moodScore === mood.score && (
+                            <>
+                              <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-2xl leading-none">
+                                {mood.icon}
+                              </span>
+                              <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-zinc-50" />
+                            </>
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </CollapsibleBlock>
 
