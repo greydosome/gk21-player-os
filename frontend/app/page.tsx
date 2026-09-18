@@ -3045,59 +3045,7 @@ const FoodSection = memo(function FoodSection({
   return (
     <CollapsibleBlock title={`${title} · ${kcal}kcal / 목표 ${target}kcal`}>
       <div className="space-y-3">
-        {foods.map((food) => {
-          const amount = counts.get(food.label) ?? 0;
-          const itemKcal = foodKcal(food, amount);
-          const unitLabel = food.mode === "gram" ? "g" : "개";
-
-          return (
-            <div
-              key={food.label}
-              className={[
-                "rounded-2xl border-2 bg-zinc-800 p-3",
-                amount > 0 ? DIET_COLOR.border : "border-transparent",
-              ].join(" ")}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium text-zinc-100">{food.label}</p>
-                <p className="text-xs text-zinc-500">
-                  {food.mode === "gram" ? `100g당 ${food.kcalPer100g}kcal` : `1개당 ${food.kcalPerPiece}kcal`}
-                </p>
-              </div>
-              {amount > 0 && (
-                <div className="mt-1 flex items-center justify-between">
-                  <p className="text-sm font-medium text-zinc-100">
-                    현재섭취 {amount}
-                    {unitLabel} / {itemKcal}kcal
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => onChangeCount(food.label, 0)}
-                    className="text-xs font-normal text-zinc-500 underline"
-                  >
-                    초기화
-                  </button>
-                </div>
-              )}
-              <div className="mt-2">
-                {food.mode === "gram" ? (
-                  <GramStepper
-                    onAdd={(v) => onChangeCount(food.label, amount + v)}
-                    color={DIET_COLOR}
-                    defaultAmount={food.defaultAmount ?? 100}
-                  />
-                ) : (
-                  <Stepper
-                    value={amount}
-                    onChange={(v) => onChangeCount(food.label, v)}
-                    suffix="개"
-                    step={1}
-                  />
-                )}
-              </div>
-            </div>
-          );
-        })}
+        <FoodSwipeCard foods={foods} counts={counts} onChangeCount={onChangeCount} color={DIET_COLOR} />
 
         {customEntriesByCategory(customItems, category).map(({ item, index }) => (
           <CustomFoodRow
@@ -3112,6 +3060,120 @@ const FoodSection = memo(function FoodSection({
     </CollapsibleBlock>
   );
 });
+
+// 음식마다 카드를 세로로 쌓는 대신, 한 번에 하나만 보여주고 좌우로 넘기는 컴팩트 카드형.
+// 넘기는 동안에도 담은 양은 그대로 유지되고(카드 자체가 아니라 index만 바뀜),
+// 스텝퍼는 기존 GramStepper/Stepper를 그대로 재사용한다.
+function FoodSwipeCard({
+  foods,
+  counts,
+  onChangeCount,
+  color,
+}: {
+  foods: FoodItem[];
+  counts: Map<string, number>;
+  onChangeCount: (label: string, count: number) => void;
+  color: BlockColor;
+}) {
+  const [index, setIndex] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const current = Math.min(index, foods.length - 1);
+  const food = foods[current];
+  const amount = counts.get(food.label) ?? 0;
+  const itemKcal = foodKcal(food, amount);
+  const unitLabel = food.mode === "gram" ? "g" : "개";
+
+  function goPrev() {
+    setIndex((i) => (Math.min(i, foods.length - 1) - 1 + foods.length) % foods.length);
+  }
+  function goNext() {
+    setIndex((i) => (Math.min(i, foods.length - 1) + 1) % foods.length);
+  }
+
+  return (
+    <div
+      className={[
+        "rounded-2xl border-2 bg-zinc-800 p-3",
+        amount > 0 ? color.border : "border-transparent",
+      ].join(" ")}
+      onTouchStart={(e) => {
+        touchStartX.current = e.touches[0].clientX;
+      }}
+      onTouchEnd={(e) => {
+        if (touchStartX.current === null) return;
+        const dx = e.changedTouches[0].clientX - touchStartX.current;
+        touchStartX.current = null;
+        if (dx > 40) goPrev();
+        else if (dx < -40) goNext();
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={goPrev}
+          aria-label="이전 음식"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-lg text-zinc-500"
+        >
+          ‹
+        </button>
+        <div className="flex items-center gap-1.5">
+          {foods.map((f, i) => (
+            <span
+              key={f.label}
+              className={[
+                "h-1.5 rounded-full transition-all",
+                i === current ? [color.bg, "w-4"].join(" ") : "w-1.5 bg-zinc-700",
+              ].join(" ")}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={goNext}
+          aria-label="다음 음식"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-lg text-zinc-500"
+        >
+          ›
+        </button>
+      </div>
+
+      <div className="mt-0.5 flex items-baseline justify-center gap-1.5">
+        <p className="text-sm font-medium text-zinc-100">{food.label}</p>
+        <p className="text-xs text-zinc-500">
+          {food.mode === "gram" ? `100g당 ${food.kcalPer100g}kcal` : `1개당 ${food.kcalPerPiece}kcal`}
+        </p>
+      </div>
+
+      {amount > 0 && (
+        <p className="mt-0.5 text-center text-xs font-medium text-zinc-400">
+          현재섭취 {amount}
+          {unitLabel} · {itemKcal}kcal
+          <button
+            type="button"
+            onClick={() => onChangeCount(food.label, 0)}
+            className="ml-1.5 font-normal text-zinc-500 underline"
+          >
+            초기화
+          </button>
+        </p>
+      )}
+
+      <div className="mt-2">
+        {food.mode === "gram" ? (
+          <GramStepper
+            onAdd={(v) => onChangeCount(food.label, amount + v)}
+            color={color}
+            defaultAmount={food.defaultAmount ?? 100}
+          />
+        ) : (
+          <div className="flex justify-center">
+            <Stepper value={amount} onChange={(v) => onChangeCount(food.label, v)} suffix="개" step={1} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // CustomFoodForm(추가)과 CustomFoodRow(수정)가 공유하는 입력 필드 UI.
 function CustomFoodFields({
