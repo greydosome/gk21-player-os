@@ -2267,7 +2267,7 @@ export default function Home() {
             <Section title="🙂 마음 상태" color={DAILY_COLOR} collapsible defaultOpen={false}>
               <div className="space-y-4">
                 <CollapsibleBlock title="🙂 컨디션">
-                  <div className="pt-7">
+                  <div className="pt-10">
                     <div className="relative h-9">
                       {/* 그라데이션 배경은 별도 레이어로 분리해서 overflow-hidden을 걸어야
                           모서리가 둥글게 잘린다. 이모지/막대 표시는 이 레이어 밖(형제 요소)에
