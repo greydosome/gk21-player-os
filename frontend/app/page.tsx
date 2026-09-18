@@ -2276,22 +2276,26 @@ export default function Home() {
                         className="absolute inset-0 overflow-hidden rounded-2xl"
                         style={{ background: "linear-gradient(90deg, #f87171, #fb923c, #facc15, #a3e635, #4ade80)" }}
                       />
-                      <div
-                        className="pointer-events-none absolute top-1/2 flex -translate-y-1/2 flex-col items-center"
-                        style={{
-                          left: `${Math.min(96, Math.max(4, ((moodDragValue - 1) / 4) * 100))}%`,
-                          transform: "translate(-50%, -50%)",
-                        }}
-                      >
-                        <span className="absolute -top-9 text-2xl leading-none">
-                          {
-                            MOOD_OPTIONS.reduce((closest, m) =>
-                              Math.abs(m.score - moodDragValue) < Math.abs(closest.score - moodDragValue) ? m : closest
-                            ).icon
-                          }
-                        </span>
-                        <span className="h-9 w-0.5 bg-zinc-50" />
-                      </div>
+                      {/* moodScore가 null인 동안(아직 안 만진 상태)에는 표시를 비워둬서
+                          "이미 뭔가 기록됐다"는 오해가 없게 한다 — 실제로 만지면 그때부터 보인다. */}
+                      {moodScore !== null && (
+                        <div
+                          className="pointer-events-none absolute top-1/2 flex -translate-y-1/2 flex-col items-center"
+                          style={{
+                            left: `${Math.min(96, Math.max(4, ((moodDragValue - 1) / 4) * 100))}%`,
+                            transform: "translate(-50%, -50%)",
+                          }}
+                        >
+                          <span className="absolute -top-9 text-2xl leading-none">
+                            {
+                              MOOD_OPTIONS.reduce((closest, m) =>
+                                Math.abs(m.score - moodDragValue) < Math.abs(closest.score - moodDragValue) ? m : closest
+                              ).icon
+                            }
+                          </span>
+                          <span className="h-9 w-0.5 bg-zinc-50" />
+                        </div>
+                      )}
                       {/* 실제 드래그는 투명한 네이티브 range 입력이 처리한다 — 터치/마우스 드래그,
                           키보드 조작을 공짜로 얻고, step을 잘게 둬서 손가락을 따라 부드럽게 움직인다.
                           moodScore 자체는 정수 1~5만 저장하므로 드래그 중에도 반올림해서 커밋한다. */}
@@ -2310,6 +2314,20 @@ export default function Home() {
                         className="absolute inset-0 h-9 w-full cursor-pointer opacity-0"
                       />
                     </div>
+                    {moodScore !== null && (
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMoodScore(null);
+                            setMoodDragValue(3);
+                          }}
+                          className="text-xs font-medium text-zinc-500 underline"
+                        >
+                          지우기
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </CollapsibleBlock>
 
@@ -3118,7 +3136,7 @@ function FoodSwipeCard({
   return (
     <div
       className={[
-        "rounded-2xl border-2 bg-zinc-800 p-3",
+        "rounded-2xl border-2 bg-zinc-800 p-2.5",
         amount > 0 ? color.border : "border-transparent",
       ].join(" ")}
       onTouchStart={(e) => {
@@ -3137,7 +3155,7 @@ function FoodSwipeCard({
           type="button"
           onClick={goPrev}
           aria-label="이전 음식"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-lg text-zinc-500"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-base text-zinc-500"
         >
           ‹
         </button>
@@ -3156,7 +3174,7 @@ function FoodSwipeCard({
           type="button"
           onClick={goNext}
           aria-label="다음 음식"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-lg text-zinc-500"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-base text-zinc-500"
         >
           ›
         </button>
@@ -3796,20 +3814,20 @@ function GramStepper({
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex flex-1 items-center justify-center gap-4 rounded-xl border border-zinc-700 bg-zinc-900 py-2.5">
+    <div className="flex items-center gap-2">
+      <div className="flex flex-1 items-center justify-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900 py-2">
         <button
           type="button"
           onClick={() => setPicked((v) => clamp(v - step))}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-base font-semibold text-zinc-100"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-sm font-semibold text-zinc-100"
         >
           −
         </button>
-        <span className="min-w-[64px] text-center text-base font-bold tabular-nums text-zinc-100">{picked}g</span>
+        <span className="min-w-[52px] text-center text-sm font-semibold tabular-nums text-zinc-100">{picked}g</span>
         <button
           type="button"
           onClick={() => setPicked((v) => clamp(v + step))}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-base font-semibold text-zinc-100"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-sm font-semibold text-zinc-100"
         >
           +
         </button>
@@ -3817,7 +3835,7 @@ function GramStepper({
       <button
         type="button"
         onClick={() => onAdd(picked)}
-        className={[color.bg, "shrink-0 rounded-2xl px-4 py-2.5 text-sm font-semibold text-zinc-950"].join(" ")}
+        className={[color.bg, "shrink-0 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-950"].join(" ")}
       >
         +{picked}g 담기
       </button>
@@ -3841,18 +3859,18 @@ function Stepper({
       <button
         type="button"
         onClick={() => onChange(value - step)}
-        className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-base font-semibold text-zinc-100"
+        className="h-7 w-7 rounded-full border border-zinc-700 bg-zinc-900 text-sm font-semibold text-zinc-100"
       >
         −
       </button>
-      <span className="w-14 text-center text-sm font-semibold text-zinc-100">
+      <span className="w-12 text-center text-sm font-semibold text-zinc-100">
         {value}
         {suffix}
       </span>
       <button
         type="button"
         onClick={() => onChange(value + step)}
-        className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-base font-semibold text-zinc-100"
+        className="h-7 w-7 rounded-full border border-zinc-700 bg-zinc-900 text-sm font-semibold text-zinc-100"
       >
         +
       </button>
