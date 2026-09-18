@@ -3204,7 +3204,8 @@ function FoodSwipeCard({
       <div className="mt-2">
         {food.mode === "gram" ? (
           <GramStepper
-            onAdd={(v) => onChangeCount(food.label, amount + v)}
+            amount={amount}
+            onChange={(v) => onChangeCount(food.label, v)}
             color={color}
             defaultAmount={food.defaultAmount ?? 100}
           />
@@ -3792,52 +3793,42 @@ function ScaleRow({
 // 휠 스크롤 대신 +/- 스텝퍼로 담을 양(g)을 정한 뒤 "담기"를 눌러 현재 섭취량에 더한다.
 // (개수 항목의 Stepper와 달리, 여기서는 picked가 "지금 고르고 있는 양"이고 onAdd가
 // 실제 섭취량에 누적으로 더해준다 — 하루에 여러 번 나눠 먹었을 때 반복해서 담을 수 있게.)
+// "얼마나 담을지 고르고 별도 버튼으로 확정"하는 2단계 방식이 −/+ 옆에 왜 담기
+// 버튼이 또 있는지 헷갈린다는 피드백을 받아서, +/-가 실제 섭취량을 그 자리에서
+// 바로 바꾸는 1단계 방식으로 바꿨다. 한 번 누르면 그 음식의 기본 1회분(defaultAmount)만큼
+// 바로 더해지거나 빠진다 — Stepper(개수형)와 동일한 조작 감각.
 function GramStepper({
-  onAdd,
+  amount,
+  onChange,
   color,
-  step = 10,
-  min = 10,
-  max = 1000,
   defaultAmount = 100,
+  min = 0,
 }: {
-  onAdd: (amount: number) => void;
+  amount: number;
+  onChange: (amount: number) => void;
   color: BlockColor;
-  step?: number;
-  min?: number;
-  max?: number;
   defaultAmount?: number;
+  min?: number;
 }) {
-  const [picked, setPicked] = useState(defaultAmount);
-
-  function clamp(v: number) {
-    return Math.min(max, Math.max(min, v));
-  }
-
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex flex-1 items-center justify-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900 py-2">
-        <button
-          type="button"
-          onClick={() => setPicked((v) => clamp(v - step))}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-sm font-semibold text-zinc-100"
-        >
-          −
-        </button>
-        <span className="min-w-[52px] text-center text-sm font-semibold tabular-nums text-zinc-100">{picked}g</span>
-        <button
-          type="button"
-          onClick={() => setPicked((v) => clamp(v + step))}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-sm font-semibold text-zinc-100"
-        >
-          +
-        </button>
-      </div>
+    <div className="flex items-center justify-center gap-3">
       <button
         type="button"
-        onClick={() => onAdd(picked)}
-        className={[color.bg, "shrink-0 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-950"].join(" ")}
+        onClick={() => onChange(Math.max(min, amount - defaultAmount))}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-sm font-semibold text-zinc-100"
       >
-        +{picked}g 담기
+        −
+      </button>
+      <span className="min-w-[56px] text-center text-sm font-semibold tabular-nums text-zinc-100">{amount}g</span>
+      <button
+        type="button"
+        onClick={() => onChange(amount + defaultAmount)}
+        className={[
+          color.bg,
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-zinc-950",
+        ].join(" ")}
+      >
+        +
       </button>
     </div>
   );
