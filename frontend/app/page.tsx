@@ -3802,19 +3802,31 @@ function GramStepper({
   onChange,
   color,
   defaultAmount = 100,
+  step = 10,
   min = 0,
 }: {
   amount: number;
   onChange: (amount: number) => void;
   color: BlockColor;
   defaultAmount?: number;
+  step?: number;
   min?: number;
 }) {
+  // "+"는 0에서 시작할 때만 그 음식의 기본 1회분(defaultAmount)으로 바로 뛰고,
+  // 그 다음부터는(이미 얼마라도 담겨 있으면) 10g씩 세밀하게 더한다.
+  // defaultAmount씩 계속 배로 뛰면 미세 조절이 안 된다는 피드백을 반영.
+  function handlePlus() {
+    onChange(amount === 0 ? defaultAmount : amount + step);
+  }
+  function handleMinus() {
+    onChange(Math.max(min, amount - step));
+  }
+
   return (
     <div className="flex items-center justify-center gap-3">
       <button
         type="button"
-        onClick={() => onChange(Math.max(min, amount - defaultAmount))}
+        onClick={handleMinus}
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-sm font-semibold text-zinc-100"
       >
         −
@@ -3822,7 +3834,7 @@ function GramStepper({
       <span className="min-w-[56px] text-center text-sm font-semibold tabular-nums text-zinc-100">{amount}g</span>
       <button
         type="button"
-        onClick={() => onChange(amount + defaultAmount)}
+        onClick={handlePlus}
         className={[
           color.bg,
           "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-zinc-950",
