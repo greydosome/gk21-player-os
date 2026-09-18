@@ -843,6 +843,9 @@ export default function Home() {
   const [isInjured, setIsInjured] = useState(false);
   const [injuryNote, setInjuryNote] = useState("");
   const [moodScore, setMoodScore] = useState<number | null>(null);
+  // 컨디션 슬라이더의 실시간 드래그 위치(연속값). moodScore는 정수 1~5만 저장하지만,
+  // 드래그하는 동안 손가락을 부드럽게 따라가도록 별도로 소수 단위까지 들고 있는다.
+  const [moodDragValue, setMoodDragValue] = useState(3);
   // GK 체크: gk_record에 이미 있던 필드지만 프론트 UI가 없어서 한 번도 쓰인 적 없었다.
   // 점수(등급)엔 반영하지 않는 참고용 코칭 데이터라 hasAnyInput/ready 계산에서는 제외한다.
   const [lightnessScore, setLightnessScore] = useState<number | null>(null);
@@ -1392,6 +1395,7 @@ export default function Home() {
         setIsInjured(loaded.isInjured);
         setInjuryNote(loaded.injuryNote);
         setMoodScore(loaded.moodScore);
+        setMoodDragValue(loaded.moodScore ?? 3);
         setWorkoutComment(loaded.workoutComment);
         setMedicationItems(loaded.medicationItems);
         setLightnessScore(loaded.lightnessScore);
@@ -2266,32 +2270,42 @@ export default function Home() {
                   <div className="pt-7">
                     <div className="relative h-9">
                       {/* 그라데이션 배경은 별도 레이어로 분리해서 overflow-hidden을 걸어야
-                          모서리가 둥글게 잘린다. 이모지 표시는 이 레이어 밖(형제 요소)에
+                          모서리가 둥글게 잘린다. 이모지/막대 표시는 이 레이어 밖(형제 요소)에
                           둬야 막대 위로 튀어나오는 부분이 같이 잘리지 않는다. */}
                       <div
                         className="absolute inset-0 overflow-hidden rounded-2xl"
                         style={{ background: "linear-gradient(90deg, #f87171, #fb923c, #facc15, #a3e635, #4ade80)" }}
                       />
-                      <div className="absolute inset-0 flex">
-                        {MOOD_OPTIONS.map((mood) => (
-                          <button
-                            key={mood.score}
-                            type="button"
-                            aria-label={`컨디션 ${mood.score}점`}
-                            onClick={() => setMoodScore(moodScore === mood.score ? null : mood.score)}
-                            className="relative flex-1"
-                          >
-                            {moodScore === mood.score && (
-                              <>
-                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-2xl leading-none">
-                                  {mood.icon}
-                                </span>
-                                <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-zinc-50" />
-                              </>
-                            )}
-                          </button>
-                        ))}
+                      <div
+                        className="pointer-events-none absolute top-1/2 flex -translate-y-1/2 flex-col items-center"
+                        style={{ left: `${((moodDragValue - 1) / 4) * 100}%`, transform: "translate(-50%, -50%)" }}
+                      >
+                        <span className="absolute -top-9 text-2xl leading-none">
+                          {
+                            MOOD_OPTIONS.reduce((closest, m) =>
+                              Math.abs(m.score - moodDragValue) < Math.abs(closest.score - moodDragValue) ? m : closest
+                            ).icon
+                          }
+                        </span>
+                        <span className="h-9 w-0.5 bg-zinc-50" />
                       </div>
+                      {/* 실제 드래그는 투명한 네이티브 range 입력이 처리한다 — 터치/마우스 드래그,
+                          키보드 조작을 공짜로 얻고, step을 잘게 둬서 손가락을 따라 부드럽게 움직인다.
+                          moodScore 자체는 정수 1~5만 저장하므로 드래그 중에도 반올림해서 커밋한다. */}
+                      <input
+                        type="range"
+                        min={1}
+                        max={5}
+                        step={0.01}
+                        value={moodDragValue}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value);
+                          setMoodDragValue(v);
+                          setMoodScore(Math.round(v));
+                        }}
+                        aria-label="컨디션"
+                        className="absolute inset-0 h-9 w-full cursor-pointer opacity-0"
+                      />
                     </div>
                   </div>
                 </CollapsibleBlock>
@@ -2489,21 +2503,29 @@ export default function Home() {
                     ).map((field) => (
                       <div key={field.label} className="flex items-center justify-between gap-3">
                         <p className="text-sm font-medium text-zinc-300">{field.label}</p>
-                        <div className="flex gap-2.5">
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <button
-                              key={n}
-                              type="button"
-                              aria-label={`${field.label} ${n}점`}
-                              onClick={() => field.setValue(field.value === n ? null : n)}
-                              className={[
-                                "h-5 w-5 rounded-full border-2 transition-colors",
-                                field.value !== null && n <= field.value
-                                  ? [DAILY_COLOR.border, DAILY_COLOR.bg].join(" ")
-                                  : "border-zinc-700",
-                              ].join(" ")}
-                            />
-                          ))}
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex gap-2.5">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <button
+                                key={n}
+                                type="button"
+                                aria-label={`${field.label} ${n}점`}
+                                onClick={() => field.setValue(field.value === n ? null : n)}
+                                className="h-5 w-5 rounded-full border-2 transition-colors"
+                                style={
+                                  field.value !== null && n <= field.value
+                                    ? { borderColor: "var(--pop-bg)", backgroundColor: "var(--pop-bg)" }
+                                    : { borderColor: "var(--color-zinc-700)" }
+                                }
+                              />
+                            ))}
+                          </div>
+                          <span
+                            className="w-7 text-right text-xs font-semibold tabular-nums"
+                            style={{ color: field.value !== null ? "var(--pop-bg)" : "var(--color-zinc-600)" }}
+                          >
+                            {field.value ?? "-"}/5
+                          </span>
                         </div>
                       </div>
                     ))}
