@@ -2477,8 +2477,8 @@ export default function Home() {
 
             <Section title="🖐 GK 체크" color={DAILY_COLOR} collapsible defaultOpen={false}>
               <div className="space-y-4">
-                <CollapsibleBlock title="🖐 오늘의 GK 체크">
-                  <div className="space-y-3">
+                <CollapsibleBlock title="🎯 오늘 체크">
+                  <div className="space-y-5">
                     {(
                       [
                         { label: "몸이 가벼움", value: lightnessScore, setValue: setLightnessScore },
@@ -2488,8 +2488,8 @@ export default function Home() {
                       ] as const
                     ).map((field) => (
                       <div key={field.label} className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-normal text-zinc-500">{field.label}</p>
-                        <div className="flex gap-1.5">
+                        <p className="text-sm font-medium text-zinc-300">{field.label}</p>
+                        <div className="flex gap-2.5">
                           {[1, 2, 3, 4, 5].map((n) => (
                             <button
                               key={n}
@@ -2497,7 +2497,7 @@ export default function Home() {
                               aria-label={`${field.label} ${n}점`}
                               onClick={() => field.setValue(field.value === n ? null : n)}
                               className={[
-                                "h-3.5 w-3.5 rounded-full border-2 transition-colors",
+                                "h-5 w-5 rounded-full border-2 transition-colors",
                                 field.value !== null && n <= field.value
                                   ? [DAILY_COLOR.border, DAILY_COLOR.bg].join(" ")
                                   : "border-zinc-700",
@@ -2508,7 +2508,7 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
-                  <p className="mt-3 text-xs font-normal text-zinc-600">
+                  <p className="mt-4 text-xs font-normal text-zinc-600">
                     풋살 없는 날은 비워도 됩니다. 점수 반영 X, 코칭 데이터입니다.
                   </p>
                 </CollapsibleBlock>
