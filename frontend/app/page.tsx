@@ -2278,7 +2278,10 @@ export default function Home() {
                       />
                       <div
                         className="pointer-events-none absolute top-1/2 flex -translate-y-1/2 flex-col items-center"
-                        style={{ left: `${((moodDragValue - 1) / 4) * 100}%`, transform: "translate(-50%, -50%)" }}
+                        style={{
+                          left: `${Math.min(96, Math.max(4, ((moodDragValue - 1) / 4) * 100))}%`,
+                          transform: "translate(-50%, -50%)",
+                        }}
                       >
                         <span className="absolute -top-9 text-2xl leading-none">
                           {
