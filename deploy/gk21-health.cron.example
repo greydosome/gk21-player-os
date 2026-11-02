@@ -1,4 +1,7 @@
-# TEMPLATE ONLY. Confirm the host cron timezone is Asia/Seoul before installation.
-# Retry late sync / failures at ten-minute intervals; input hash avoids duplicate completed calls.
-# Existing backup cron remains unchanged. Nothing installs this automatically.
-*/10 11-23 * * * rocky cd /home/rocky/gk21/backend && /ABSOLUTE/PATH/TO/uv run python -m app.services.health_coaching_job
+# TEMPLATE ONLY. Nothing installs this automatically.
+# The job itself decides "due" using Asia/Seoul (it exits with `not_due` before 11:00 KST),
+# so this schedule must NOT be restricted to hours like 11-23: cron uses the host timezone and
+# the production VM runs in UTC, where `11-23` would mean 20:00-08:00 KST and delay coaching
+# until the evening. Run every ten minutes all day; the input hash avoids duplicate completed calls.
+# Existing backup cron remains unchanged.
+*/10 * * * * rocky cd /home/rocky/gk21/backend && /ABSOLUTE/PATH/TO/uv run python -m app.services.health_coaching_job

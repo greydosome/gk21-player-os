@@ -33,7 +33,7 @@
 6. 기존 Scriptable 위젯에는 인증 정보를 추가할 필요가 없다. 기존 HTTP 읽기 주소도 유지 가능하다. 새 건강 업로드만 HTTPS 주소를 사용한다.
 7. `sql/migrations/2026-11-02_apple_health.sql`만 명시적으로 적용한다. day_record/ai_analysis 등 기존 테이블이 실제로 존재하는지 먼저 확인한다. 마이그레이션을 자동 실행하는 코드는 없다.
 8. `APPLE_HEALTH_ENABLED=true`, `APPLE_HEALTH_COACHING_ENABLED=false`로 수집만 검증한다. HTTP/무인증/잘못된 토큰 요청이 차단되는지 확인한다.
-9. 기기 비교 검증 후 `APPLE_HEALTH_COACHING_ENABLED=true`. 서버 스케줄 템플릿에서 사용자/uv 절대 경로/Asia/Seoul 시간대를 확인한다. `deploy/gk21-health.cron.example`은 설치되지 않은 템플릿이다.
+9. 기기 비교 검증 후 `APPLE_HEALTH_COACHING_ENABLED=true`. 서버 스케줄 템플릿에서 사용자/uv 절대 경로를 확인한다. 작업이 한국 시간 11시 이전에는 스스로 건너뛰므로(`not_due`) cron은 시간대와 무관하게 하루 종일 10분 간격으로 둔다. 운영 VM은 UTC라서 `11-23`처럼 시간대를 제한하면 한국 시간 저녁에야 실행된다. `deploy/gk21-health.cron.example`은 설치되지 않은 템플릿이다.
 
 기존 ChatGPT 오전 11시 예약은 변경하지 않는다. 이 구현의 결과는 GK21 앱에 저장한다.
 
