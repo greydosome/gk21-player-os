@@ -1,8 +1,7 @@
 # REVIEW TEMPLATE: merge into existing nginx configuration only after approval.
-# Requires ngx_http_auth_request_module (check nginx -V), Certbot >=5.4.
+# Requires Certbot >=5.4. The app and existing APIs remain public.
 # Both upstreams must bind to 127.0.0.1, never expose ports 3000/8000.
 limit_req_zone $binary_remote_addr zone=gk21_health:10m rate=6r/m;
-limit_req_zone $binary_remote_addr zone=gk21_login:10m rate=5r/m;
 server {
     listen 80;
     server_name 217.142.230.185;
@@ -11,8 +10,14 @@ server {
         default_type text/plain;
         try_files $uri =404;
     }
-    location /api/ { return 403; }
-    location / { return 301 https://217.142.230.185$request_uri; }
+    location = /api/integrations/apple-health/daily { return 403; }
+    # Existing HTTP app/widget URLs remain usable without authentication.
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto http;
+    }
+    location / { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host; }
 }
 server {
     listen 443 ssl;
@@ -21,30 +26,6 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/217.142.230.185/privkey.pem;
     client_max_body_size 32k;
     add_header Cache-Control "no-store" always;
-    location = /_gk21_auth {
-        internal;
-        proxy_pass http://127.0.0.1:8000/api/auth/check;
-        proxy_pass_request_body off;
-        proxy_set_header Content-Length "";
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-    }
-    location = /login {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto https;
-    }
-    location = /api/auth/login {
-        limit_req zone=gk21_login burst=3 nodelay;
-        limit_req_status 429;
-        client_max_body_size 1k;
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto https;
-        access_log off;
-    }
     location = /api/integrations/apple-health/daily {
         limit_req zone=gk21_health burst=5 nodelay;
         limit_req_status 429;
@@ -62,11 +43,8 @@ server {
         proxy_set_header Authorization $http_authorization;
     }
     location / {
-        auth_request /_gk21_auth;
-        error_page 401 = @login;
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
     }
-    location @login { return 302 /login; }
 }

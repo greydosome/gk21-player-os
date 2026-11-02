@@ -814,7 +814,6 @@ export default function Home() {
     setMedicationInfoCache((prev) => ({ ...prev, [name]: "loading" }));
     fetch(`/api/medication-info?name=${encodeURIComponent(name)}`, { cache: "no-store" })
       .then((res) => {
-        if (res.status === 401) window.location.replace("/login");
         if (!res.ok) throw new Error("기록을 불러오지 못했습니다.");
         return res.json();
       })
@@ -1278,7 +1277,6 @@ export default function Home() {
 
     fetch("/api/food-history", { cache: "no-store" })
       .then((res) => {
-        if (res.status === 401) window.location.replace("/login");
         if (!res.ok) throw new Error("기록을 불러오지 못했습니다.");
         return res.json();
       })
@@ -1302,7 +1300,6 @@ export default function Home() {
 
     fetch("/api/medication-history", { cache: "no-store" })
       .then((res) => {
-        if (res.status === 401) window.location.replace("/login");
         if (!res.ok) throw new Error("기록을 불러오지 못했습니다.");
         return res.json();
       })
@@ -1343,7 +1340,6 @@ export default function Home() {
 
     fetch(`/api/dashboard?record_date=${recordDate}`, { cache: "no-store" })
       .then((res) => {
-        if (res.status === 401) window.location.replace("/login");
         if (!res.ok) throw new Error("기록을 불러오지 못했습니다.");
         return res.json();
       })

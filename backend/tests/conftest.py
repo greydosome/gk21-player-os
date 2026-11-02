@@ -28,7 +28,6 @@ def cleanup():
 atexit.register(cleanup)
 os.environ["DATABASE_URL"] = f"postgresql+psycopg://test_owner@127.0.0.1:{PORT}/postgres"
 os.environ["OPENAI_API_KEY"] = ""
-os.environ["APP_AUTH_ENABLED"] = "false"
 os.environ["APPLE_HEALTH_ENABLED"] = "false"
 os.environ["APPLE_HEALTH_COACHING_ENABLED"] = "false"
 
@@ -54,7 +53,6 @@ with engine.begin() as conn:
 
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch):
-    monkeypatch.setattr(settings, "APP_AUTH_ENABLED", False)
     monkeypatch.setattr(settings, "APPLE_HEALTH_ENABLED", False)
     monkeypatch.setattr(settings, "APPLE_HEALTH_COACHING_ENABLED", False)
     with engine.begin() as conn:

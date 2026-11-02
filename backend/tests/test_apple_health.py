@@ -1,4 +1,3 @@
-import base64
 import hashlib
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -16,7 +15,6 @@ from app.services.apple_health import save_health, read_health
 
 NOW = datetime.now(ZoneInfo("Asia/Seoul"))
 DAY = NOW.date()
-PASSWORD = "test-only-owner-password-with-high-entropy-placeholder"
 TOKEN = "test-only-separate-upload-token"
 
 
@@ -25,7 +23,7 @@ def payload(**overrides):
 
 
 def authorize(monkeypatch):
-    for key, value in {"APP_AUTH_ENABLED": True, "APPLE_HEALTH_ENABLED": True, "APP_AUTH_PASSWORD_SHA256": hashlib.sha256(PASSWORD.encode()).hexdigest(), "APPLE_HEALTH_TOKEN_SHA256": hashlib.sha256(TOKEN.encode()).hexdigest()}.items():
+    for key, value in {"APPLE_HEALTH_ENABLED": True, "APPLE_HEALTH_TOKEN_SHA256": hashlib.sha256(TOKEN.encode()).hexdigest()}.items():
         monkeypatch.setattr(settings, key, value)
 
 
@@ -33,20 +31,20 @@ def test_disabled_and_fail_closed(monkeypatch):
     with TestClient(app) as client:
         assert client.post("/api/integrations/apple-health/daily", json=payload()).status_code == 404
         monkeypatch.setattr(settings, "APPLE_HEALTH_ENABLED", True)
-        assert client.get("/api/dashboard").status_code == 503
+        assert client.get("/openapi.json").status_code == 200
+        assert client.get("/login").status_code == 404
+    with TestClient(app, base_url="https://testserver") as client:
+        monkeypatch.setattr(settings, "APPLE_HEALTH_TOKEN_SHA256", "")
+        assert client.post("/api/integrations/apple-health/daily", json=payload()).status_code == 401
 
 
 def test_auth_scope_tls_size_and_validation(monkeypatch):
     authorize(monkeypatch)
     bearer = {"Authorization": f"Bearer {TOKEN}"}
-    basic = {"Authorization": "Basic " + base64.b64encode(f"{settings.APP_AUTH_USER}:{PASSWORD}".encode()).decode()}
     path = "/api/integrations/apple-health/daily"
     with TestClient(app, base_url="https://testserver") as client:
         assert client.post(path, json=payload()).status_code == 401
-        assert client.post(path, json=payload(), headers=basic).status_code == 401
-        assert client.get("/api/dashboard", headers=bearer).status_code == 401
-        assert client.get("/openapi.json").status_code == 401
-        assert client.get("/openapi.json", headers=basic).status_code == 200
+        assert client.get("/openapi.json").status_code == 200
         response = client.post(path, json=payload(), headers=bearer)
         assert response.status_code == 200 and response.json()["status"] == "created"
         assert response.headers["cache-control"] == "no-store"
@@ -164,11 +162,9 @@ def test_coach_persists_existing_output_contract(monkeypatch):
         assert conn.execute(text("SELECT ai_status FROM ai_analysis")).scalar() == "RULE_DONE"
 
 
-def test_token_revocation_and_unicode_basic(monkeypatch):
+def test_token_revocation(monkeypatch):
     authorize(monkeypatch)
     with TestClient(app, base_url="https://testserver") as client:
-        malformed = "Basic " + base64.b64encode("사용자:wrong".encode()).decode()
-        assert client.get("/openapi.json", headers={"Authorization": malformed}).status_code == 401
         monkeypatch.setattr(settings, "APPLE_HEALTH_TOKEN_SHA256", hashlib.sha256(b"rotated").hexdigest())
         assert client.post("/api/integrations/apple-health/daily", json=payload(), headers={"Authorization": f"Bearer {TOKEN}"}).status_code == 401
 
@@ -186,3 +182,19 @@ def test_stale_status_and_collection_only(monkeypatch):
         monkeypatch.setattr(settings, "APPLE_HEALTH_ENABLED", False)
         assert read_health(conn, DAY) == {"enabled": False}
         assert health_context(conn, DAY) == {}
+
+
+def test_public_app_reads_health_and_existing_write_stays_public(monkeypatch):
+    from app.api import dashboard, day
+    monkeypatch.setattr(settings, "APPLE_HEALTH_ENABLED", True)
+    for name in ["get_dashboard", "get_daily_ai_analysis", "get_day_detail", "get_active_goal"]:
+        monkeypatch.setattr(dashboard, name, lambda *a, **kw: None)
+    monkeypatch.setattr(dashboard, "build_today_missions", lambda *a: [])
+    monkeypatch.setattr(day, "save_day", lambda req: 123)
+    with engine.begin() as conn:
+        save_health(conn, AppleHealthRequest(**payload()))
+    with TestClient(app, base_url="http://testserver") as client:
+        response = client.get(f"/api/dashboard?record_date={DAY}")
+        assert response.status_code == 200
+        assert response.json()["apple_health"]["summary"]["sleep_hours"] == 7.25
+        assert client.post("/api/day", json={"record_date": str(DAY)}).status_code == 200

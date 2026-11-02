@@ -29,4 +29,4 @@ GK21 is a personal Player Operating System for managing condition, diet, workout
 
 ## Apple Health integration (disabled by default)
 
-Implementation, isolated tests, iPhone Shortcut payload, HTTPS/authentication rollout, and rollback: [integration guide](docs/apple-health-integration.md). No production migration or scheduling is automatic.
+Implementation, isolated tests, iPhone Shortcut payload, upload-only HTTPS/token rollout, and rollback: [integration guide](docs/apple-health-integration.md). No production migration or scheduling is automatic.

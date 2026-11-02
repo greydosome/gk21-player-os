@@ -3,7 +3,7 @@
 ## 현재 상태와 범위
 
 이 변경은 로컬 코드·테스트만 준비한다. 운영 서버, 실제 DB, nginx, cron, 아이폰을 변경하지 않는다.
-기본값은 수신/코칭/앱 인증 모두 OFF이며 기존 HTTP 위젯을 즉시 중단하지 않는다.
+기본값은 수신/코칭 OFF이며 기존 HTTP 위젯을 즉시 중단하지 않는다.
 **현재 공인 HTTP·무인증 서버에는 건강 데이터나 토큰을 보내면 안 된다.**
 
 1차 범위: 기상일 기준 수면 시간, 날짜별 운동 종류/분, 같은 날짜 측정 체중.
@@ -28,9 +28,9 @@
 1. 실제 DB 스키마와 서비스 실행 설정을 확인하고 백업을 별도 DB에 복원해 본다. 저장소의 초기 스키마는 완전한 운영 스키마가 아니며 DROP TABLE이 있으므로 사용하지 않는다.
 2. 도메인 없이 현재 공인 IP용 Let’s Encrypt 인증서로 HTTPS를 구성한다. 상세 순서는 [도메인 없는 접속 설정](private-access.md)을 따른다. `deploy/nginx-apple-health.conf.example`를 기존 설정에 병합한다. 3000/8000은 loopback 바인딩 및 방화벽 제한. 기존 IP:80 경로도 API에 우회 접근할 수 없도록 차단한다.
 3. backend 실행 예: `uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1`. 프록시 헤더는 localhost nginx만 신뢰한다. 기존 `run.sh`는 개발용 0.0.0.0/--reload 설정이므로 운영용으로 사용하지 않는다.
-4. 앱 전용 랜덤 비밀번호와 별도 업로드 전용 랜덤 토큰(각 32바이트 이상)을 로컬에서 생성한다. 여기나 저장소에 붙여넣지 않는다. 앱 비밀번호의 SHA-256을 `APP_AUTH_PASSWORD_SHA256`, 업로드 토큰의 SHA-256을 `APPLE_HEALTH_TOKEN_SHA256`에 설정한다. `APP_AUTH_USER`는 ASCII 사용자명으로 한다. SHA-256 저장은 고엔트로피 랜덤 비밀값 전용이다.
-5. 독립된 랜덤 `APP_SESSION_SECRET`을 설정하고 `APP_AUTH_ENABLED=true`로 API와 UI를 보호한다. nginx auth_request가 세션을 확인하며 별도 htpasswd는 사용하지 않는다. 앱은 비밀번호를 한 번 입력하면 Secure/HttpOnly 쿠키로 최대 30일간 로그인된다. nginx는 모든 `/api/`를 FastAPI로 직접 전달해야 한다. 앱 Basic 인증으로 업로드를 호출할 수 없고 업로드 Bearer로 기존 데이터를 읽거나 수정할 수 없다.
-6. Scriptable 위젯 URL을 HTTPS로 바꾸고 `Authorization: Basic ...` 헤더를 Keychain에 보관한 앱 자격 증명에서 구성한다. 위젯을 인증 없이 계속 열어두는 예외 경로는 만들지 않는다.
+4. 건강 업로드 전용 랜덤 토큰(32바이트 이상)을 생성한다. SHA-256만 `APPLE_HEALTH_TOKEN_SHA256`에 설정하고 원문은 아이폰 단축어에 한 번 저장한다. 채팅/저장소/로그에 넣지 않는다.
+5. 앱 로그인·세션·앱 비밀번호는 사용하지 않는다. 기존 조회·수정 API는 공개 상태를 유지한다. 건강 업로드 인증은 새 수신 경로에만 적용한다.
+6. 기존 Scriptable 위젯에는 인증 정보를 추가할 필요가 없다. 기존 HTTP 읽기 주소도 유지 가능하다. 새 건강 업로드만 HTTPS 주소를 사용한다.
 7. `sql/migrations/2026-11-02_apple_health.sql`만 명시적으로 적용한다. day_record/ai_analysis 등 기존 테이블이 실제로 존재하는지 먼저 확인한다. 마이그레이션을 자동 실행하는 코드는 없다.
 8. `APPLE_HEALTH_ENABLED=true`, `APPLE_HEALTH_COACHING_ENABLED=false`로 수집만 검증한다. HTTP/무인증/잘못된 토큰 요청이 차단되는지 확인한다.
 9. 기기 비교 검증 후 `APPLE_HEALTH_COACHING_ENABLED=true`. 서버 스케줄 템플릿에서 사용자/uv 절대 경로/Asia/Seoul 시간대를 확인한다. `deploy/gk21-health.cron.example`은 설치되지 않은 템플릿이다.
@@ -84,5 +84,5 @@ frontend: `npx tsc --noEmit`, `npx eslint app/AppleHealthCard.tsx`, `npm run bui
 - OpenAI에는 기존 코칭 데이터와 최소 건강 요약만 전송하며 `store=False`. 이것은 모든 제공자 보존 정책이 사라진다는 의미가 아니다.
 - 제안 보존 정책: 건강 요약 및 실행 메타데이터 90일. 운영자가 별도 승인 후 `record_date < CURRENT_DATE - 90` 범위만 삭제하는 유지보수 작업을 추가한다. 이 변경은 자동 삭제 작업을 설치하지 않는다.
 - 계정/기기 교체 시 업로드 토큰 해시를 바꿔 이전 단축어를 폐기한다. 완전 삭제 요청에는 건강 기반 ai_analysis 결과와 백업 잔존 기간도 포함한다.
-- 롤백: 단축어 자동화 중단 → 코칭 스케줄 중단 → HEALTH 두 플래그 OFF. **APP_AUTH_ENABLED와 HTTPS는 유지**한다. 건강 데이터가 있는 이전 코드로 무인증 회귀하지 않는다.
+- 롤백: 단축어 자동화 중단 → 코칭 스케줄 중단 → HEALTH 두 플래그 OFF. **업로드용 HTTPS는 유지**한다. 앱과 기존 API의 공개 접근은 사용자가 선택한 기존 동작이다.
 - 테이블은 우선 남겨 조사하고 별도 삭제 결정한다. 수동 기록은 변경하지 않았으므로 복원할 필요가 없다. 건강을 반영한 기존 코칭 결과는 필요하면 건강 OFF 상태에서 재생성한다.
