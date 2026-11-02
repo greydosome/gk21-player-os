@@ -3229,9 +3229,9 @@ function CustomFoodFields({
   setUnit,
   quantityInput,
   setQuantityInput,
-  rateInput,
-  setRateInput,
-  totalCalorie,
+  totalInput,
+  setTotalInput,
+  rate,
   color,
 }: {
   name: string;
@@ -3242,9 +3242,9 @@ function CustomFoodFields({
   setUnit: (v: "g" | "count") => void;
   quantityInput: string;
   setQuantityInput: (v: string) => void;
-  rateInput: string;
-  setRateInput: (v: string) => void;
-  totalCalorie: number | null;
+  totalInput: string;
+  setTotalInput: (v: string) => void;
+  rate: number | null;
   color: BlockColor;
 }) {
   return (
@@ -3291,18 +3291,9 @@ function CustomFoodFields({
         </button>
       </div>
 
-      {/* 총 칼로리를 직접 곱셈해서 넣지 않아도 되도록, "단위당 몇 kcal"와 "얼마나 먹었는지"를
-          따로 입력받아 총 칼로리를 자동으로 계산한다(예: 1개당 70kcal × 3개 = 210kcal). */}
+      {/* 100g당/1개당 칼로리를 몰라도 되도록, 실제로 먹은 양과 그 총 칼로리만 입력받고
+          단위당 칼로리는 자동으로 계산해서 보여준다(예: 150g, 210kcal -> 100g당 140kcal). */}
       <div className="flex gap-2">
-        <input
-          type="number"
-          inputMode="decimal"
-          min={0}
-          value={rateInput}
-          onChange={(e) => setRateInput(e.target.value)}
-          placeholder={unit === "g" ? "100g당 kcal" : "1개당 kcal"}
-          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
-        />
         <input
           type="number"
           inputMode="decimal"
@@ -3310,12 +3301,21 @@ function CustomFoodFields({
           value={quantityInput}
           onChange={(e) => setQuantityInput(e.target.value)}
           placeholder={unit === "g" ? "먹은 양(g)" : "먹은 개수"}
-          className="w-28 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
+        />
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          value={totalInput}
+          onChange={(e) => setTotalInput(e.target.value)}
+          placeholder="총 칼로리(kcal)"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-100 placeholder:text-zinc-500 placeholder:font-normal"
         />
       </div>
       <div className="flex items-center justify-between rounded-xl bg-zinc-800 px-3 py-2">
-        <p className="text-xs font-normal text-zinc-500">총 칼로리 (자동 계산)</p>
-        <p className="text-sm font-semibold text-zinc-100">{totalCalorie !== null ? `${totalCalorie}kcal` : "-"}</p>
+        <p className="text-xs font-normal text-zinc-500">{unit === "g" ? "100g당 (자동 계산)" : "1개당 (자동 계산)"}</p>
+        <p className="text-sm font-semibold text-zinc-100">{rate !== null ? `${rate}kcal` : "-"}</p>
       </div>
     </>
   );
@@ -3333,29 +3333,27 @@ function useCustomFoodFormState(initial?: CustomFoodEntry, initialName?: string)
   const [category, setCategory] = useState<FoodCategory>(initial?.category ?? "general");
   const [unit, setUnit] = useState<"g" | "count">(initial?.unit ?? "g");
   const [quantityInput, setQuantityInput] = useState(defaultQuantityInput(initial));
-  const [rateInput, setRateInput] = useState(
-    initial ? String(rateFromTotal(initial.unit, initial.quantity, initial.totalCalorie) ?? "") : ""
-  );
+  const [totalInput, setTotalInput] = useState(initial ? String(initial.totalCalorie) : "");
 
   const quantity = quantityInput.trim() === "" ? null : Number(quantityInput);
-  const rate = rateInput.trim() === "" ? null : Number(rateInput);
-  const totalCalorie = totalFromRate(unit, rate, quantity);
-  const kcalPer100g = unit === "g" ? rate : null;
-
+  const totalCalorie = totalInput.trim() === "" ? null : Number(totalInput);
   const quantityValid = quantity !== null && !Number.isNaN(quantity) && quantity > 0;
-  const rateValid = rate !== null && !Number.isNaN(rate) && rate >= 0;
-  const canSubmit = name.trim() !== "" && quantityValid && rateValid;
+  const totalValid = totalCalorie !== null && !Number.isNaN(totalCalorie) && totalCalorie >= 0;
+  // 먹은 양과 총 칼로리에서 100g당/1개당 칼로리를 역산한다.
+  const rate = quantityValid && totalValid ? rateFromTotal(unit, quantity, totalCalorie) : null;
+  const kcalPer100g = unit === "g" ? rate : null;
+  const canSubmit = name.trim() !== "" && quantityValid && totalValid;
 
   function reset(entry?: CustomFoodEntry) {
     setName(entry?.name ?? "");
     setCategory(entry?.category ?? "general");
     setUnit(entry?.unit ?? "g");
     setQuantityInput(defaultQuantityInput(entry));
-    setRateInput(entry ? String(rateFromTotal(entry.unit, entry.quantity, entry.totalCalorie) ?? "") : "");
+    setTotalInput(entry ? String(entry.totalCalorie) : "");
   }
 
   return {
-    name, setName, category, setCategory, unit, setUnit, quantityInput, setQuantityInput, rateInput, setRateInput,
+    name, setName, category, setCategory, unit, setUnit, quantityInput, setQuantityInput, totalInput, setTotalInput,
     quantity, rate, totalCalorie, kcalPer100g, canSubmit, reset,
   };
 }
@@ -3385,8 +3383,8 @@ function CustomFoodForm({
           category={f.category} setCategory={f.setCategory}
           unit={f.unit} setUnit={f.setUnit}
           quantityInput={f.quantityInput} setQuantityInput={f.setQuantityInput}
-          rateInput={f.rateInput} setRateInput={f.setRateInput}
-          totalCalorie={f.totalCalorie}
+          totalInput={f.totalInput} setTotalInput={f.setTotalInput}
+          rate={f.rate}
           color={DIET_COLOR}
         />
 
@@ -3497,8 +3495,8 @@ function CustomFoodRow({
           category={f.category} setCategory={f.setCategory}
           unit={f.unit} setUnit={f.setUnit}
           quantityInput={f.quantityInput} setQuantityInput={f.setQuantityInput}
-          rateInput={f.rateInput} setRateInput={f.setRateInput}
-          totalCalorie={f.totalCalorie}
+          totalInput={f.totalInput} setTotalInput={f.setTotalInput}
+          rate={f.rate}
           color={color}
         />
 
