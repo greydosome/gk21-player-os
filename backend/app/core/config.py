@@ -29,5 +29,13 @@ class Settings:
 
     AI_PROMPT_VERSION: str = os.getenv("AI_PROMPT_VERSION", "v1.0.0")
 
+    APP_AUTH_ENABLED: bool = os.getenv("APP_AUTH_ENABLED", "false").lower() == "true"
+    APP_SESSION_SECRET: str = os.getenv("APP_SESSION_SECRET", "")
+    APP_AUTH_USER: str = os.getenv("APP_AUTH_USER", "gk21")
+    APP_AUTH_PASSWORD_SHA256: str = os.getenv("APP_AUTH_PASSWORD_SHA256", "")
+    APPLE_HEALTH_ENABLED: bool = os.getenv("APPLE_HEALTH_ENABLED", "false").lower() == "true"
+    APPLE_HEALTH_COACHING_ENABLED: bool = os.getenv("APPLE_HEALTH_COACHING_ENABLED", "false").lower() == "true"
+    APPLE_HEALTH_TOKEN_SHA256: str = os.getenv("APPLE_HEALTH_TOKEN_SHA256", "")
+
 settings = Settings()
 

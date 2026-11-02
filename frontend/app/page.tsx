@@ -1,5 +1,6 @@
 "use client";
 
+import AppleHealthCard from "./AppleHealthCard";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type WorkoutType = {
@@ -812,7 +813,11 @@ export default function Home() {
 
     setMedicationInfoCache((prev) => ({ ...prev, [name]: "loading" }));
     fetch(`/api/medication-info?name=${encodeURIComponent(name)}`, { cache: "no-store" })
-      .then((res) => res.json())
+      .then((res) => {
+        if (res.status === 401) window.location.replace("/login");
+        if (!res.ok) throw new Error("기록을 불러오지 못했습니다.");
+        return res.json();
+      })
       .then((data) => {
         if (data?.success === false) {
           setMedicationInfoCache((prev) => ({ ...prev, [name]: "error" }));
@@ -1212,6 +1217,29 @@ export default function Home() {
     return data;
   }
 
+  // Refresh server-generated coaching without reloading or autosaving the input form.
+  useEffect(() => {
+    let cancelled = false;
+    async function refreshCoach() {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch(`/api/dashboard?record_date=${recordDate}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data.success || data.ai?.overview?.status !== "COMPLETED") return;
+        const ai = data.ai;
+        setCoachStatus("ready");
+        setCoachText(ai.cards?.coach ?? ai.summary ?? "");
+        setCoachWorkoutText(ai.comments?.workout ?? "");
+        setCoachMealText(ai.comments?.meal ?? "");
+        setCoachRecommendedExercises(ai.recommendations?.exercise ?? []);
+        setCoachRecommendedFoods(ai.recommendations?.food ?? []);
+      } catch { /* Preserve the last displayed result on transient network errors. */ }
+    }
+    const timer = setInterval(() => { void refreshCoach(); }, 60000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [recordDate]);
+
   async function pollCoachFeedback(date: string, attemptsLeft: number, generation: number) {
     // 폴링 도중 날짜가 바뀌거나 새 코칭 요청이 시작되면 이 체인은 더 이상 유효하지 않다.
     if (generation !== coachPollGenRef.current) return;
@@ -1249,7 +1277,11 @@ export default function Home() {
     let cancelled = false;
 
     fetch("/api/food-history", { cache: "no-store" })
-      .then((res) => res.json())
+      .then((res) => {
+        if (res.status === 401) window.location.replace("/login");
+        if (!res.ok) throw new Error("기록을 불러오지 못했습니다.");
+        return res.json();
+      })
       .then((data) => {
         if (cancelled) return;
         const decoded = parseGeneralFoodItems(data?.items ?? []);
@@ -1269,7 +1301,11 @@ export default function Home() {
     let cancelled = false;
 
     fetch("/api/medication-history", { cache: "no-store" })
-      .then((res) => res.json())
+      .then((res) => {
+        if (res.status === 401) window.location.replace("/login");
+        if (!res.ok) throw new Error("기록을 불러오지 못했습니다.");
+        return res.json();
+      })
       .then((data) => {
         if (cancelled) return;
         const entries = normalizeMedicationEntries(data?.items);
@@ -1306,7 +1342,11 @@ export default function Home() {
     coachPollGenRef.current += 1;
 
     fetch(`/api/dashboard?record_date=${recordDate}`, { cache: "no-store" })
-      .then((res) => res.json())
+      .then((res) => {
+        if (res.status === 401) window.location.replace("/login");
+        if (!res.ok) throw new Error("기록을 불러오지 못했습니다.");
+        return res.json();
+      })
       .then((data) => {
         if (cancelled) return;
 
@@ -1321,6 +1361,15 @@ export default function Home() {
           return;
         }
 
+        const ai = data?.ai;
+        if (ai?.overview?.status === "COMPLETED") {
+          setCoachStatus("ready");
+          setCoachText(ai?.cards?.coach ?? ai?.summary ?? "");
+          setCoachWorkoutText(ai?.comments?.workout ?? "");
+          setCoachMealText(ai?.comments?.meal ?? "");
+          setCoachRecommendedExercises(ai?.recommendations?.exercise ?? []);
+          setCoachRecommendedFoods(ai?.recommendations?.food ?? []);
+        }
         const d = data?.dashboard;
         const detail = data?.detail;
 
@@ -2927,6 +2976,8 @@ export default function Home() {
               {autoSaveStatus === "saving" && "자동 저장 중..."}
               {autoSaveStatus === "saved" && "✓ 자동 저장됨"}
             </p>
+
+            <AppleHealthCard key={recordDate} recordDate={recordDate} />
 
             <Section title="🤖 AI 코치" color={AI_COLOR}>
               <button

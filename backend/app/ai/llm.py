@@ -62,7 +62,8 @@ def call_ai(prompt: str):
 
         model=settings.AI_MODEL,
 
-        input=prompt
+        input=prompt,
+        store=False
 
     )
 
@@ -78,7 +79,7 @@ def call_ai(prompt: str):
 
     except json.JSONDecodeError as exc:
 
-        raise ValueError(f"AI response is not valid JSON: {output_text}") from exc
+        raise ValueError("AI response is not valid JSON") from exc
 
     usage = getattr(response, "usage", None)
 

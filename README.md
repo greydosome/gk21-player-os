@@ -26,3 +26,7 @@ GK21 is a personal Player Operating System for managing condition, diet, workout
 - Phase 5: AI Coach Save
 - Phase 6: OpenAI API Integration
 - Phase 7: PWA
+
+## Apple Health integration (disabled by default)
+
+Implementation, isolated tests, iPhone Shortcut payload, HTTPS/authentication rollout, and rollback: [integration guide](docs/apple-health-integration.md). No production migration or scheduling is automatic.

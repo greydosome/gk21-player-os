@@ -5,6 +5,7 @@ from fastapi import APIRouter, Query
 from app.crud.dashboard import get_active_goal, get_dashboard, get_day_detail
 from app.crud.ai_analysis import get_daily_ai_analysis
 from app.db.session import engine
+from app.services.apple_health import read_health
 from app.services.mission import build_today_missions
 from app.services.philosophy import get_daily_philosophy
 
@@ -22,6 +23,7 @@ def api_get_dashboard(record_date: date | None = Query(default=None)):
         ai = get_daily_ai_analysis(target, conn=conn)
         detail = get_day_detail(target, conn=conn)
         goal = get_active_goal(conn=conn)
+        apple_health = read_health(conn, target)
 
     missions = build_today_missions(dashboard)
 
@@ -37,4 +39,5 @@ def api_get_dashboard(record_date: date | None = Query(default=None)):
         "philosophy": philosophy,
         "detail": detail,
         "goal": goal,
+        "apple_health": apple_health,
     }

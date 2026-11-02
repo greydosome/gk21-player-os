@@ -1,0 +1,88 @@
+# Apple 건강 → GK21 자동 기록 (구현 / 운영 전환 안내)
+
+## 현재 상태와 범위
+
+이 변경은 로컬 코드·테스트만 준비한다. 운영 서버, 실제 DB, nginx, cron, 아이폰을 변경하지 않는다.
+기본값은 수신/코칭/앱 인증 모두 OFF이며 기존 HTTP 위젯을 즉시 중단하지 않는다.
+**현재 공인 HTTP·무인증 서버에는 건강 데이터나 토큰을 보내면 안 된다.**
+
+1차 범위: 기상일 기준 수면 시간, 날짜별 운동 종류/분, 같은 날짜 측정 체중.
+원시 심박·GPS·약물·걸음수·활동 에너지·식사 자동 추정은 수집하지 않는다.
+자동 기록은 기존 입력 폼과 분리한 앱 카드에 저장·표시한다. 기존 수동 필드와 운동 목록은 바꾸지 않는다.
+코치는 기존 식단/수동 운동과 건강 참고 기록을 함께 받으며 운동량을 두 출처 사이에서 합산하지 않는다.
+대시보드 카드와 코칭은 열린 화면에서 60초 간격으로 갱신하며 사용자 입력 폼은 다시 불러오지 않는다.
+
+## 구성
+
+- `POST /api/integrations/apple-health/daily`: 업로드 전용 Bearer 인증, 최대 32KiB, 단위/날짜 검증.
+- `apple_health_daily`: 날짜별 요약, 항목별 수집 시각. 같은/과거 collected_at은 무시.
+- null/생략은 미수집이며 이전 값을 지우지 않는다. 빈 workouts 배열은 수집 구간에 운동이 없다는 명시적 값이다.
+- `apple_health_coaching_run`: 실행 상태/입력 해시. 완료된 동일 입력은 재호출하지 않음. 동일 입력은 최대 3회 시도하며 실패 한도를 넘으면 retry_limit을 보고한다. 새 입력은 시도 횟수를 초기화한다. 운영자는 원인을 해결한 뒤 해당 날짜 실행 메타데이터만 초기화해 재시도할 수 있다.
+- 기존 `ai_analysis`와 조회 API로 결과 저장. 오전 11시 이후 실행, 늦은 업로드/실패는 다음 실행에서 재시도.
+- PostgreSQL 잠금으로 동시 실행 차단, 결과 저장 전 입력 해시 재확인. 프로세스 종료 시 DB 잠금이 풀리며 다음 실행이 재개한다.
+- OpenAI 호출 성공 후 DB 저장 전 프로세스가 죽는 경우 재호출 비용까지 exactly-once로 보장하지 않는다.
+- 수신 OFF에서는 새 테이블을 조회하지 않는다. 코칭 OFF에서는 건강 데이터가 프롬프트에 들어가지 않는다.
+
+## 운영 전 확인 (별도 배포 승인 후)
+
+1. 실제 DB 스키마와 서비스 실행 설정을 확인하고 백업을 별도 DB에 복원해 본다. 저장소의 초기 스키마는 완전한 운영 스키마가 아니며 DROP TABLE이 있으므로 사용하지 않는다.
+2. 도메인 없이 현재 공인 IP용 Let’s Encrypt 인증서로 HTTPS를 구성한다. 상세 순서는 [도메인 없는 접속 설정](private-access.md)을 따른다. `deploy/nginx-apple-health.conf.example`를 기존 설정에 병합한다. 3000/8000은 loopback 바인딩 및 방화벽 제한. 기존 IP:80 경로도 API에 우회 접근할 수 없도록 차단한다.
+3. backend 실행 예: `uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1`. 프록시 헤더는 localhost nginx만 신뢰한다. 기존 `run.sh`는 개발용 0.0.0.0/--reload 설정이므로 운영용으로 사용하지 않는다.
+4. 앱 전용 랜덤 비밀번호와 별도 업로드 전용 랜덤 토큰(각 32바이트 이상)을 로컬에서 생성한다. 여기나 저장소에 붙여넣지 않는다. 앱 비밀번호의 SHA-256을 `APP_AUTH_PASSWORD_SHA256`, 업로드 토큰의 SHA-256을 `APPLE_HEALTH_TOKEN_SHA256`에 설정한다. `APP_AUTH_USER`는 ASCII 사용자명으로 한다. SHA-256 저장은 고엔트로피 랜덤 비밀값 전용이다.
+5. 독립된 랜덤 `APP_SESSION_SECRET`을 설정하고 `APP_AUTH_ENABLED=true`로 API와 UI를 보호한다. nginx auth_request가 세션을 확인하며 별도 htpasswd는 사용하지 않는다. 앱은 비밀번호를 한 번 입력하면 Secure/HttpOnly 쿠키로 최대 30일간 로그인된다. nginx는 모든 `/api/`를 FastAPI로 직접 전달해야 한다. 앱 Basic 인증으로 업로드를 호출할 수 없고 업로드 Bearer로 기존 데이터를 읽거나 수정할 수 없다.
+6. Scriptable 위젯 URL을 HTTPS로 바꾸고 `Authorization: Basic ...` 헤더를 Keychain에 보관한 앱 자격 증명에서 구성한다. 위젯을 인증 없이 계속 열어두는 예외 경로는 만들지 않는다.
+7. `sql/migrations/2026-11-02_apple_health.sql`만 명시적으로 적용한다. day_record/ai_analysis 등 기존 테이블이 실제로 존재하는지 먼저 확인한다. 마이그레이션을 자동 실행하는 코드는 없다.
+8. `APPLE_HEALTH_ENABLED=true`, `APPLE_HEALTH_COACHING_ENABLED=false`로 수집만 검증한다. HTTP/무인증/잘못된 토큰 요청이 차단되는지 확인한다.
+9. 기기 비교 검증 후 `APPLE_HEALTH_COACHING_ENABLED=true`. 서버 스케줄 템플릿에서 사용자/uv 절대 경로/Asia/Seoul 시간대를 확인한다. `deploy/gk21-health.cron.example`은 설치되지 않은 템플릿이다.
+
+기존 ChatGPT 오전 11시 예약은 변경하지 않는다. 이 구현의 결과는 GK21 앱에 저장한다.
+
+## 단축어 구성
+
+아래는 구현된 API 계약이다. 실제 iOS 버전에서 건강 표본 동작의 노출 항목을 확인해야 하며, 서명된 .shortcut 파일은 포함하지 않는다.
+
+1. 현재 날짜를 Asia/Seoul 기준으로 정한다. 최근 3일을 날짜별로 반복한다. 해당 날짜 활동은 자정부터 다음 자정(오늘이면 현재 시각)까지 조회한다.
+2. 건강 표본 찾기에서 필요한 항목만 읽기 권한을 허용한다. 출처는 실제 사용하는 Apple Watch/체중 앱으로 고정한다.
+3. 수면은 그 날짜에 끝나는 주 수면 세션의 asleep/core/deep/REM 구간만 사용한다. in-bed/awake 제외, 겹치는 구간은 합집합으로 집계한다. 여러 출처 또는 전체 asleep와 단계 표본을 함께 더하지 않는다. 단축어에서 중복 제거를 확실히 구현하지 못하면 수면 항목을 보내지 말고 별도 검증한다.
+4. 운동은 날짜별 종목과 분 단위 시간으로 구성한다. 동일 운동을 여러 출처에서 중복 수집하지 않는다. 단축어가 운동 표본을 제공하지 않는 iOS에서는 항목을 생략한다. 자정을 넘는 운동은 날짜별 시간을 분할한다.
+5. 체중은 해당 날짜의 마지막 실제 측정값과 ISO 8601 측정 시각을 함께 보낸다. 전날 체중을 오늘 측정값으로 보내지 않는다.
+6. 단축어의 사전 동작으로 아래 JSON을 구성한다. 모든 숫자는 숫자형, 시각은 `+09:00` 등 오프셋 포함. 누락 항목은 생략/null이며 0으로 만들지 않는다. collected_at은 조회를 완료한 시각으로 설정한다.
+7. URL 콘텐츠 가져오기 → HTTPS IP 주소의 `/api/integrations/apple-health/daily` → POST → JSON 본문. 헤더 `Authorization: Bearer <업로드 전용 토큰>`, `Content-Type: application/json`. 토큰이 든 단축어는 공유하지 않는다.
+8. 응답 success/status를 확인한다. 재시도는 같은 payload/collected_at으로 보내도 안전하다. 실패 알림에 본문이나 토큰을 넣지 않는다.
+9. 10:45 시간 자동화로 실행하도록 설정하고 잠금 해제 상태에서 최초 권한 허용을 완료한다. 잠금 상태에서는 건강 읽기가 실패할 수 있다. 실패 시 잠금 해제 후 실행할 바로가기를 둔다. 정시 무인 수집을 보장하지 않는다.
+
+예시 값은 가상 데이터이며 날짜/시각은 실행 시 동적으로 바꿔야 한다:
+
+```json
+{
+  "schema_version": 1,
+  "record_date": "2026-11-02",
+  "timezone": "Asia/Seoul",
+  "collected_at": "2026-11-02T10:45:00+09:00",
+  "summary": {
+    "sleep_hours": 7.25,
+    "weight_kg": 75.2,
+    "weight_measured_at": "2026-11-02T08:00:00+09:00",
+    "workouts": [{"workout_type": "걷기", "minutes": 30}]
+  }
+}
+```
+
+3일 업로드 후 앱에서 날짜별 수면·운동·체중·수집 시각을 건강 앱과 대조한다. 출처가 겹치는 수면, 자정, 누락, 오프라인, 잠금, 재전송을 확인한다.
+
+## 검증
+
+backend: `uv sync --dev` 후 `uv run python -m pytest -q`.
+테스트는 PATH에 PostgreSQL initdb/pg_ctl/postgres가 있어야 하며 임시 localhost 클러스터를 생성하고 삭제한다. 외부 DB로 대체하지 않는다. 운영 .env DATABASE_URL을 사용하지 않고 OpenAI 호출은 가짜 응답으로 대체한다.
+실제 운영 전체 스키마를 복제한 테스트는 아니며 기존 SQL 소비 계약에 맞춘 최소 테이블을 사용한다.
+frontend: `npx tsc --noEmit`, `npx eslint app/AppleHealthCard.tsx`, `npm run build`.
+기존 이미지 아이콘 빌드는 외부 이모지 다운로드에 의존한다. 사내 인증서 환경에서는 시스템 CA 설정이 필요할 수 있다. TLS 검증을 끄지 않는다.
+
+## 개인정보·보존·롤백
+
+- API/프록시 로그에 본문/Authorization을 남기지 않는다. DB 예외 SQL 매개변수는 숨긴다. 코칭 오류는 일반 오류 코드만 저장한다.
+- OpenAI에는 기존 코칭 데이터와 최소 건강 요약만 전송하며 `store=False`. 이것은 모든 제공자 보존 정책이 사라진다는 의미가 아니다.
+- 제안 보존 정책: 건강 요약 및 실행 메타데이터 90일. 운영자가 별도 승인 후 `record_date < CURRENT_DATE - 90` 범위만 삭제하는 유지보수 작업을 추가한다. 이 변경은 자동 삭제 작업을 설치하지 않는다.
+- 계정/기기 교체 시 업로드 토큰 해시를 바꿔 이전 단축어를 폐기한다. 완전 삭제 요청에는 건강 기반 ai_analysis 결과와 백업 잔존 기간도 포함한다.
+- 롤백: 단축어 자동화 중단 → 코칭 스케줄 중단 → HEALTH 두 플래그 OFF. **APP_AUTH_ENABLED와 HTTPS는 유지**한다. 건강 데이터가 있는 이전 코드로 무인증 회귀하지 않는다.
+- 테이블은 우선 남겨 조사하고 별도 삭제 결정한다. 수동 기록은 변경하지 않았으므로 복원할 필요가 없다. 건강을 반영한 기존 코칭 결과는 필요하면 건강 OFF 상태에서 재생성한다.

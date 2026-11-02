@@ -135,6 +135,7 @@ def save_day_record(conn, req):
 
 def save_day(req):
     with engine.begin() as conn:
+        conn.execute(text("SELECT pg_advisory_xact_lock(2101, :day)"), {"day": req.record_date.toordinal()})
         day_record_id = save_day_record(conn, req)
 
         save_body(conn, day_record_id, req.body)

@@ -25,6 +25,10 @@ def generate_daily_rule_analysis(conn, day_record_id, record_date):
 
 
 def run_daily_llm_analysis(day_record_id, record_date):
+    from app.core.config import settings
+    if settings.APPLE_HEALTH_ENABLED and settings.APPLE_HEALTH_COACHING_ENABLED:
+        from app.services.health_coaching import run_health_coaching
+        return run_health_coaching(record_date)
     try:
         with engine.begin() as conn:
             mark_ai_analysis_running(conn, day_record_id)
@@ -46,5 +50,5 @@ def run_daily_llm_analysis(day_record_id, record_date):
             mark_ai_analysis_failed(
                 conn=conn,
                 day_record_id=day_record_id,
-                error_message=exc
+                error_message="COACHING_FAILED"
             )

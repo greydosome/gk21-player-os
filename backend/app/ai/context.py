@@ -7,6 +7,7 @@ from datetime import date
 
 from sqlalchemy import text
 
+from app.services.apple_health import health_context
 from app.ai.progress import calculate_goal_progress
 
 from app.crud.food_history import get_general_food_history
@@ -44,6 +45,8 @@ def get_ai_context(target_date: date, conn=None):
     # 데이터를 별도 커넥션이 못 보는 문제를 피한다. conn이 없을 때(예: 백그라운드 LLM 분석)만
     # 새 커넥션을 연다.
     with (nullcontext(conn) if conn is not None else engine.connect()) as conn:
+
+        apple_health = health_context(conn, target_date)
 
         today = conn.execute(
 
@@ -245,6 +248,9 @@ def get_ai_context(target_date: date, conn=None):
     context = {
 
         "target_date": str(target_date),
+        "apple_health": apple_health,
+        "recent_7_days": [dict(row) for row in history if (target_date - row["record_date"]).days < 7],
+        "recent_30_days": [dict(row) for row in history if (target_date - row["record_date"]).days < 30],
 
         "today": dict(today) if today else {},
 

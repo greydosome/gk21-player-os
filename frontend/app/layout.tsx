@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import SessionControls from "./SessionControls";
 import ServiceWorkerRegister from "./ServiceWorkerRegister";
 
 const geistSans = Geist({
@@ -42,6 +43,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-zinc-950">
+        <SessionControls />
         {children}
         <ServiceWorkerRegister />
       </body>

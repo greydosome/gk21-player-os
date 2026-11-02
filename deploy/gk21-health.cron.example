@@ -1,0 +1,4 @@
+# TEMPLATE ONLY. Confirm the host cron timezone is Asia/Seoul before installation.
+# Retry late sync / failures at ten-minute intervals; input hash avoids duplicate completed calls.
+# Existing backup cron remains unchanged. Nothing installs this automatically.
+*/10 11-23 * * * rocky cd /home/rocky/gk21/backend && /ABSOLUTE/PATH/TO/uv run python -m app.services.health_coaching_job
