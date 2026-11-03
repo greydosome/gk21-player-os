@@ -228,7 +228,7 @@ const DARK_PALETTES: { key: string; label: string; emoji: string; swatch: string
 const DAY_BADGE_ACTIVE_CLASS = "border-[var(--pop-bg)] bg-[var(--pop-bg)] text-[var(--pop-fg)]";
 
 type FoodItem =
-  | { label: string; mode: "gram"; kcalPer100g: number; defaultAmount?: number }
+  | { label: string; mode: "gram"; kcalPer100g: number; defaultAmount?: number; canGrams?: number }
   | { label: string; mode: "piece"; unit: string; kcalPerPiece: number };
 
 // 카탈로그 밖에서 이름+g또는개수(선택)+총칼로리로 직접 기록하는 항목. 단백질/탄수화물/지방/보충음식
@@ -378,9 +378,11 @@ function decodeCustomFoodItem(raw: string): CustomFoodEntry | null {
 
 const PROTEIN_FOODS: FoodItem[] = [
   { label: "달걀", mode: "piece", unit: "1개", kcalPerPiece: 100 },
-  { label: "참치 마일드", mode: "gram", kcalPer100g: 126, defaultAmount: 90 },
+  // canGrams가 있는 음식은 "캔" 단위(0.5캔씩)로 조절한다. 저장은 기존처럼 g 정수라서
+  // 백엔드/과거 기록은 그대로 호환되고, 화면에서만 캔으로 환산해 보여준다.
+  { label: "참치 마일드", mode: "gram", kcalPer100g: 126, canGrams: 90 },
   { label: "닭가슴살", mode: "gram", kcalPer100g: 100 },
-  { label: "닭가슴살스팸", mode: "gram", kcalPer100g: 170 },
+  { label: "닭가슴살스팸", mode: "gram", kcalPer100g: 170, canGrams: 200 },
 ];
 
 const CARB_FOODS: FoodItem[] = [
@@ -563,6 +565,11 @@ function workoutCategoryTotals(
     (totals, w) => ({ minutes: totals.minutes + w.minutes, kcal: totals.kcal + w.calorieEstimate }),
     catalogTotals
   );
+}
+
+// 캔 환산 표시: 1 / 1.5 / 0.5처럼 불필요한 소수점 0을 떼고 보여준다.
+function formatCans(amount: number, canGrams: number) {
+  return `${Number((amount / canGrams).toFixed(2))}캔`;
 }
 
 function foodKcal(food: FoodItem, amount: number) {
@@ -3124,7 +3131,9 @@ function FoodSwipeCard({
   const food = foods[current];
   const amount = counts.get(food.label) ?? 0;
   const itemKcal = foodKcal(food, amount);
+  const canGrams = food.mode === "gram" ? food.canGrams : undefined;
   const unitLabel = food.mode === "gram" ? "g" : "개";
+  const amountLabel = canGrams ? `${formatCans(amount, canGrams)} (${amount}g)` : `${amount}${unitLabel}`;
 
   function goPrev() {
     setIndex((i) => (Math.min(i, foods.length - 1) - 1 + foods.length) % foods.length);
@@ -3183,14 +3192,15 @@ function FoodSwipeCard({
       <div className="mt-0.5 flex items-baseline justify-center gap-1.5">
         <p className="text-sm font-medium text-zinc-100">{food.label}</p>
         <p className="text-xs text-zinc-500">
-          {food.mode === "gram" ? `100g당 ${food.kcalPer100g}kcal` : `1개당 ${food.kcalPerPiece}kcal`}
+          {food.mode === "gram"
+            ? `${canGrams ? `1캔 ${canGrams}g · ` : ""}100g당 ${food.kcalPer100g}kcal`
+            : `1개당 ${food.kcalPerPiece}kcal`}
         </p>
       </div>
 
       {amount > 0 && (
         <p className="mt-0.5 text-center text-xs font-medium text-zinc-400">
-          현재섭취 {amount}
-          {unitLabel} · {itemKcal}kcal
+          현재섭취 {amountLabel} · {itemKcal}kcal
           <button
             type="button"
             onClick={() => onChangeCount(food.label, 0)}
@@ -3208,6 +3218,7 @@ function FoodSwipeCard({
             onChange={(v) => onChangeCount(food.label, v)}
             color={color}
             defaultAmount={food.defaultAmount ?? 100}
+            canGrams={canGrams}
           />
         ) : (
           <div className="flex justify-center">
@@ -3802,6 +3813,7 @@ function GramStepper({
   defaultAmount = 100,
   step = 10,
   min = 0,
+  canGrams,
 }: {
   amount: number;
   onChange: (amount: number) => void;
@@ -3809,15 +3821,19 @@ function GramStepper({
   defaultAmount?: number;
   step?: number;
   min?: number;
+  // 캔 단위 음식: 0에서 +는 1캔, 이후 ±0.5캔씩. 표시도 "1.5캔"으로 한다.
+  canGrams?: number;
 }) {
+  const stepG = canGrams ? Math.round(canGrams / 2) : step;
+  const firstG = canGrams ?? defaultAmount;
   // "+"는 0에서 시작할 때만 그 음식의 기본 1회분(defaultAmount)으로 바로 뛰고,
   // 그 다음부터는(이미 얼마라도 담겨 있으면) 10g씩 세밀하게 더한다.
   // defaultAmount씩 계속 배로 뛰면 미세 조절이 안 된다는 피드백을 반영.
   function handlePlus() {
-    onChange(amount === 0 ? defaultAmount : amount + step);
+    onChange(amount === 0 ? firstG : amount + stepG);
   }
   function handleMinus() {
-    onChange(Math.max(min, amount - step));
+    onChange(Math.max(min, amount - stepG));
   }
 
   return (
@@ -3829,7 +3845,7 @@ function GramStepper({
       >
         −
       </button>
-      <span className="min-w-[56px] text-center text-sm font-semibold tabular-nums text-zinc-100">{amount}g</span>
+      <span className="min-w-[56px] text-center text-sm font-semibold tabular-nums text-zinc-100">{canGrams ? formatCans(amount, canGrams) : `${amount}g`}</span>
       <button
         type="button"
         onClick={handlePlus}
