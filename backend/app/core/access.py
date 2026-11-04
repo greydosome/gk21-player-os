@@ -6,10 +6,11 @@ from starlette.responses import JSONResponse
 from app.core.config import settings
 
 UPLOAD_PATH = "/api/integrations/apple-health/daily"
+EXPORT_PATH = "/api/integrations/apple-health/export"
 
 
 async def access_guard(request, call_next):
-    if request.url.path.rstrip("/") != UPLOAD_PATH:
+    if request.url.path.rstrip("/") not in {UPLOAD_PATH, EXPORT_PATH}:
         return await call_next(request)
     if not settings.APPLE_HEALTH_ENABLED:
         return JSONResponse({"detail": "Integration disabled"}, status_code=404)
