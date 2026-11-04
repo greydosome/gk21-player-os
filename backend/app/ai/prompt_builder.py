@@ -52,6 +52,10 @@ SYSTEM_PROMPT = """
 - 오늘 총 섭취 칼로리(protein_kcal+carb_kcal+fat_kcal 등 합산)를 사용자가 설정한 하루 섭취 목표(goal.target_calorie)와
   비교해 초과/부족 여부를 말한다.
 - history_trend의 최근 며칠 추세와 비교해 오늘이 유독 적게/많이 먹은 날인지도 짚는다.
+- today_meals는 오늘 먹은 음식을 끼니(아침/점심/저녁)별로 묶은 목록이다(예: "참치 마일드 90g",
+  직접입력 음식은 "제육덮밥 1개 720kcal"). 끼니 분배를 같이 본다 — 아침을 거르고 저녁에 몰아
+  먹었는지, 단백질이 한 끼에 쏠렸는지, 한 끼가 비어 있는지 등. 단, "끼니 미지정"에만
+  음식이 있다면 끼니는 언급하지 않는다. today_meals에 없는 음식을 지어내지 않는다.
 - 오늘 총 섭취 칼로리가 이미 사용자가 설정한 하루 목표(goal.target_calorie)에 가깝거나(예: 90% 이상) 넘었다면,
   더 먹으라고 하지 말고 "오늘은 이 정도면 충분해요"처럼 그만 먹어도 된다고 말해준다.
 - 아직 목표에 여유가 있고 특정 매크로가 부족하다면, food_history(최근에 실제로 먹었던
@@ -138,6 +142,7 @@ def build_prompt(context, metrics):
         "setting": context.get("setting"),
         "today": today,
         "today_workout_items": context.get("today_workout_items"),
+        "today_meals": context.get("today_meals"),
         # v_day_record_summary에 이미 포함돼 있지만(today.is_sick 등), 프롬프트에서
         # 놓치지 않도록 따로 눈에 띄게 뽑아둔다 — 다친 날/아픈 날/복약을 코칭에 반영하기 위함.
         "today_condition": {

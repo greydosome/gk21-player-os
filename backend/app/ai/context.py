@@ -12,6 +12,8 @@ from app.ai.progress import calculate_goal_progress
 
 from app.crud.food_history import get_general_food_history
 
+from app.ai.meal_summary import summarize_meals
+
 from app.db.session import engine
 
 
@@ -245,6 +247,29 @@ def get_ai_context(target_date: date, conn=None):
 
         ).mappings().all()
 
+        # 칼로리 합계(today.protein_kcal 등)만으로는 "어느 끼니에 무엇을 먹었는지"를 알 수 없어서,
+        # 끼니 표시가 붙은 식단 문자열을 따로 읽어 끼니별 음식 목록으로 만든다.
+        meal_row = conn.execute(
+
+            text("""
+
+                SELECT br.protein_items, br.carb_items, br.fat_items,
+                       br.supplement_items, br.general_food_items
+
+                FROM body_record br
+
+                JOIN day_record dr ON dr.day_record_id = br.day_record_id
+
+                WHERE dr.record_date = :record_date
+
+            """),
+
+            {"record_date": target_date}
+
+        ).mappings().first()
+
+    today_meals = summarize_meals(*(meal_row.values() if meal_row else ()))
+
     context = {
 
         "target_date": str(target_date),
@@ -255,6 +280,8 @@ def get_ai_context(target_date: date, conn=None):
         "today": dict(today) if today else {},
 
         "today_workout_items": [dict(row) for row in today_workout_items],
+
+        "today_meals": today_meals,
 
         "history": [dict(row) for row in history],
 
