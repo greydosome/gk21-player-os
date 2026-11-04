@@ -18,3 +18,7 @@ build/
 .vscode/
 .idea/
 .DS_Store
+
+# Generated Shortcuts are build artifacts; personal token-bearing files must
+# be built outside this repository and must never be committed.
+artifacts/shortcuts/

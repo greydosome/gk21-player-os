@@ -74,6 +74,27 @@ def test_preserves_manual_duplicate_missing_and_stale(monkeypatch):
         assert read_health(conn, DAY-timedelta(days=1))["status"] == "missing"
 
 
+def test_shortcut_seconds_upload_round_trip(monkeypatch):
+    """Seconds-derived hours retain precision through HTTP, DB and app reads."""
+    authorize(monkeypatch)
+    seconds = 23025
+    body = payload(summary={"sleep_hours": seconds / 3600})
+    body.update(schema_version=1, timezone="Asia/Seoul")
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+    with TestClient(app, base_url="https://testserver") as client:
+        response = client.post("/api/integrations/apple-health/daily", json=body, headers=headers)
+        assert response.status_code == 200
+        assert response.json()["status"] == "created"
+        duplicate = client.post("/api/integrations/apple-health/daily", json=body, headers=headers)
+        assert duplicate.json()["status"] == "ignored_older_or_duplicate"
+    with engine.connect() as conn:
+        result = read_health(conn, DAY)
+        assert result["summary"]["sleep_hours"] * 3600 == pytest.approx(seconds)
+        assert result["summary"].get("weight_kg") is None
+        assert result["summary"].get("workouts") is None
+        assert conn.execute(text("SELECT COUNT(*) FROM apple_health_daily")).scalar() == 1
+
+
 @pytest.mark.parametrize("summary", [{"sleep_hours": 25}, {"sleep_hours": float("nan")}, {"weight_kg": 70}, {"gps": "private"}, {"workouts": [{"workout_type": "x", "minutes": 0}]}])
 def test_invalid_metrics(summary):
     with pytest.raises(ValidationError):
