@@ -3342,12 +3342,10 @@ const MealDiet = memo(function MealDiet({
       <div className="grid grid-cols-3 gap-2">
         {macros.map((m) => (
           <div key={m.label} className="rounded-xl bg-zinc-800 px-2.5 py-2">
-            <div className="flex items-baseline justify-between gap-1">
-              <span className="text-xs font-normal text-zinc-400">{m.label}</span>
-              <span className="text-xs font-semibold tabular-nums text-zinc-100">
-                {m.kcal}/{m.target}
-              </span>
-            </div>
+            <p className="text-xs font-normal text-zinc-400">{m.label}</p>
+            <p className="text-xs font-semibold tabular-nums text-zinc-100">
+              {m.kcal}/{m.target}
+            </p>
             <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-zinc-700">
               <div
                 className={[DIET_COLOR.bg, "h-full rounded-full"].join(" ")}
