@@ -2722,7 +2722,7 @@ export default function Home() {
               </div>
             </Section>
 
-            <Section title="🍱 식단" color={DIET_COLOR} subtitle={`${totalDietKcal}kcal`}>
+            <Section title="🍱 식단" color={DIET_COLOR} subtitle={`${totalDietKcal}kcal`} collapsible>
               <MealDiet
                 proteinCounts={proteinCounts}
                 carbCounts={carbCounts}
