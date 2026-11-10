@@ -1,0 +1,23 @@
+[Unit]
+Description=GK21 authenticated ChatGPT workout tools
+After=network.target
+
+[Service]
+User=rocky
+WorkingDirectory=/home/rocky/gk21/backend
+EnvironmentFile=/etc/gk21/health.env
+EnvironmentFile=-/etc/gk21/mcp.env
+Environment=GK21_MCP_AUTH_DB=/var/lib/gk21-mcp/oauth.sqlite3
+Environment=GK21_MCP_BASE_URL=https://217.142.230.185
+ExecStart=/usr/local/bin/gk21-mcp-start.sh
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/var/lib/gk21-mcp
+
+[Install]
+WantedBy=multi-user.target

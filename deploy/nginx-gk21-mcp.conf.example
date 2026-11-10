@@ -1,0 +1,14 @@
+# Include inside the existing HTTPS server block only.
+# In the HTTP server block deny these locations with return 403 instead.
+location ~ ^/(mcp|authorize|token|register|revoke|gk21-connect|\.well-known/oauth-authorization-server|\.well-known/oauth-protected-resource(?:/mcp)?)$ {
+    access_log off;
+    client_max_body_size 32k;
+    proxy_pass http://127.0.0.1:8010;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Authorization $http_authorization;
+    proxy_buffering off;
+    add_header Cache-Control "no-store" always;
+    add_header Referrer-Policy "no-referrer" always;
+}
