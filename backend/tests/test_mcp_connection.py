@@ -114,6 +114,7 @@ def test_http_oauth_pkce_discovery_and_authenticated_mcp(oauth, monkeypatch):
         assert http.get('/.well-known/oauth-protected-resource/mcp').json()['resource']==BASE+'/mcp'
         metadata = http.get('/.well-known/oauth-authorization-server').json()
         assert metadata['issuer']==BASE+'/' or metadata['issuer']==BASE
+        assert 'none' in metadata['token_endpoint_auth_methods_supported']
         registration = http.post('/register', json={'redirect_uris':[CALLBACK],
             'token_endpoint_auth_method':'none', 'grant_types':['authorization_code','refresh_token'],
             'response_types':['code'], 'scope':SCOPE})

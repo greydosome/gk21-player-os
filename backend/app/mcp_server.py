@@ -4,15 +4,19 @@ Run separately from the existing HTTP API; does not use an OpenAI API key.
 """
 from datetime import date, datetime, timedelta
 import html
+import logging
 import os
 
 from fastapi.encoders import jsonable_encoder
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
+from mcp.server.auth.routes import build_metadata, cors_middleware
+from mcp.server.auth.handlers.metadata import MetadataHandler
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.routing import Route
 
 from app.api.workout_reports import persist, report_status
 from app.core.config import settings
@@ -99,12 +103,28 @@ def create_server(provider):
         <p>연결 요청 번호</p><code>{code}</code><p>클라이언트: {client}</p><p>돌아갈 주소: {callback}</p></main></html>''')
 
     app = mcp.streamable_http_app()
+    # The SDK accepts registered public PKCE clients, but its default discovery
+    # document omits their `none` authentication method. Advertise actual support.
+    auth = mcp.settings.auth
+    metadata = build_metadata(auth.issuer_url, auth.service_documentation_url,
+                              auth.client_registration_options, auth.revocation_options)
+    metadata.token_endpoint_auth_methods_supported.append('none')
+    metadata.revocation_endpoint_auth_methods_supported.append('none')
+    for index, route in enumerate(app.router.routes):
+        if route.path == '/.well-known/oauth-authorization-server':
+            app.router.routes[index] = Route(route.path,
+                endpoint=cors_middleware(MetadataHandler(metadata).handle, ['GET','OPTIONS']),
+                methods=['GET','OPTIONS'])
+            break
 
     class PrivateHeaders(BaseHTTPMiddleware):
         async def dispatch(self, request, call_next):
             if request.url.scheme != 'https':
                 return JSONResponse({'detail':'HTTPS required'}, status_code=403)
             response = await call_next(request)
+            if request.url.path == '/token':
+                # Status only: never log codes, tokens, headers, body, or query.
+                logging.getLogger(__name__).info('GK21 OAuth token endpoint status=%d', response.status_code)
             response.headers.update({'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
                 'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'"})
             return response
