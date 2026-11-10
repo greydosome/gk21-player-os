@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import text
 
 from app.schemas.apple_health import AppleHealthRequest
+from app.core.config import settings
 from app.services.apple_health import read_health, save_health
 
 KOREA = ZoneInfo("Asia/Seoul")
@@ -114,6 +115,8 @@ def daily_workouts(rows, day):
 
 def save_export(conn, payload, now):
     sleep, workouts = normalize(payload, now)
+    if sleep and not settings.APPLE_HEALTH_SLEEP_ENABLED:
+        raise ValueError("Sleep integration disabled")
     # Serialize read/aggregate/write, including multi-request export batches.
     conn.execute(text("SELECT pg_advisory_xact_lock(2102, 1)"))
     changed_days = set()
@@ -145,5 +148,9 @@ def save_export(conn, payload, now):
             statuses[str(day)] = "unchanged"
             continue
         req = AppleHealthRequest(record_date=day, collected_at=now, summary=summary)
-        statuses[str(day)] = save_health(conn, req)
+        statuses[str(day)] = save_health(conn, req, project_workouts=False)
+    from app.services.health_records import sync_record, raw_workouts
+    if settings.APPLE_HEALTH_RECORD_SYNC_ENABLED:
+        for day in sorted(changed_days):
+            sync_record(conn, day, workouts=raw_workouts(conn, day))
     return {"success": True, "dates": statuses}

@@ -22,3 +22,6 @@ build/
 # Generated Shortcuts are build artifacts; personal token-bearing files must
 # be built outside this repository and must never be committed.
 artifacts/shortcuts/
+
+# Private device validation captures
+artifacts/validation/

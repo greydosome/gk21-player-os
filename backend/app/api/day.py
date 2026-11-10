@@ -39,5 +39,7 @@ def api_save_day(req: DayRecordRequest, background_tasks: BackgroundTasks):
     return {
         "success": True,
         "day_record_id": day_record_id,
+        "health_record_revision": req.health_record_revision,
+        "health_record_applied": req._health_merge,
         "ai_status": "RULE_DONE"
     }

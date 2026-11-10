@@ -1,6 +1,5 @@
 "use client";
 
-import AppleHealthCard from "./AppleHealthCard";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type WorkoutType = {
@@ -12,6 +11,7 @@ type WorkoutType = {
 };
 
 const WORKOUT_TYPES: WorkoutType[] = [
+  { label: "근력운동", category: "strength", kcalPerMin: 6, defaultMinutes: 15 },
   { label: "풋살", category: "cardio", kcalPerMin: 8, defaultMinutes: 90 },
   { label: "PT", category: "strength", kcalPerMin: 7, defaultMinutes: 60 },
   {
@@ -797,6 +797,7 @@ export default function Home() {
   // 날짜가 바뀌거나 새 코칭 요청이 시작되면 증가시켜, 이전 체인이 더 이상
   // fetch/setState를 하지 않고 스스로 멈추게 한다.
   const coachPollGenRef = useRef(0);
+  const healthRecordRevisionRef = useRef<string | null>(null);
 
   // 테마: 기본은 검은색(dark), localStorage에 저장해 다음 방문에도 유지한다.
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -1263,6 +1264,7 @@ export default function Home() {
         sleep_quality_score: sleepHours >= 7 ? 85 : 70,
         wake_condition: ready.level.label,
       },
+      health_record_revision: healthRecordRevisionRef.current,
     };
   }
 
@@ -1274,6 +1276,29 @@ export default function Home() {
     });
     const data = await res.json();
     if (!res.ok || !data.success) throw new Error(JSON.stringify(data));
+    if (loadedDateRef.current === recordDate) {
+      healthRecordRevisionRef.current = data.health_record_revision ?? healthRecordRevisionRef.current;
+      const applied = data.health_record_applied;
+      if (applied) {
+        if (applied.sleep_hours != null) setSleepHours(applied.sleep_hours);
+        const types = new Set<string>(applied.workout_types ?? []);
+        const items = applied.workout_items as {workout_type: string; minutes: number; detail: string | null; calorie_estimate: number | null}[];
+        setSelectedWorkouts((current) => {
+          const next = new Map(current);
+          types.forEach((type) => next.delete(type));
+          items.filter((item) => WORKOUT_TYPES.some((type) => type.label === item.workout_type)).forEach((item) => {
+            next.set(item.workout_type, {minutes: item.minutes, details: new Set(item.detail ? item.detail.split(", ") : [])});
+          });
+          return next;
+        });
+        setCustomCardioWorkouts((current) => [
+          ...current.filter((item) => !types.has(item.name)),
+          ...items.filter((item) => !WORKOUT_TYPES.some((type) => type.label === item.workout_type)).map((item) => ({
+            name: item.workout_type, minutes: item.minutes, calorieEstimate: item.calorie_estimate ?? 0,
+          })),
+        ]);
+      }
+    }
     return data;
   }
 
@@ -1429,6 +1454,7 @@ export default function Home() {
         }
         const d = data?.dashboard;
         const detail = data?.detail;
+        healthRecordRevisionRef.current = data.health_record_revision ?? null;
 
         const loaded = {
           morningMed: d?.morning_med_taken ?? false,
@@ -2722,7 +2748,7 @@ export default function Home() {
               </div>
             </Section>
 
-            <Section title="🍱 식단" color={DIET_COLOR} subtitle={`${totalDietKcal}kcal`} collapsible defaultOpen={false}>
+            <Section title="🍱 식단" color={DIET_COLOR} subtitle={`${totalDietKcal}kcal`}>
               <MealDiet
                 proteinCounts={proteinCounts}
                 carbCounts={carbCounts}
@@ -2887,7 +2913,6 @@ export default function Home() {
               {autoSaveStatus === "saved" && "✓ 자동 저장됨"}
             </p>
 
-            <AppleHealthCard key={recordDate} recordDate={recordDate} />
 
             <Section title="🤖 AI 코치" color={AI_COLOR}>
               <button
@@ -3342,10 +3367,12 @@ const MealDiet = memo(function MealDiet({
       <div className="grid grid-cols-3 gap-2">
         {macros.map((m) => (
           <div key={m.label} className="rounded-xl bg-zinc-800 px-2.5 py-2">
-            <p className="text-xs font-normal text-zinc-400">{m.label}</p>
-            <p className="text-xs font-semibold tabular-nums text-zinc-100">
-              {m.kcal}/{m.target}
-            </p>
+            <div className="flex items-baseline justify-between gap-1">
+              <span className="text-xs font-normal text-zinc-400">{m.label}</span>
+              <span className="text-xs font-semibold tabular-nums text-zinc-100">
+                {m.kcal}/{m.target}
+              </span>
+            </div>
             <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-zinc-700">
               <div
                 className={[DIET_COLOR.bg, "h-full rounded-full"].join(" ")}

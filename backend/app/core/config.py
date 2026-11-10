@@ -30,6 +30,8 @@ class Settings:
     AI_PROMPT_VERSION: str = os.getenv("AI_PROMPT_VERSION", "v1.0.0")
 
     APPLE_HEALTH_ENABLED: bool = os.getenv("APPLE_HEALTH_ENABLED", "false").lower() == "true"
+    APPLE_HEALTH_RECORD_SYNC_ENABLED: bool = os.getenv("APPLE_HEALTH_RECORD_SYNC_ENABLED", "false").lower() == "true"
+    APPLE_HEALTH_SLEEP_ENABLED: bool = os.getenv("APPLE_HEALTH_SLEEP_ENABLED", "true").lower() == "true"
     APPLE_HEALTH_COACHING_ENABLED: bool = os.getenv("APPLE_HEALTH_COACHING_ENABLED", "false").lower() == "true"
     APPLE_HEALTH_TOKEN_SHA256: str = os.getenv("APPLE_HEALTH_TOKEN_SHA256", "")
 

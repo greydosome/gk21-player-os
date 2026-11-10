@@ -23,6 +23,8 @@ async def upload_health(request: Request):
             raise HTTPException(413, "Payload too large")
     try:
         req = AppleHealthRequest.model_validate(json.loads(payload))
+        if not settings.APPLE_HEALTH_SLEEP_ENABLED and req.summary.sleep_hours is not None:
+            raise ValueError("Sleep integration disabled")
     except ValueError:
         raise HTTPException(422, "Invalid health summary") from None
     # Run synchronous SQL outside the event loop.
