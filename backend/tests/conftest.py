@@ -51,12 +51,15 @@ with engine.begin() as conn:
     conn.exec_driver_sql(migration.replace("BEGIN;", "").replace("COMMIT;", ""))
     workout_migration = (Path(__file__).parents[2] / "sql/migrations/2026-11-04_health_export_workouts.sql").read_text()
     conn.exec_driver_sql(workout_migration.replace("BEGIN;", "").replace("COMMIT;", ""))
+    report_migration = (Path(__file__).parents[2] / "sql/migrations/2026-11-10_workout_conversation_reports.sql").read_text()
+    conn.exec_driver_sql(report_migration.replace("BEGIN;", "").replace("COMMIT;", ""))
 
 
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch):
     monkeypatch.setattr(settings, "APPLE_HEALTH_ENABLED", False)
     monkeypatch.setattr(settings, "APPLE_HEALTH_COACHING_ENABLED", False)
+    monkeypatch.setattr(settings, "WORKOUT_CONVERSATION_ENABLED", False)
     with engine.begin() as conn:
         conn.execute(text("TRUNCATE day_record, apple_health_daily, apple_health_coaching_run, apple_health_workout, ai_analysis RESTART IDENTITY CASCADE"))
     yield

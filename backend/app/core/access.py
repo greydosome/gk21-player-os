@@ -7,12 +7,15 @@ from app.core.config import settings
 
 UPLOAD_PATH = "/api/integrations/apple-health/daily"
 EXPORT_PATH = "/api/integrations/apple-health/export"
+REPORT_PATH = "/api/integrations/workout-reports"
 
 
 async def access_guard(request, call_next):
-    if request.url.path.rstrip("/") not in {UPLOAD_PATH, EXPORT_PATH}:
+    path = request.url.path.rstrip("/")
+    if path not in {UPLOAD_PATH, EXPORT_PATH, REPORT_PATH}:
         return await call_next(request)
-    if not settings.APPLE_HEALTH_ENABLED:
+    enabled = settings.WORKOUT_CONVERSATION_ENABLED if path == REPORT_PATH else settings.APPLE_HEALTH_ENABLED
+    if not enabled:
         return JSONResponse({"detail": "Integration disabled"}, status_code=404)
     if request.url.scheme != "https":
         return JSONResponse({"detail": "HTTPS required"}, status_code=403)
@@ -22,7 +25,7 @@ async def access_guard(request, call_next):
              and hmac.compare_digest(hashlib.sha256(authorization[7:].encode()).hexdigest(), expected))
     if not valid:
         return JSONResponse({"detail": "Upload token required"}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
-    if request.headers.get("content-type", "").split(";")[0] != "application/json":
+    if request.method != 'GET' and request.headers.get("content-type", "").split(";")[0] != "application/json":
         return JSONResponse({"detail": "JSON required"}, status_code=415)
     origin = request.headers.get("origin")
     if origin and origin != f"https://{request.headers.get('host')}":

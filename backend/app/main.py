@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.api import apple_health
+from app.api import workout_reports
 from app.core.access import access_guard
 from app.api import ai_analysis
 from app.api import dashboard
@@ -31,3 +32,4 @@ app.include_router(period_coaching.router)
 
 app.middleware("http")(access_guard)
 app.include_router(apple_health.router)
+app.include_router(workout_reports.router)

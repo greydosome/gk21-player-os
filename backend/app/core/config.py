@@ -34,6 +34,7 @@ class Settings:
     APPLE_HEALTH_SLEEP_ENABLED: bool = os.getenv("APPLE_HEALTH_SLEEP_ENABLED", "true").lower() == "true"
     APPLE_HEALTH_COACHING_ENABLED: bool = os.getenv("APPLE_HEALTH_COACHING_ENABLED", "false").lower() == "true"
     APPLE_HEALTH_TOKEN_SHA256: str = os.getenv("APPLE_HEALTH_TOKEN_SHA256", "")
+    WORKOUT_CONVERSATION_ENABLED: bool = os.getenv("WORKOUT_CONVERSATION_ENABLED", "false").lower() == "true"
 
 settings = Settings()
 

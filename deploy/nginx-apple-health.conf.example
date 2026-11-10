@@ -12,6 +12,7 @@ server {
     }
     location = /api/integrations/apple-health/daily { return 403; }
     location = /api/integrations/apple-health/export { return 403; }
+    location = /api/integrations/workout-reports { return 403; }
     # Existing HTTP app/widget URLs remain usable without authentication.
     location /api/ {
         proxy_pass http://127.0.0.1:8000;
@@ -37,6 +38,15 @@ server {
         access_log off;
     }
     location = /api/integrations/apple-health/export {
+        limit_req zone=gk21_health burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Authorization $http_authorization;
+        access_log off;
+    }
+    location = /api/integrations/workout-reports {
         limit_req zone=gk21_health burst=5 nodelay;
         limit_req_status 429;
         proxy_pass http://127.0.0.1:8000;

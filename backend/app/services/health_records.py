@@ -13,7 +13,9 @@ NAMES = {'Soccer': '풋살', 'Cycling': '자전거', 'Indoor Cycling': '자전�
          'Walking': '걷기', 'Running': '달리기', 'Stair Climbing': '계단 오르기',
          'Traditional Strength Training': '근력운동', 'Functional Strength Training': '근력운동'}
 CALORIES = {'풋살': 8, '자전거': 7, '걷기': 4, '달리기': 8, '계단 오르기': 10,
-            '등운동': 6, '근력운동': 6}
+            '등운동': 6, '근력운동': 6, '하체운동': 7, '가슴운동': 6,
+            '팔운동': 5, '어깨운동': 5, '코어운동': 5, '하체모빌리티': 3,
+            '클럽벨': 5, '인클라인 워킹': 200 / 30, '스텝퍼': 6}
 
 
 def rounded(value):
@@ -26,6 +28,14 @@ def raw_workouts(conn, day):
     rows = conn.execute(text('''SELECT * FROM apple_health_workout
         WHERE ended_at >= :begin AND ended_at < :finish ORDER BY started_at, external_id'''),
         {'begin': begin, 'finish': begin + timedelta(days=1)}).mappings().all()
+    rows = [dict(row) for row in rows]
+    unique_rows = {}
+    for row in rows:
+        identity = (row['workout_type'], row['started_at'], row['ended_at'], row['duration_seconds'])
+        unique_rows.setdefault(identity, row)
+    rows = list(unique_rows.values())
+    from app.services.workout_reports import project_reports
+    rows, extras, _ = project_reports(conn, day, rows)
     result, seen = {}, set()
     for row in rows:
         identity = (row['workout_type'], row['started_at'], row['ended_at'], row['duration_seconds'])
@@ -40,9 +50,13 @@ def raw_workouts(conn, day):
         for detail in (row['record_detail'] or '').split(', '):
             if detail and detail not in value['details']:
                 value['details'].append(detail)
-    return {name: {'workout_type': name, 'minutes': max(1, rounded(value['minutes'])),
+    for extra in extras:
+        value = result.setdefault(extra['category'], {'minutes': 0.0, 'details': []})
+        value['minutes'] += extra['minutes'] or 0
+        value['details'] = list(dict.fromkeys(value['details'] + extra['details']))
+    return {name: {'workout_type': name, 'minutes': max(1 if value['minutes'] > 0 else 0, rounded(value['minutes'])),
                    'detail': ', '.join(value['details']) or None,
-                   'calorie_estimate': max(1, rounded(value['minutes'])) * CALORIES.get(name, 6)}
+                   'calorie_estimate': rounded(max(1 if value['minutes'] > 0 else 0, rounded(value['minutes'])) * CALORIES.get(name, 6))}
             for name, value in result.items()}
 
 
