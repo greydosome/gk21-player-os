@@ -1,5 +1,7 @@
 "use client";
 
+import ConsumedMeals from "./ConsumedMeals";
+
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type WorkoutType = {
@@ -2748,7 +2750,8 @@ export default function Home() {
               </div>
             </Section>
 
-            <Section title="🍱 식단" color={DIET_COLOR} subtitle={`${totalDietKcal}kcal`}>
+            <Section title="🍱 식단" color={DIET_COLOR} subtitle={`직접 입력 ${totalDietKcal}kcal`}>
+              <ConsumedMeals recordDate={recordDate} />
               <MealDiet
                 proteinCounts={proteinCounts}
                 carbCounts={carbCounts}

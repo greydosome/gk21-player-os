@@ -7,14 +7,17 @@ from app.core.config import settings
 
 UPLOAD_PATH = "/api/integrations/apple-health/daily"
 EXPORT_PATH = "/api/integrations/apple-health/export"
+MEAL_PATH = "/api/integrations/meal-reports"
 REPORT_PATH = "/api/integrations/workout-reports"
 
 
 async def access_guard(request, call_next):
     path = request.url.path.rstrip("/")
-    if path not in {UPLOAD_PATH, EXPORT_PATH, REPORT_PATH}:
+    if path not in {UPLOAD_PATH, EXPORT_PATH, REPORT_PATH, MEAL_PATH}:
         return await call_next(request)
     enabled = settings.WORKOUT_CONVERSATION_ENABLED if path == REPORT_PATH else settings.APPLE_HEALTH_ENABLED
+    if path == MEAL_PATH:
+        enabled = settings.MEAL_CONVERSATION_ENABLED
     if not enabled:
         return JSONResponse({"detail": "Integration disabled"}, status_code=404)
     if request.url.scheme != "https":

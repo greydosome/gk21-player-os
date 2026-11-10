@@ -1,4 +1,4 @@
-"""Submit a structured, explicitly completed workout report to the private GK21 API.
+"""Submit a structured, explicitly confirmed workout or meal report to the private GK21 API.
 
 Reading ChatGPT messages and interpreting completion is performed by the authorized
 local heartbeat, not by scraping sessions or embedding ChatGPT credentials here.
@@ -14,8 +14,15 @@ import urllib.request
 from uuid import uuid4
 
 
+def eligible(payload, resource):
+    if resource == 'meal':
+        return payload.get('kind') in ('consumed','correction','delete') and payload.get('confirmed_by_user') is True
+    return payload.get('kind') == 'completed' and bool(payload.get('workouts'))
+
+
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--resource', choices=['workout','meal'], default='workout')
     parser.add_argument('--token-file', type=Path, required=True)
     parser.add_argument('--base-url', default='https://217.142.230.185')
     parser.add_argument('--ssh-host', help='Use the existing authorized SSH connection to the GK21 server')
@@ -31,13 +38,15 @@ def main():
         remote_file = '/tmp/gk21-workout-report-' + uuid4().hex + '.json'
         command = ['sudo', 'python3', '/home/rocky/gk21/scripts/sync_workout_conversation.py',
                    '--token-file', str(args.token_file), '--base-url', args.base_url, args.command]
+        if args.resource != 'workout':
+            command[3:3] = ['--resource', args.resource]
         ssh_options = ['-o', 'ControlMaster=no', '-o', 'ControlPath=none', '-o', 'BatchMode=yes',
                        '-o', 'ConnectTimeout=8', '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=1']
         ssh = ['ssh', *ssh_options, args.ssh_host]
         if args.command == 'submit':
             payload = json.loads(args.file.read_text())
-            if payload.get('kind') != 'completed' or not payload.get('workouts'):
-                print(json.dumps({'success': True, 'status': 'skipped_no_completed_workout'}))
+            if not eligible(payload, args.resource):
+                print(json.dumps({'success': True, 'status': 'skipped_not_confirmed_consumption' if args.resource == 'meal' else 'skipped_no_completed_workout'}))
                 return
             if args.file.stat().st_size > 32768:
                 parser.error('Report exceeds API limit')
@@ -57,12 +66,12 @@ def main():
     token = args.token_file.read_text().strip()
     if len(token) < 24:
         parser.error('Upload token not configured')
-    url = args.base_url.rstrip('/') + '/api/integrations/workout-reports'
+    url = args.base_url.rstrip('/') + '/api/integrations/' + args.resource + '-reports'
     body = None
     if args.command == 'submit':
         payload = json.loads(args.file.read_text())
-        if payload.get('kind') != 'completed' or not payload.get('workouts'):
-            print(json.dumps({'success': True, 'status': 'skipped_no_completed_workout'}))
+        if not eligible(payload, args.resource):
+            print(json.dumps({'success': True, 'status': 'skipped_not_confirmed_consumption' if args.resource == 'meal' else 'skipped_no_completed_workout'}))
             return
         body = json.dumps(payload, ensure_ascii=False).encode()
         if len(body) > 32768:

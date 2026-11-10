@@ -36,5 +36,7 @@ class Settings:
     APPLE_HEALTH_TOKEN_SHA256: str = os.getenv("APPLE_HEALTH_TOKEN_SHA256", "")
     WORKOUT_CONVERSATION_ENABLED: bool = os.getenv("WORKOUT_CONVERSATION_ENABLED", "false").lower() == "true"
 
+    MEAL_CONVERSATION_ENABLED: bool = os.getenv("MEAL_CONVERSATION_ENABLED", "false").lower() == "true"
+
 settings = Settings()
 
