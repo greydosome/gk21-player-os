@@ -81,18 +81,21 @@ def create_server(provider):
         pending = provider.pending(request_id)
         if not pending:
             return HTMLResponse('연결 요청이 만료되었습니다. ChatGPT에서 다시 연결해주세요.', status_code=410)
-        redirect = provider.finish(request_id) if pending['approved'] else None
+        redirect = provider.finish(request_id) if pending['approved'] and request.query_params.get('continue') == '1' else None
         if redirect:
             return RedirectResponse(redirect, status_code=303)
         code = html.escape(request_id)
         client = html.escape(pending['client_id'])
         callback = html.escape(pending['params']['redirect_uri'])
+        refresh = '' if pending['approved'] else '<meta http-equiv="refresh" content="4">'
+        action = (f'<p>서버 승인이 완료되었습니다.</p><p><a href="/gk21-connect?request={code}&amp;continue=1">ChatGPT로 돌아가기</a></p>'
+                  if pending['approved'] else '<p>소유자의 서버 승인을 기다리고 있습니다. 이 페이지에서는 권한을 부여할 수 없습니다.</p>')
         return HTMLResponse(f'''<!doctype html><html lang="ko"><meta charset="utf-8">
-        <meta name="viewport" content="width=device-width"><meta http-equiv="refresh" content="4">
+        <meta name="viewport" content="width=device-width">{refresh}
         <title>GK21 연결 승인 대기</title><main style="max-width:640px;margin:60px auto;font:18px sans-serif;padding:20px">
         <h1>GK21 운동 기록 연결</h1><p>운동 날짜의 워치 기록 조회와 완료 운동 저장 권한을 요청했습니다.</p>
         <p>수면·식단·심박·이동 경로를 제공하지 않습니다.</p>
-        <p>소유자의 서버 승인 후 자동으로 ChatGPT로 돌아갑니다. 이 페이지에서는 권한을 부여할 수 없습니다.</p>
+        {action}
         <p>연결 요청 번호</p><code>{code}</code><p>클라이언트: {client}</p><p>돌아갈 주소: {callback}</p></main></html>''')
 
     app = mcp.streamable_http_app()

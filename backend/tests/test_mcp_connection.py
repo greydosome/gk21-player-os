@@ -129,7 +129,14 @@ def test_http_oauth_pkce_discovery_and_authenticated_mcp(oauth, monkeypatch):
         # No HTTP approve endpoint; owner CLI controls the actual permission grant.
         assert http.post('/gk21-connect', json={'request':request_id}).status_code==405
         oauth.approve(request_id)
-        redirect = http.get(pending.headers['location'], follow_redirects=False)
+        # Refresh/prefetch must not consume the approved request or issue a code.
+        for _ in range(2):
+            approved_page = http.get(pending.headers['location'], follow_redirects=False)
+            assert approved_page.status_code == 200
+            assert 'ChatGPT로 돌아가기' in approved_page.text
+            assert 'http-equiv="refresh"' not in approved_page.text
+            assert oauth.pending(request_id)['approved']
+        redirect = http.get(pending.headers['location']+'&continue=1', follow_redirects=False)
         code = parse_qs(urlsplit(redirect.headers['location']).query)['code'][0]
         body = dict(grant_type='authorization_code', client_id=client_id,
             code=code, redirect_uri=CALLBACK, code_verifier='incorrect', resource=BASE+'/mcp')
