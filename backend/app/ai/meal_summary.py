@@ -24,7 +24,7 @@ def _custom_text(parts: list[str]):
     name, quantity, unit, kcal = parts[1].strip(), parts[2], parts[3], parts[4]
     meal = parts[6] if len(parts) >= 7 and parts[6] in MEALS else None
     amount = f"{quantity}{'g' if unit != 'count' else '개'} " if quantity else ""
-    return f"{name} {amount}{kcal}kcal", meal
+    return f"{name} {amount}" + (f"{kcal}kcal" if kcal else "열량 미확인"), meal
 
 
 def summarize_meals(*item_lists) -> dict[str, list[str]]:

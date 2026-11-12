@@ -26,6 +26,8 @@ def api_get_dashboard(record_date: date | None = Query(default=None)):
         goal = get_active_goal(conn=conn)
         apple_health = read_health(conn, target)
         health_record_revision = revision(conn, target)
+        from app.services.meal_native import revision as meal_revision
+        meal_record_revision = meal_revision(conn, target)
 
     missions = build_today_missions(dashboard)
 
@@ -43,4 +45,5 @@ def api_get_dashboard(record_date: date | None = Query(default=None)):
         "goal": goal,
         "apple_health": apple_health,
         "health_record_revision": health_record_revision,
+        "meal_record_revision": meal_record_revision,
     }

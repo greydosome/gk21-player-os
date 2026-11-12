@@ -136,6 +136,8 @@ def save_day_record(conn, req):
 def save_day(req):
     with engine.begin() as conn:
         conn.execute(text("SELECT pg_advisory_xact_lock(2101, :day)"), {"day": req.record_date.toordinal()})
+        from app.services.meal_native import protect_form
+        protect_form(conn, req)
         from app.services.health_records import protect_stale_form
         protect_stale_form(conn, req)
         day_record_id = save_day_record(conn, req)

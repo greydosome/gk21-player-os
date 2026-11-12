@@ -17,7 +17,7 @@ def save_report(conn, report):
         if old != payload:
             raise ValueError('Message content conflict')
         return {'success':True, 'status':'unchanged'}
-    current = conn.execute(text('SELECT revision,deleted FROM meal_conversation_entry WHERE conversation_id=:c AND meal_key=:k'),params).mappings().first()
+    current = conn.execute(text('SELECT revision,deleted,record_date FROM meal_conversation_entry WHERE conversation_id=:c AND meal_key=:k'),params).mappings().first()
     revision = current['revision'] if current else 0
     if revision != report.expected_revision:
         raise ValueError('Revision conflict; read current state before correcting')
@@ -29,7 +29,11 @@ def save_report(conn, report):
         (conversation_id,meal_key,record_date,revision,deleted,payload) VALUES (:c,:k,:day,:revision,:deleted,CAST(:p AS jsonb))
         ON CONFLICT(conversation_id,meal_key) DO UPDATE SET record_date=excluded.record_date,
         revision=excluded.revision,deleted=excluded.deleted,payload=excluded.payload,updated_at=now()"""),params)
-    return {'success':True,'status':'processed','revision':revision+1}
+    from app.services.meal_native import sync
+    if current and current['record_date'] != report.record_date:
+        sync(conn, current['record_date'])
+    conflicts = sync(conn, report.record_date)
+    return {'success':True,'status':'processed','revision':revision+1,'native_conflicts':conflicts}
 
 def read_meals(conn, day, include_deleted=False):
     if not settings.MEAL_CONVERSATION_ENABLED:

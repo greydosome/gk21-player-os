@@ -24,13 +24,13 @@ export default function ConsumedMeals({recordDate}:{recordDate:string}) {
   },[recordDate]);
   if(failed)return <p role="status">실제 섭취 기록을 불러오지 못했습니다.</p>;
   if(!state?.enabled || state.day!==recordDate)return null;
-  return <section className="rounded-xl border border-zinc-700 p-4 my-3">
-    <h3 className="font-semibold">대화에서 확인한 실제 섭취</h3>
-    <p className="text-xs text-zinc-400">추천 식단과 별도 기록입니다. 기존 직접 입력 합계에는 포함하지 않습니다.</p>
+  return <details className="rounded-xl border border-zinc-700 p-3 my-3">
+    <summary className="text-sm text-zinc-400 cursor-pointer">자동 기록의 영양정보 출처</summary>
+    <p className="text-xs text-zinc-400">섭취 음식은 아래 기존 식단 항목에 반영됩니다. 열량 미확인 항목은 합계에서 제외되며, 직접 수정한 항목은 보존합니다.</p>
     {!state.entries.length && <p>확인된 섭취 기록이 없습니다.</p>}
     {state.entries.map(e=><div key={`${e.conversation_id}:${e.meal_key}`} className="mt-3">
       <p>{({breakfast:"아침",lunch:"점심",dinner:"저녁",snack:"간식",unknown:"끼니 미확인"} as Record<string,string>)[e.payload.meal_type]}</p>
       {e.payload.foods.map((f,i)=><p key={i}>{f.name} · {f.quantity??"양 미확인"} · {f.kcal==null?"열량 미확인":`${f.kcal} kcal${f.estimated?" (추정)":""}`}<span className="block text-xs text-zinc-400">단백질 {f.protein_g??"미확인"}{f.protein_g!=null?"g":""} · 탄수화물 {f.carbohydrate_g??"미확인"}{f.carbohydrate_g!=null?"g":""} · 지방 {f.fat_g??"미확인"}{f.fat_g!=null?"g":""} · 출처: {f.nutrition_source??"미확인"}</span></p>)}
     </div>)}
-  </section>;
+  </details>;
 }

@@ -264,7 +264,7 @@ type CustomFoodEntry = {
   name: string;
   unit: "g" | "count";
   quantity: number | null;
-  totalCalorie: number;
+  totalCalorie: number | null;
   kcalPer100g: number | null;
   category: FoodCategory;
   meal?: Meal | null;
@@ -373,7 +373,7 @@ function encodeCustomFoodItem(entry: CustomFoodEntry) {
     entry.name.replaceAll("|", ""),
     entry.quantity ?? "",
     entry.unit,
-    entry.totalCalorie,
+    entry.totalCalorie ?? "",
     entry.category,
   ];
   // 끼니는 7번째 필드로만 붙인다. 끼니 없는 항목은 예전과 똑같은 6-part 문자열을 유지한다.
@@ -387,7 +387,7 @@ function decodeCustomFoodItem(raw: string): CustomFoodEntry | null {
   const [, name, quantityRaw, unitRaw, totalCalorieRaw, categoryRaw, mealRaw] = parts;
   const unit: "g" | "count" = unitRaw === "count" ? "count" : "g";
   const quantity = quantityRaw === "" ? null : Number(quantityRaw);
-  const totalCalorie = Number(totalCalorieRaw);
+  const totalCalorie = totalCalorieRaw === "" ? null : Number(totalCalorieRaw);
   // 5-part(레거시) 항목은 카테고리가 없었으므로 일반식으로 취급한다.
   const category: FoodCategory = FOOD_CATEGORY_OPTIONS.some((o) => o.value === categoryRaw)
     ? (categoryRaw as FoodCategory)
@@ -643,8 +643,8 @@ function buildFoodItems(foods: FoodItem[], counts: Map<string, number>): string[
 function parseFoodItems(items: string[]) {
   const map = new Map<string, number>();
   items.forEach((item) => {
-    const match = item.match(/^(.*) (\d+)(?:g|개)(?:@(아침|점심|저녁))?$/);
-    if (match) map.set(foodKey(match[1], (match[3] as Meal | undefined) ?? null), parseInt(match[2], 10));
+    const match = item.match(/^(.*) (\d+(?:\.\d+)?)(?:g|개)(?:@(아침|점심|저녁))?$/);
+    if (match) map.set(foodKey(match[1], (match[3] as Meal | undefined) ?? null), parseFloat(match[2]));
   });
   return map;
 }
@@ -654,7 +654,7 @@ function parseGeneralFoodItems(items: string[]): CustomFoodEntry[] {
 }
 
 function sumCustomKcal(items: CustomFoodEntry[], category: FoodCategory) {
-  return items.filter((item) => item.category === category).reduce((sum, item) => sum + item.totalCalorie, 0);
+  return items.filter((item) => item.category === category).reduce((sum, item) => sum + (item.totalCalorie ?? 0), 0);
 }
 
 // 이름이 같은 항목이 여러 날짜에 걸쳐 반복될 수 있으므로, 가장 최근 값(먼저 나오는 항목)만 남긴다.
@@ -799,6 +799,8 @@ export default function Home() {
   // 날짜가 바뀌거나 새 코칭 요청이 시작되면 증가시켜, 이전 체인이 더 이상
   // fetch/setState를 하지 않고 스스로 멈추게 한다.
   const coachPollGenRef = useRef(0);
+  const [mealSyncConflict, setMealSyncConflict] = useState(false);
+  const mealRecordRevisionRef = useRef<string | null>(null);
   const healthRecordRevisionRef = useRef<string | null>(null);
 
   // 테마: 기본은 검은색(dark), localStorage에 저장해 다음 방문에도 유지한다.
@@ -1267,6 +1269,7 @@ export default function Home() {
         wake_condition: ready.level.label,
       },
       health_record_revision: healthRecordRevisionRef.current,
+      meal_record_revision: mealRecordRevisionRef.current,
     };
   }
 
@@ -1277,6 +1280,7 @@ export default function Home() {
       body: JSON.stringify(buildPayload(triggerAiCoaching)),
     });
     const data = await res.json();
+    if (res.status === 409) setMealSyncConflict(true);
     if (!res.ok || !data.success) throw new Error(JSON.stringify(data));
     if (loadedDateRef.current === recordDate) {
       healthRecordRevisionRef.current = data.health_record_revision ?? healthRecordRevisionRef.current;
@@ -1457,6 +1461,7 @@ export default function Home() {
         const d = data?.dashboard;
         const detail = data?.detail;
         healthRecordRevisionRef.current = data.health_record_revision ?? null;
+        mealRecordRevisionRef.current = data.meal_record_revision ?? null;
 
         const loaded = {
           morningMed: d?.morning_med_taken ?? false,
@@ -1832,7 +1837,8 @@ export default function Home() {
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(JSON.stringify(data));
+      if (res.status === 409) setMealSyncConflict(true);
+    if (!res.ok || !data.success) throw new Error(JSON.stringify(data));
       setPeriodCoachResult(data.coaching);
       setPeriodCoachStatus("ready");
     } catch {
@@ -2750,7 +2756,9 @@ export default function Home() {
               </div>
             </Section>
 
-            <Section title="🍱 식단" color={DIET_COLOR} subtitle={`직접 입력 ${totalDietKcal}kcal`}>
+            <Section title="🍱 식단" color={DIET_COLOR} subtitle={`섭취 ${totalDietKcal}kcal`}>
+              {mealSyncConflict && <p role="alert" className="text-amber-400">새 식단이 반영되어 저장을 잠시 멈췄습니다. <button onClick={() => window.location.reload()} className="underline">새로고침</button> 후 다시 입력해주세요.</p>}
+              {customMealItems.some((item) => item.totalCalorie === null) && <p className="text-xs text-zinc-400">열량 미확인 음식은 칼로리 합계에서 제외됩니다.</p>}
               <ConsumedMeals recordDate={recordDate} />
               <MealDiet
                 proteinCounts={proteinCounts}
@@ -3098,7 +3106,7 @@ function foodSubtitle(food: FoodItem) {
 
 function customSubtitle(item: CustomFoodEntry) {
   const amount = item.quantity !== null ? `${item.quantity}${item.unit === "g" ? "g" : "개"} · ` : "";
-  return `${amount}${item.totalCalorie}kcal`;
+  return `${amount}${item.totalCalorie === null ? "열량 미확인" : `${item.totalCalorie}kcal`}`;
 }
 
 const MealDiet = memo(function MealDiet({
@@ -3181,7 +3189,7 @@ const MealDiet = memo(function MealDiet({
     (slot: MealSlot) =>
       (rowsBySlot.get(slot) ?? []).reduce((sum, row) => {
         if (row.kind === "food") return sum + foodKcal(row.food, row.amount);
-        if (row.kind === "custom") return sum + row.item.totalCalorie;
+        if (row.kind === "custom") return sum + (row.item.totalCalorie ?? 0);
         return sum;
       }, 0),
     [rowsBySlot]
@@ -3663,7 +3671,7 @@ function CustomFoodFields({
 function defaultQuantityInput(entry?: CustomFoodEntry) {
   if (!entry) return "";
   if (entry.quantity != null) return String(entry.quantity);
-  return entry.unit === "g" ? "100" : "1";
+  return "";
 }
 
 function useCustomFoodFormState(initial?: CustomFoodEntry, initialName?: string, initialCategory?: FoodCategory) {
@@ -3672,12 +3680,12 @@ function useCustomFoodFormState(initial?: CustomFoodEntry, initialName?: string,
   const [meal, setMeal] = useState<Meal | null>(initial?.meal ?? null);
   const [unit, setUnit] = useState<"g" | "count">(initial?.unit ?? "g");
   const [quantityInput, setQuantityInput] = useState(defaultQuantityInput(initial));
-  const [totalInput, setTotalInput] = useState(initial ? String(initial.totalCalorie) : "");
+  const [totalInput, setTotalInput] = useState(initial ? String(initial.totalCalorie ?? "") : "");
 
   const quantity = quantityInput.trim() === "" ? null : Number(quantityInput);
   const totalCalorie = totalInput.trim() === "" ? null : Number(totalInput);
-  const quantityValid = quantity !== null && !Number.isNaN(quantity) && quantity > 0;
-  const totalValid = totalCalorie !== null && !Number.isNaN(totalCalorie) && totalCalorie >= 0;
+  const quantityValid = quantity === null || (!Number.isNaN(quantity) && quantity > 0);
+  const totalValid = totalCalorie === null || (!Number.isNaN(totalCalorie) && totalCalorie >= 0);
   // 먹은 양과 총 칼로리에서 100g당/1개당 칼로리를 역산한다.
   const rate = quantityValid && totalValid ? rateFromTotal(unit, quantity, totalCalorie) : null;
   const kcalPer100g = unit === "g" ? rate : null;
@@ -3689,7 +3697,7 @@ function useCustomFoodFormState(initial?: CustomFoodEntry, initialName?: string,
     setMeal(entry?.meal ?? null);
     setUnit(entry?.unit ?? "g");
     setQuantityInput(defaultQuantityInput(entry));
-    setTotalInput(entry ? String(entry.totalCalorie) : "");
+    setTotalInput(entry ? String(entry.totalCalorie ?? "") : "");
   }
 
   return {
@@ -3712,7 +3720,7 @@ function CustomFoodForm({
   const f = useCustomFoodFormState(undefined, initialName, initialCategory);
 
   function handleAdd() {
-    if (!f.canSubmit || f.totalCalorie === null) return;
+    if (!f.canSubmit) return;
     onAdd({ name: f.name.trim(), unit: f.unit, quantity: f.quantity, totalCalorie: f.totalCalorie, kcalPer100g: f.kcalPer100g, category: f.category, meal: null });
     f.reset();
   }
@@ -3772,7 +3780,7 @@ function CustomFoodRow({
   }
 
   function handleSave() {
-    if (!f.canSubmit || f.totalCalorie === null) return;
+    if (!f.canSubmit) return;
     onSave({ name: f.name.trim(), unit: f.unit, quantity: f.quantity, totalCalorie: f.totalCalorie, kcalPer100g: f.kcalPer100g, category: f.category, meal: f.meal });
     setEditing(false);
   }

@@ -15,7 +15,9 @@ def setup_meals(monkeypatch):
     monkeypatch.setattr(settings,'MEAL_CONVERSATION_ENABLED',True)
     with engine.begin() as c:
         c.exec_driver_sql((Path(__file__).parents[2]/'sql/migrations/2026-11-10_meal_conversation.sql').read_text().replace('BEGIN;','').replace('COMMIT;',''))
-        c.exec_driver_sql('TRUNCATE meal_conversation_entry,meal_conversation_event')
+        c.exec_driver_sql((Path(__file__).parents[2]/'sql/migrations/2026-11-12_meal_native.sql').read_text().replace('BEGIN;','').replace('COMMIT;',''))
+        c.exec_driver_sql('CREATE TABLE IF NOT EXISTS body_record(day_record_id bigint PRIMARY KEY, protein_items jsonb,carb_items jsonb,fat_items jsonb,general_food_items jsonb,protein_kcal integer,carb_kcal integer,fat_kcal integer,updated_at timestamptz DEFAULT now())')
+        c.exec_driver_sql('TRUNCATE meal_conversation_entry,meal_conversation_event,meal_native_sync,body_record')
 
 def report(**kw):
     now=datetime.now(ZoneInfo('Asia/Seoul'))
@@ -92,3 +94,73 @@ def test_rejected_http_transport_limits_and_provenance(monkeypatch):
         with pytest.raises(ValueError):report(foods=[food])
     with engine.connect() as c:
         assert c.execute(text('SELECT count(*) FROM meal_conversation_event')).scalar()==0
+
+
+def test_native_catalog_unknown_and_correction():
+    r=report(foods=[{'name':'달걀','quantity':'2개'}, {'name':'샤인머스캣','quantity':'200g'}],meal_type='breakfast')
+    with engine.begin() as c:
+        save_report(c,r)
+        row=c.execute(text('SELECT * FROM body_record')).mappings().one()
+        assert row['protein_items']==['달걀 2개@아침']
+        assert row['protein_kcal']==200
+        assert row['general_food_items']==['CUSTOM|샤인머스캣|200|g||general|아침']
+        save_report(c,report(message_id='fix',kind='correction',expected_revision=1,meal_type='breakfast',foods=[{'name':'달걀','quantity':'3개'}]))
+        row=c.execute(text('SELECT * FROM body_record')).mappings().one()
+        assert row['protein_items']==['달걀 3개@아침'] and row['protein_kcal']==300
+        assert row['general_food_items']==[]
+        save_report(c,report(message_id='del',kind='delete',expected_revision=2,foods=[]))
+        row=c.execute(text('SELECT * FROM body_record')).mappings().one()
+        assert row['protein_items']==[] and row['protein_kcal']==0
+
+
+def test_native_preserves_manual_and_blocks_stale_form():
+    from app.services.meal_native import sync,protect_form,revision
+    from app.schemas.day import DayRecordRequest
+    from fastapi import HTTPException
+    r=report(foods=[{'name':'달걀','quantity':'2개'}])
+    with engine.begin() as c:
+        save_report(c,r)
+        req=DayRecordRequest(record_date=r.record_date)
+        with pytest.raises(HTTPException):protect_form(c,req)
+        req.meal_record_revision=revision(c,r.record_date)
+        protect_form(c,req)
+        c.execute(text("UPDATE body_record SET protein_items='[\"달걀 4개\"]'::jsonb,protein_kcal=400"))
+        sync(c,r.record_date)
+        row=c.execute(text('SELECT * FROM body_record')).mappings().one()
+        assert row['protein_items']==['달걀 4개'] and row['protein_kcal']==400
+        save_report(c,report(message_id='del',kind='delete',expected_revision=1,foods=[]))
+        assert c.execute(text('SELECT protein_kcal FROM body_record')).scalar()==400
+
+
+def test_native_toast_retry_and_no_manual_collision():
+    from app.services.meal_native import sync
+    food={'name':'햄치즈 토스트','quantity':'1개','kcal':530,'nutrition_basis':'estimate','nutrition_source':'synthetic test source','estimated':True}
+    r=report(foods=[food],meal_type='lunch')
+    with engine.begin() as c:
+        save_report(c,r);sync(c,r.record_date)
+        assert c.execute(text('SELECT general_food_items FROM body_record')).scalar()==['CUSTOM|햄치즈 토스트|1|count|530.0|general|점심']
+        assert save_report(c,r)['status']=='unchanged'
+        c.execute(text("UPDATE body_record SET general_food_items='[]'::jsonb"))
+        sync(c,r.record_date);sync(c,r.record_date)
+        assert c.execute(text('SELECT general_food_items FROM body_record')).scalar()==[]
+
+
+def test_native_quantity_and_existing_catalog():
+    from app.services.meal_native import project
+    result=project([{'payload':{'meal_type':'lunch','foods':[
+        {'name':'꿀 스틱','quantity':'8g 2개 (총 16g)'},
+        {'name':'닭가슴살 스팸','quantity':'2/3캔'},
+        {'name':'사과','quantity':'반 개'}]}}])
+    assert result['protein_items']==['닭가슴살스팸 133.333g@점심']
+    assert 'CUSTOM|꿀 스틱|16|g||general|점심' in result['general_food_items']
+    assert 'CUSTOM|사과|0.5|count||general|점심' in result['general_food_items']
+
+
+def test_native_existing_food_alias_not_added_twice():
+    r=report(foods=[{'name':'더덕양념무침','quantity':'조금'}],meal_type='dinner')
+    with engine.begin() as c:
+        day_id=c.execute(text('INSERT INTO day_record(record_date) VALUES (:d) RETURNING day_record_id'),{'d':r.record_date}).scalar()
+        c.execute(text('INSERT INTO body_record(day_record_id,general_food_items) VALUES (:id,CAST(:items AS jsonb))'),{'id':day_id,'items':'["CUSTOM|더덕무침|100|g|160|general|저녁"]'})
+        result=save_report(c,r)
+        assert result['native_conflicts']
+        assert len(c.execute(text('SELECT general_food_items FROM body_record')).scalar())==1
