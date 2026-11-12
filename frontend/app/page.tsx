@@ -2726,7 +2726,7 @@ export default function Home() {
             <Section
               title="🔥 칼로리"
               color={remainingKcal < 0 ? OVER_BUDGET_COLOR : CALORIE_COLOR}
-              subtitle={`${remainingKcal >= 0 ? remainingKcal : `-${Math.abs(remainingKcal)}`}kcal 남음`}
+              subtitle={`총 ${totalDietKcal}kcal / 초과 ${Math.max(0, -remainingKcal)}kcal`}
             >
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-2xl bg-zinc-800 p-3">
@@ -2734,14 +2734,14 @@ export default function Home() {
                   <p className="mt-1 text-lg font-bold tabular-nums text-zinc-100">{totalDietKcal}kcal</p>
                 </div>
                 <div className="rounded-2xl bg-zinc-800 p-3">
-                  <p className="text-xs font-normal text-zinc-500">잔여 칼로리 / 목표 {DAILY_CALORIE_BUDGET}kcal</p>
+                  <p className="text-xs font-normal text-zinc-500">{remainingKcal < 0 ? "초과 칼로리" : "남은 칼로리"} / 기준 {DAILY_CALORIE_BUDGET}kcal</p>
                   <p
                     className={[
                       "mt-1 text-lg font-bold tabular-nums",
                       remainingKcal < 0 ? OVER_BUDGET_COLOR.text : "text-zinc-100",
                     ].join(" ")}
                   >
-                    {remainingKcal}kcal
+                    {Math.abs(remainingKcal)}kcal
                   </p>
                 </div>
               </div>

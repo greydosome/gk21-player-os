@@ -164,3 +164,23 @@ def test_native_existing_food_alias_not_added_twice():
         result=save_report(c,r)
         assert result['native_conflicts']
         assert len(c.execute(text('SELECT general_food_items FROM body_record')).scalar())==1
+
+def test_nutrition_enrichment_is_additive_and_idempotent():
+    from app.services.meal_nutrition import enrich
+    with engine.begin() as c:
+        r=report(foods=[{'name':'합계 검증 음식','kcal':2000,'nutrition_source':'synthetic fixture','nutrition_basis':'user','estimated':False},{'name':'추가 음식','quantity':'100g'}])
+        save_report(c,r)
+        update=[dict(index=1,name='추가 음식',kcal=300,nutrition_source='synthetic 300kcal/100g fixture',nutrition_basis='estimate',estimated=True)]
+        result=enrich(c,'test','lunch-1',1,update)
+        assert result['revision']==2
+        items=c.execute(text('SELECT general_food_items FROM body_record')).scalar_one()
+        total=sum(float(x.split('|')[4]) for x in items)
+        assert total==2300
+        assert max(0,total-1200)==1100
+        assert enrich(c,'test','lunch-1',1,update)['status']=='unchanged'
+        assert len(c.execute(text('SELECT general_food_items FROM body_record')).scalar_one())==2
+        entry=read_meals(c,r.record_date)['entries'][0]
+        assert entry['payload']['foods'][1]['quantity']=='100g'
+        assert entry['payload']['reported_at']==r.model_dump(mode='json')['reported_at']
+        with pytest.raises(ValueError):enrich(c,'test','lunch-1',1,[{**update[0],'kcal':400}])
+        with pytest.raises(ValueError):enrich(c,'test','lunch-1',2,[{**update[0],'quantity':'200g'}])
